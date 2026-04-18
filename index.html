@@ -585,13 +585,23 @@ window.onload = function() {
 
 /* ========== 表示制御 ========== */
 function loadAndShow(type) {
-  document.getElementById('statusMsg').style.display='none';
   hideAll();
   if(!type){showMenu();return;}
   var formEl=document.getElementById('form-'+type);
   if(!formEl){showMenu();return;}
-  formEl.classList.add('active');
-  if(userId&&['newOrder','change','stop','resume'].indexOf(type)!==-1) loadCustomerInfo(type);
+
+  // userId がある場合は顧客情報を取得してからフォームを表示
+  if(userId && ['newOrder','change','stop','resume'].indexOf(type)!==-1){
+    document.getElementById('statusMsg').textContent='読み込み中...';
+    document.getElementById('statusMsg').style.display='block';
+    loadCustomerInfoThen(type, function(){
+      document.getElementById('statusMsg').style.display='none';
+      formEl.classList.add('active');
+    });
+  } else {
+    document.getElementById('statusMsg').style.display='none';
+    formEl.classList.add('active');
+  }
 }
 function showMenu(){hideAll();document.getElementById('menuWrap').style.display='block';}
 function hideAll(){
@@ -602,8 +612,8 @@ function hideAll(){
 }
 
 /* ========== 顧客情報 ========== */
-function loadCustomerInfo(type) {
-  if(!userId) return;
+function loadCustomerInfoThen(type, callback) {
+  if(!userId){if(callback) callback(); return;}
   fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
     .then(function(r){return r.json();})
     .then(function(data){
@@ -628,8 +638,12 @@ function loadCustomerInfo(type) {
         }
         window._customerData={name:data.name||'',address:data.address||'',phone:data.phone||''};
       }
-    }).catch(function(){});
+      if(callback) callback();
+    }).catch(function(){if(callback) callback();});
 }
+
+// 後方互換
+function loadCustomerInfo(type){ loadCustomerInfoThen(type, null); }
 
 /* ========== お弁当グリッド ========== */
 function buildBentoGrids(){
