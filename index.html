@@ -196,6 +196,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <div class="date-tags" id="date-tags"></div>
       <div class="warn-msg hidden" id="date-warn">週3日からのご注文となります</div>
     </div>
+    <div id="start-date-wrap">
     <div class="sec-label">配達開始日</div>
     <div class="calendar-wrap">
       <div class="cal-header">
@@ -211,6 +212,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
     </div>
     <div class="date-tags" id="date-tags-start"></div>
     <input type="hidden" id="no-startDate" value="">
+    </div>
     <div id="referral-wrap">
     <div class="sec-label">何でお知りになりましたか？<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
     <div class="field">
@@ -722,6 +724,9 @@ function switchPattern(p){
   document.getElementById('tab-specify').classList.toggle('active',p==='specify');
   document.getElementById('pattern-weekly').classList.toggle('hidden',p!=='weekly');
   document.getElementById('pattern-specify').classList.toggle('hidden',p!=='specify');
+  // 日程指定の場合は配達開始日カレンダーを非表示
+  var startWrap=document.getElementById('start-date-wrap');
+  if(startWrap) startWrap.style.display=(p==='specify')?'none':'block';
 }
 
 /* ========== 前回と同じ ========== */
