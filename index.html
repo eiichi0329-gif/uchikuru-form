@@ -558,7 +558,7 @@ window.onload = function() {
   var liffId=liffIdMap[type]||'2009776168-RIJ6LPoI';
 
   if(typeof liff!=='undefined'){
-    document.getElementById('statusMsg').textContent='読み込み中...';
+    document.getElementById('statusMsg').textContent='お客様情報を確認中...';
     var liffTimeout=setTimeout(function(){loadAndShow(type);},5000);
     liff.init({liffId:liffId})
       .then(function(){
@@ -592,7 +592,7 @@ function loadAndShow(type) {
 
   // userId がある場合は顧客情報を取得してからフォームを表示
   if(userId && ['newOrder','change','stop','resume'].indexOf(type)!==-1){
-    document.getElementById('statusMsg').textContent='読み込み中...';
+    document.getElementById('statusMsg').textContent='お客様情報を確認中...';
     document.getElementById('statusMsg').style.display='block';
     loadCustomerInfoThen(type, function(){
       document.getElementById('statusMsg').style.display='none';
