@@ -160,8 +160,15 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <div class="field"><label>ご住所<span class="req">*</span></label><input type="text" id="no-address" placeholder="例：北九州市小倉北区〇〇1-2-3"></div>
       <div class="field"><label>電話番号<span class="req">*</span></label><input type="tel" id="no-phone" placeholder="例：090-1234-5678"></div>
     </div>
-    <div class="sec-label">お弁当の種類・数量</div>
-    <div class="bento-grid" id="bento-grid-newOrder"></div>
+    <div class="sec-label">注文内容</div>
+    <div class="check-row" id="no-sameCheck" onclick="toggleSameOrderNew()">
+      <div class="check-box" id="no-checkBox"></div>
+      <span class="check-label">前回と同じ内容で注文する</span>
+    </div>
+    <div id="no-newOrder-wrap">
+      <div class="sec-label" style="margin-top:12px;">お弁当の種類・数量</div>
+      <div class="bento-grid" id="bento-grid-newOrder"></div>
+    </div>
     <div class="sec-label">配達曜日・スケジュール</div>
     <div class="pattern-tabs">
       <div class="pattern-tab active" id="tab-weekly" onclick="switchPattern('weekly')">毎週</div>
@@ -190,7 +197,20 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <div class="warn-msg hidden" id="date-warn">週3日からのご注文となります</div>
     </div>
     <div class="sec-label">配達開始日</div>
-    <div class="field"><input type="date" id="no-startDate"></div>
+    <div class="calendar-wrap">
+      <div class="cal-header">
+        <button onclick="changeMonthCal('cal-grid-start',-1)">‹</button>
+        <span class="cal-title" id="cal-title-start"></span>
+        <button onclick="changeMonthCal('cal-grid-start',1)">›</button>
+      </div>
+      <div class="cal-days-header">
+        <span>日</span><span class="wd">月</span><span class="wd">火</span>
+        <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>
+      </div>
+      <div class="cal-grid" id="cal-grid-start"></div>
+    </div>
+    <div class="date-tags" id="date-tags-start"></div>
+    <input type="hidden" id="no-startDate" value="">
     <div class="sec-label">何でお知りになりましたか？<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
     <div class="field">
       <select id="no-referral">
@@ -203,7 +223,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       </select>
     </div>
     <div class="sec-label">店舗への伝達事項<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
-    <div class="field"><textarea id="no-note" placeholder="不在時の置き場所、その他ご要望など"></textarea></div>
+    <div class="field"><textarea id="no-note" placeholder="その他ご要望など"></textarea></div>
     <button class="btn-submit" onclick="submitForm('newOrder')">送信する</button>
   </div>
 
@@ -231,17 +251,43 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <label>変更内容の詳細<span class="req">*</span></label>
       <textarea id="ch-detail" placeholder="変更内容を具体的にご記入ください"></textarea>
     </div>
-    <div class="field" id="ch-cancelDate-wrap" style="display:none;">
-      <label>キャンセル日<span class="req">*</span></label>
-      <input type="date" id="ch-cancelDate">
-      <div class="note">複数日の場合は「伝達事項」に記入してください</div>
+    <div id="ch-cancelDate-wrap" style="display:none;">
+      <div class="sec-label">キャンセル日<span class="req">*</span></div>
+      <div class="calendar-wrap">
+      <div class="cal-header">
+        <button onclick="changeMonthCal('cal-grid-cancel',-1)">‹</button>
+        <span class="cal-title" id="cal-title-cancel"></span>
+        <button onclick="changeMonthCal('cal-grid-cancel',1)">›</button>
+      </div>
+      <div class="cal-days-header">
+        <span>日</span><span class="wd">月</span><span class="wd">火</span>
+        <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>
+      </div>
+      <div class="cal-grid" id="cal-grid-cancel"></div>
     </div>
-    <div class="field" id="ch-startDate-wrap">
-      <label>変更開始日<span class="opt">(任意)</span></label>
-      <input type="date" id="ch-startDate">
+    <div class="date-tags" id="date-tags-cancel"></div>
+    <input type="hidden" id="ch-cancelDate" value="">
+      <div class="note" style="margin-top:6px;">複数日の場合は「伝達事項」に記入してください</div>
+    </div>
+    <div id="ch-startDate-wrap">
+      <div class="sec-label">変更開始日<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
+      <div class="calendar-wrap">
+      <div class="cal-header">
+        <button onclick="changeMonthCal('cal-grid-change',-1)">‹</button>
+        <span class="cal-title" id="cal-title-change"></span>
+        <button onclick="changeMonthCal('cal-grid-change',1)">›</button>
+      </div>
+      <div class="cal-days-header">
+        <span>日</span><span class="wd">月</span><span class="wd">火</span>
+        <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>
+      </div>
+      <div class="cal-grid" id="cal-grid-change"></div>
+    </div>
+    <div class="date-tags" id="date-tags-change"></div>
+    <input type="hidden" id="ch-startDate" value="">
     </div>
     <div class="sec-label">店舗への伝達事項<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
-    <div class="field"><textarea id="ch-note" placeholder="不在時の置き場所、その他ご要望など"></textarea></div>
+    <div class="field"><textarea id="ch-note" placeholder="その他ご要望など"></textarea></div>
     <button class="btn-submit" onclick="submitForm('change')">送信する</button>
   </div>
 
@@ -255,13 +301,26 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <div class="field"><label>電話番号<span class="req">*</span></label><input type="tel" id="st-phone" placeholder="例：090-1234-5678"></div>
     </div>
     <div class="sec-label">最終配達日</div>
-    <div class="field"><input type="date" id="st-lastDate"></div>
+    <div class="calendar-wrap">
+      <div class="cal-header">
+        <button onclick="changeMonthStop(-1)">‹</button>
+        <span class="cal-title" id="cal-title-stop"></span>
+        <button onclick="changeMonthStop(1)">›</button>
+      </div>
+      <div class="cal-days-header">
+        <span>日</span><span class="wd">月</span><span class="wd">火</span>
+        <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>
+      </div>
+      <div class="cal-grid" id="cal-grid-stop"></div>
+    </div>
+    <div class="date-tags" id="date-tags-stop"></div>
+    <input type="hidden" id="st-lastDate" value="">
     <div class="sec-label">停止理由<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
     <div class="field">
       <textarea id="st-reason" placeholder="退会理由をご自由にお書きください"></textarea>
     </div>
     <div class="sec-label">店舗への伝達事項<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
-    <div class="field"><textarea id="st-note" placeholder="不在時の置き場所、その他ご要望など"></textarea></div>
+    <div class="field"><textarea id="st-note" placeholder="その他ご要望など"></textarea></div>
     <button class="btn-submit" onclick="submitForm('stop')">送信する</button>
   </div>
 
@@ -286,9 +345,22 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <div class="warn-msg hidden" id="day-warn-resume">週3日からのご注文となります</div>
     </div>
     <div class="sec-label">再開日</div>
-    <div class="field"><input type="date" id="rs-startDate"></div>
+    <div class="calendar-wrap">
+      <div class="cal-header">
+        <button onclick="changeMonthCal('cal-grid-resume',-1)">‹</button>
+        <span class="cal-title" id="cal-title-resume"></span>
+        <button onclick="changeMonthCal('cal-grid-resume',1)">›</button>
+      </div>
+      <div class="cal-days-header">
+        <span>日</span><span class="wd">月</span><span class="wd">火</span>
+        <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>
+      </div>
+      <div class="cal-grid" id="cal-grid-resume"></div>
+    </div>
+    <div class="date-tags" id="date-tags-resume"></div>
+    <input type="hidden" id="rs-startDate" value="">
     <div class="sec-label">店舗への伝達事項<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
-    <div class="field"><textarea id="rs-note" placeholder="不在時の置き場所、その他ご要望など"></textarea></div>
+    <div class="field"><textarea id="rs-note" placeholder="その他ご要望など"></textarea></div>
     <button class="btn-submit" onclick="submitForm('resume')">送信する</button>
   </div>
 
@@ -327,473 +399,442 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
 </div>
 
 <script>
-var GAS_URL = '%%GAS_URL%%';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbyfWePrwtwVN34RKnpSq2Av8ydvx2SzGEo74kcrAEpPrVq8NPk9j_tvh6fc7IBgOW9UMw/exec';
 var userId = '';
 var isSameOrder = false;
+var isSameOrderNew = false;
 var selectedDates = [];
-var calYear, calMonth;
 var currentPattern = 'weekly';
-
-// お弁当リスト（修正版）
-var BENTO_LIST = [
-  'うちくるおかず',
-  'うちくる小箱',
-  'うちくるダブル',
-  'うちくるご膳',
-  'ごはん'
-];
+var BENTO_LIST = ['うちくるおかず','うちくる小箱','うちくるダブル','うちくるご膳','ごはん'];
 var DAY_LABELS = ['月','火','水','木','金'];
 
-// =====================
-// 初期化
-// =====================
-window.onload = function() {
-  buildBentoGrids();
-  buildDayGrids();
-  initCalendar();
-
-  var gasType = '%%INIT_TYPE%%';
-  var gasUid  = '%%INIT_UID%%';
-  var params  = new URLSearchParams(window.location.search);
-
-  if (gasUid) userId = gasUid;
-  if (!userId && params.get('uid')) userId = params.get('uid');
-
-  var type = gasType || params.get('type') || '';
-
-  // 配達開始日・変更開始日・再開日のmin値を「来週月曜日」に設定
-  setDateInputMins();
-
-  if (typeof liff !== 'undefined') {
-    document.getElementById('statusMsg').textContent = '読み込み中...';
-    var liffTimeout = setTimeout(function() { loadAndShow(type); }, 5000);
-    liff.init({ liffId: '2009776168-LOBLun0h' })
-      .then(function() {
-        clearTimeout(liffTimeout);
-        if (liff.isInClient()) {
-          liff.getProfile()
-            .then(function(profile) { userId = profile.userId; loadAndShow(type); })
-            .catch(function() { loadAndShow(type); });
-        } else {
-          loadAndShow(type);
-        }
-      })
-      .catch(function() { clearTimeout(liffTimeout); loadAndShow(type); });
-  } else {
-    loadAndShow(type);
-  }
-};
-
-// =====================
-// フォーム表示制御
-// =====================
-function loadAndShow(type) {
-  document.getElementById('statusMsg').style.display = 'none';
-  hideAll();
-  if (!type) { showMenu(); return; }
-  var formEl = document.getElementById('form-' + type);
-  if (!formEl) { showMenu(); return; }
-  // フォームを先に表示してからcustomer情報を非同期取得
-  formEl.classList.add('active');
-  if (userId && ['newOrder','change','stop','resume'].indexOf(type) !== -1) {
-    loadCustomerInfo(type);
-  }
-}
-
-function showMenu() {
-  hideAll();
-  document.getElementById('menuWrap').style.display = 'block';
-}
-
-// 配達開始日などのdate inputを来週月曜日以降に制限
-function setDateInputMins() {
-  var today = new Date(); today.setHours(0,0,0,0);
-  var dow = today.getDay();
-  var daysToNextMonday = (dow === 0) ? 8 : (8 - dow);
-  var nextMonday = new Date(today);
-  nextMonday.setDate(today.getDate() + daysToNextMonday);
-  var minStr = nextMonday.getFullYear() + '-' + pad(nextMonday.getMonth()+1) + '-' + pad(nextMonday.getDate());
-  var dateIds = ['no-startDate','ch-startDate','ch-cancelDate','rs-startDate','st-lastDate'];
-  dateIds.forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) el.min = minStr;
-  });
-}
-
-function hideAll() {
-  document.getElementById('menuWrap').style.display = 'none';
-  document.getElementById('statusMsg').style.display = 'none';
-  document.getElementById('completeWrap').classList.remove('active');
-  var forms = document.querySelectorAll('.form-wrap');
-  for (var i = 0; i < forms.length; i++) forms[i].classList.remove('active');
-}
-
-// =====================
-// 顧客情報取得・表示
-// 情報がある場合は入力欄を非表示にしてカードのみ表示
-// =====================
-function loadCustomerInfo(type) {
-  if (!userId) return;
-  var url = GAS_URL + '?action=getCustomer&userId=' + encodeURIComponent(userId);
-  fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      if (data.name || data.address || data.phone) {
-        // カードに表示
-        var cardHtml = '<div class="card-label">お客様情報</div>';
-        if (data.name)    cardHtml += '<div class="info-row"><span class="lbl">名前</span><span>' + data.name + '</span></div>';
-        if (data.address) cardHtml += '<div class="info-row"><span class="lbl">住所</span><span>' + data.address + '</span></div>';
-        if (data.phone)   cardHtml += '<div class="info-row"><span class="lbl">電話</span><span>' + data.phone + '</span></div>';
-
-        var card = document.getElementById('ccard-' + type);
-        if (card) {
-          card.innerHTML = cardHtml;
-          card.style.display = 'block';
-        }
-
-        // 入力欄を非表示
-        var fieldsEl = document.getElementById('fields-' + type);
-        if (fieldsEl) fieldsEl.style.display = 'none';
-
-        // ★ 非表示でもinputのvalueに必ずセット（送信時に住所が空にならないよう）
-        var pf = { newOrder:'no', change:'ch', stop:'st', resume:'rs' };
-        var p = pf[type];
-        if (p) {
-          var ne = document.getElementById(p+'-name');
-          var pe = document.getElementById(p+'-phone');
-          var ae = document.getElementById(p+'-address');
-          if (ne) ne.value = data.name    || '';
-          if (pe) pe.value = data.phone   || '';
-          if (ae) ae.value = data.address || '';
-        }
-
-        // ★ グローバル変数にも保持（buildParamsで参照）
-        window._customerData = {
-          name:    data.name    || '',
-          address: data.address || '',
-          phone:   data.phone   || ''
-        };
-      }
-    })
-    .catch(function(){});
-}
-
-// =====================
-// お弁当グリッド
-// =====================
-function buildBentoGrids() {
-  ['bento-grid-newOrder','bento-grid-resume'].forEach(function(gid) {
-    var wrap = document.getElementById(gid);
-    if (!wrap) return;
-    BENTO_LIST.forEach(function(name, idx) {
-      var row = document.createElement('div');
-      row.className = 'bento-row';
-      row.id = gid+'-row-'+idx;
-      row.innerHTML =
-        '<div class="bento-check" onclick="toggleBento(\''+gid+'\','+idx+')">' +
-          '<div class="cb" id="'+gid+'-cb-'+idx+'"></div>' +
-        '</div>' +
-        '<div class="bento-name-area" onclick="toggleBento(\''+gid+'\','+idx+')">' +
-          '<div class="bento-name">'+name+'</div>' +
-        '</div>' +
-        '<div class="bento-qty-area">' +
-          '<button onclick="changeQty(\''+gid+'\','+idx+',-1)">－</button>' +
-          '<span class="qty-num" id="'+gid+'-qty-'+idx+'">1</span>' +
-          '<button onclick="changeQty(\''+gid+'\','+idx+',1)">＋</button>' +
-        '</div>';
-      wrap.appendChild(row);
-    });
-  });
-}
-
-function toggleBento(gid, idx) {
-  document.getElementById(gid+'-row-'+idx).classList.toggle('selected');
-}
-
-function changeQty(gid, idx, delta) {
-  var el = document.getElementById(gid+'-qty-'+idx);
-  var val = parseInt(el.textContent) + delta;
-  if (val < 1) val = 1; if (val > 9) val = 9;
-  el.textContent = val;
-}
-
-function getBentoStr(gid) {
-  var parts = [];
-  BENTO_LIST.forEach(function(name, idx) {
-    var row = document.getElementById(gid+'-row-'+idx);
-    if (row && row.classList.contains('selected')) {
-      parts.push(name+' '+document.getElementById(gid+'-qty-'+idx).textContent+'食');
-    }
-  });
-  return parts.join('、');
-}
-
-// =====================
-// 曜日グリッド（週3日チェック付き）
-// =====================
-function buildDayGrids() {
-  [['day-grid','day-warn'],['day-grid-resume','day-warn-resume']].forEach(function(pair) {
-    var gid = pair[0];
-    var wid = pair[1];
-    var wrap = document.getElementById(gid);
-    if (!wrap) return;
-    DAY_LABELS.forEach(function(d) {
-      var btn = document.createElement('div');
-      btn.className = 'day-btn';
-      btn.textContent = d;
-      btn.onclick = (function(b, g, w){ return function(){
-        b.classList.toggle('selected');
-        checkDayCount(g, w);
-      }; })(btn, gid, wid);
-      wrap.appendChild(btn);
-    });
-  });
-}
-
-function checkDayCount(gid, warnId) {
-  var count = document.getElementById(gid).querySelectorAll('.day-btn.selected').length;
-  var warn  = document.getElementById(warnId);
-  if (warn) warn.classList.toggle('hidden', count === 0 || count >= 3);
-}
-
-function getSelectedDays(gid) {
-  var days = [];
-  document.getElementById(gid).querySelectorAll('.day-btn.selected').forEach(function(b){ days.push(b.textContent); });
-  return days.join('・');
-}
-
-// =====================
-// カレンダー（土日グレーアウト・当日週選択不可）
-// =====================
-function initCalendar() {
-  var now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
-  renderCalendar();
-}
-
-function changeMonth(delta) {
-  calMonth += delta;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  if (calMonth < 0)  { calMonth = 11; calYear--; }
-  renderCalendar();
-}
-
-// 当日を含む週の月曜日を返す（選択不可の基準）
-function getThisWeekMonday() {
-  var today = new Date(); today.setHours(0,0,0,0);
-  var dow = today.getDay(); // 0=日
-  var diff = (dow === 0) ? -6 : 1 - dow; // 月曜日に戻す
-  var monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  return monday;
-}
-
-function renderCalendar() {
-  document.getElementById('cal-title').textContent = calYear+'年'+(calMonth+1)+'月';
-  var grid = document.getElementById('cal-grid'); grid.innerHTML = '';
-  var first = new Date(calYear,calMonth,1).getDay();
-  var days  = new Date(calYear,calMonth+1,0).getDate();
-  var today = new Date(); today.setHours(0,0,0,0);
-  var thisWeekMonday = getThisWeekMonday();
-  // 当日を含む週の日曜日（週末）
-  var thisWeekSunday = new Date(thisWeekMonday);
-  thisWeekSunday.setDate(thisWeekMonday.getDate() + 6);
-
-  for (var i = 0; i < first; i++) {
-    var e = document.createElement('div'); e.className='cal-cell empty'; grid.appendChild(e);
-  }
-  for (var d = 1; d <= days; d++) {
-    var cell = document.createElement('div');
-    var dt   = new Date(calYear,calMonth,d);
-    var dow  = dt.getDay(); // 0=日, 6=土
-    var ds   = calYear+'-'+pad(calMonth+1)+'-'+pad(d);
-    cell.className = 'cal-cell';
-    cell.textContent = d;
-
-    var isWeekend      = (dow === 0 || dow === 6);
-    var isThisWeek     = (dt <= thisWeekSunday);
-    var isDisabled     = isWeekend || isThisWeek;
-
-    if (isDisabled) {
-      cell.classList.add(isWeekend ? 'weekend' : 'disabled');
-    } else {
-      if (selectedDates.indexOf(ds)!==-1) cell.classList.add('selected');
-      cell.onclick = (function(s,c){ return function(){ toggleDate(s,c); }; })(ds,cell);
-    }
-    grid.appendChild(cell);
-  }
-  checkDateCount();
-}
+/* ========== カレンダー ========== */
+var calState = {};
 
 function pad(n){ return n<10?'0'+n:String(n); }
 
-function toggleDate(ds, cell) {
-  var idx = selectedDates.indexOf(ds);
-  if (idx===-1) { selectedDates.push(ds); cell.classList.add('selected'); }
-  else { selectedDates.splice(idx,1); cell.classList.remove('selected'); }
-  renderDateTags();
-  checkDateCount();
+function getThisWeekMonday() {
+  var today = new Date(); today.setHours(0,0,0,0);
+  var dow = today.getDay();
+  var diff = (dow===0) ? -6 : 1-dow;
+  var m = new Date(today); m.setDate(today.getDate()+diff); return m;
 }
 
-function checkDateCount() {
-  var warn = document.getElementById('date-warn');
-  if (!warn) return;
-  warn.classList.toggle('hidden', selectedDates.length === 0 || selectedDates.length >= 3);
+function initAllCalendars() {
+  var ids = ['cal-grid','cal-grid-start','cal-grid-stop','cal-grid-change','cal-grid-cancel','cal-grid-resume'];
+  var now = new Date();
+  ids.forEach(function(id){
+    calState[id] = {
+      year: now.getFullYear(), month: now.getMonth(),
+      selectedDates: [],
+      singleSelect: (id!=='cal-grid' && id!=='cal-grid-cancel')
+    };
+    renderCalendarById(id);
+  });
 }
 
-function renderDateTags() {
-  var wrap = document.getElementById('date-tags'); wrap.innerHTML = '';
-  selectedDates.slice().sort().forEach(function(ds) {
-    var pp = ds.split('-');
-    var tag = document.createElement('div'); tag.className='date-tag';
-    tag.innerHTML = parseInt(pp[1])+'月'+parseInt(pp[2])+'日 <span class="rm" onclick="removeDate(\''+ds+'\')">✕</span>';
+function changeMonthCal(calId, delta) {
+  var s = calState[calId]; if(!s) return;
+  s.month += delta;
+  if(s.month>11){s.month=0;s.year++;}
+  if(s.month<0){s.month=11;s.year--;}
+  renderCalendarById(calId);
+}
+function changeMonth(delta){ changeMonthCal('cal-grid',delta); }
+
+function renderCalendarById(calId) {
+  var s = calState[calId]; if(!s) return;
+  var titleEl = document.getElementById(calId.replace('cal-grid','cal-title'));
+  if(titleEl) titleEl.textContent = s.year+'年'+(s.month+1)+'月';
+  var grid = document.getElementById(calId); if(!grid) return;
+  grid.innerHTML = '';
+  var first = new Date(s.year,s.month,1).getDay();
+  var days  = new Date(s.year,s.month+1,0).getDate();
+  var mon   = getThisWeekMonday();
+  var sun   = new Date(mon); sun.setDate(mon.getDate()+6);
+  for(var i=0;i<first;i++){
+    var e=document.createElement('div');e.className='cal-cell empty';grid.appendChild(e);
+  }
+  for(var d=1;d<=days;d++){
+    var cell=document.createElement('div');
+    var dt=new Date(s.year,s.month,d);
+    var dow=dt.getDay();
+    var ds=s.year+'-'+pad(s.month+1)+'-'+pad(d);
+    cell.className='cal-cell'; cell.textContent=d;
+    if(dow===0||dow===6){ cell.classList.add('weekend'); }
+    else if(dt<=sun){ cell.classList.add('disabled'); }
+    else {
+      if(s.selectedDates.indexOf(ds)!==-1) cell.classList.add('selected');
+      (function(cid,dstr){ cell.onclick=function(){ toggleDateCal(cid,dstr); }; })(calId,ds);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function toggleDateCal(calId, ds) {
+  var s = calState[calId]; if(!s) return;
+  var inputMap = {
+    'cal-grid-start':'no-startDate',
+    'cal-grid-stop':'st-lastDate','cal-grid-change':'ch-startDate',
+    'cal-grid-cancel':'ch-cancelDate','cal-grid-resume':'rs-startDate'
+  };
+  if(s.singleSelect){
+    s.selectedDates=[ds];
+    renderCalendarById(calId);
+    var el=document.getElementById(inputMap[calId]); if(el) el.value=ds;
+    var tagsEl=document.getElementById(calId.replace('cal-grid','date-tags'));
+    if(tagsEl){
+      var pp=ds.split('-');
+      tagsEl.innerHTML='<div class="date-tag">'+parseInt(pp[1])+'月'+parseInt(pp[2])+'日</div>';
+    }
+  } else {
+    var idx=s.selectedDates.indexOf(ds);
+    if(idx===-1) s.selectedDates.push(ds); else s.selectedDates.splice(idx,1);
+    renderCalendarById(calId);
+    renderDateTagsCal(calId);
+    if(calId==='cal-grid'){ selectedDates=s.selectedDates; checkDateCount(); }
+  }
+}
+
+function renderDateTagsCal(calId) {
+  var s=calState[calId]; if(!s) return;
+  var wrap=document.getElementById(calId.replace('cal-grid','date-tags')); if(!wrap) return;
+  wrap.innerHTML='';
+  s.selectedDates.slice().sort().forEach(function(ds){
+    var pp=ds.split('-');
+    var tag=document.createElement('div'); tag.className='date-tag';
+    var label=parseInt(pp[1])+'月'+parseInt(pp[2])+'日 ';
+    var btn=document.createElement('span'); btn.className='rm'; btn.textContent='✕';
+    (function(cid,dstr){ btn.onclick=function(){ removeDateCal(cid,dstr); }; })(calId,ds);
+    tag.appendChild(document.createTextNode(label)); tag.appendChild(btn);
     wrap.appendChild(tag);
   });
 }
 
-function removeDate(ds) {
-  selectedDates = selectedDates.filter(function(d){ return d!==ds; });
-  renderDateTags(); renderCalendar();
+function removeDateCal(calId, ds) {
+  var s=calState[calId]; if(!s) return;
+  s.selectedDates=s.selectedDates.filter(function(d){return d!==ds;});
+  renderCalendarById(calId); renderDateTagsCal(calId);
+  if(calId==='cal-grid'){selectedDates=s.selectedDates;checkDateCount();}
 }
 
-// =====================
-// パターン切り替え
-// =====================
-function switchPattern(p) {
-  currentPattern = p;
-  document.getElementById('tab-weekly').classList.toggle('active', p==='weekly');
-  document.getElementById('tab-specify').classList.toggle('active', p==='specify');
-  document.getElementById('pattern-weekly').classList.toggle('hidden', p!=='weekly');
-  document.getElementById('pattern-specify').classList.toggle('hidden', p!=='specify');
+function checkDateCount() {
+  var warn=document.getElementById('date-warn'); if(!warn) return;
+  var cnt=(calState['cal-grid']&&calState['cal-grid'].selectedDates)?calState['cal-grid'].selectedDates.length:0;
+  warn.classList.toggle('hidden',cnt===0||cnt>=3);
 }
+function renderCalendar(){ renderCalendarById('cal-grid'); }
+function initCalendar(){}
 
-// =====================
-// 再開：同じ注文
-// =====================
-function toggleSameOrder() {
-  isSameOrder = !isSameOrder;
-  document.getElementById('rs-sameCheck').classList.toggle('checked', isSameOrder);
-  document.getElementById('rs-checkBox').textContent = isSameOrder ? '✓' : '';
-  document.getElementById('rs-newOrder-wrap').classList.toggle('hidden', isSameOrder);
-}
+/* ========== 初期化 ========== */
+window.onload = function() {
+  buildBentoGrids();
+  buildDayGrids();
+  initAllCalendars();
 
-// =====================
-// 変更タイプ
-// =====================
-function onChangeTypeChange() {
-  var val = document.getElementById('ch-changeType').value;
-  var isC = (val==='キャンセル');
-  document.getElementById('ch-cancelDate-wrap').style.display = isC ? 'block' : 'none';
-  document.getElementById('ch-startDate-wrap').style.display  = isC ? 'none' : 'block';
-  document.getElementById('ch-detail-wrap').style.display     = isC ? 'none' : 'block';
-}
+  var params=new URLSearchParams(window.location.search);
+  if(params.get('uid')) userId=params.get('uid');
 
-// =====================
-// フォーム送信
-// =====================
-function submitForm(type) {
-  var params = buildParams(type);
-  if (!params) return;
-  params.type = type; params.userId = userId || '';
-  var btn = document.querySelector('#form-'+type+' .btn-submit');
-  btn.disabled = true; btn.textContent = '送信中...';
+  // URLから直接typeを取得
+  var type=params.get('type')||'';
 
-  var cbName = 'cb_'+Date.now();
-  params.action = 'formSubmit'; params.callback = cbName;
-
-  window[cbName] = function() { delete window[cbName]; showComplete(type); };
-
-  var qs = Object.keys(params).map(function(k){
-    return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
-  }).join('&');
-
-  var script = document.createElement('script');
-  script.src = GAS_URL+'?'+qs;
-  script.onerror = function() { delete window[cbName]; showComplete(type); };
-  document.body.appendChild(script);
-
-  setTimeout(function() {
-    if (window[cbName]) { delete window[cbName]; showComplete(type); }
-  }, 5000);
-}
-
-function buildParams(type) {
-  var p = {};
-  if (type==='newOrder') {
-    // 顧客情報が自動入力されている場合はグローバル変数からも補完
-    var cd = window._customerData || {};
-    p.name    = v('no-name')    || cd.name    || '';
-    p.address = v('no-address') || cd.address || '';
-    p.phone   = v('no-phone')   || cd.phone   || '';
-    if (!p.name||!p.address||!p.phone) { alert('お名前・住所・電話番号を入力してください'); return null; }
-    var b = getBentoStr('bento-grid-newOrder');
-    if (!b) { alert('お弁当の種類を選択してください'); return null; }
-    // 週3日チェック
-    var schedule = '';
-    if (currentPattern==='weekly') {
-      var selDays = document.getElementById('day-grid').querySelectorAll('.day-btn.selected');
-      if (selDays.length > 0 && selDays.length < 3) { alert('週3日からのご注文となります'); return null; }
-      schedule = '毎週：'+getSelectedDays('day-grid');
-    } else {
-      if (selectedDates.length > 0 && selectedDates.length < 3) { alert('週3日からのご注文となります'); return null; }
-      schedule = selectedDates.map(function(d){ var pp=d.split('-'); return parseInt(pp[1])+'月'+parseInt(pp[2])+'日'; }).join('・');
+  // LIFFはquery paramsをliff.stateに変換する場合があるので先読み
+  if(!type){
+    var liffStateRaw=params.get('liff.state')||'';
+    if(liffStateRaw){
+      try{
+        var sp=new URLSearchParams(liffStateRaw.replace(/^\?/,''));
+        type=sp.get('type')||'';
+      }catch(e){}
     }
-    p.bento=b; p.schedule=schedule; p.startDate=v('no-startDate'); p.referral=v('no-referral'); p.note=v('no-note');
+  }
 
-  } else if (type==='change') {
-    var cd2 = window._customerData || {};
-    p.name=v('ch-name')||cd2.name||''; p.phone=v('ch-phone')||cd2.phone||''; p.address=v('ch-name')||cd2.address||''; p.changeType=v('ch-changeType');
-    if (!p.name||!p.phone) { alert('お名前・電話番号を入力してください'); return null; }
-    if (!p.changeType) { alert('変更の種類を選択してください'); return null; }
-    if (p.changeType==='キャンセル') { p.detail=v('ch-cancelDate'); p.startDate=''; }
-    else { p.detail=v('ch-detail'); p.startDate=v('ch-startDate'); if(!p.detail){alert('変更内容を入力してください');return null;} }
+  var liffIdMap={
+    'newOrder':'2009776168-RIJ6LPoI',
+    'change':  '2009776168-LOBLun0h',
+    'stop':    '2009776168-N6vne4xP',
+    'resume':  '2009776168-sHfyz86X'
+  };
+  var liffId=liffIdMap[type]||'2009776168-RIJ6LPoI';
+
+  if(typeof liff!=='undefined'){
+    document.getElementById('statusMsg').textContent='読み込み中...';
+    var liffTimeout=setTimeout(function(){loadAndShow(type);},5000);
+    liff.init({liffId:liffId})
+      .then(function(){
+        clearTimeout(liffTimeout);
+        // init後にliff.stateからtypeを再取得
+        if(!type){
+          try{
+            var ls=liff.state||'';
+            if(ls){
+              var lsp=new URLSearchParams(String(ls).replace(/^\?/,'').replace(/^\//,''));
+              var t=lsp.get('type')||'';
+              if(t){type=t;}
+            }
+          }catch(e){}
+        }
+        // isInClient()に関わらずgetProfileを試みる
+        liff.getProfile()
+          .then(function(profile){userId=profile.userId;loadAndShow(type);})
+          .catch(function(){loadAndShow(type);});
+      })
+      .catch(function(){clearTimeout(liffTimeout);loadAndShow(type);});
+  } else { loadAndShow(type); }
+};
+
+/* ========== 表示制御 ========== */
+function loadAndShow(type) {
+  document.getElementById('statusMsg').style.display='none';
+  hideAll();
+  if(!type){showMenu();return;}
+  var formEl=document.getElementById('form-'+type);
+  if(!formEl){showMenu();return;}
+  formEl.classList.add('active');
+  if(userId&&['newOrder','change','stop','resume'].indexOf(type)!==-1) loadCustomerInfo(type);
+}
+function showMenu(){hideAll();document.getElementById('menuWrap').style.display='block';}
+function hideAll(){
+  document.getElementById('menuWrap').style.display='none';
+  document.getElementById('statusMsg').style.display='none';
+  document.getElementById('completeWrap').classList.remove('active');
+  document.querySelectorAll('.form-wrap').forEach(function(f){f.classList.remove('active');});
+}
+
+/* ========== 顧客情報 ========== */
+function loadCustomerInfo(type) {
+  if(!userId) return;
+  fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.name||data.address||data.phone){
+        var h='<div class="card-label">お客様情報</div>';
+        if(data.name)    h+='<div class="info-row"><span class="lbl">お名前</span><span>'+data.name+'</span></div>';
+        if(data.address) h+='<div class="info-row"><span class="lbl">ご住所</span><span>'+data.address+'</span></div>';
+        if(data.phone)   h+='<div class="info-row"><span class="lbl">電話番号</span><span>'+data.phone+'</span></div>';
+        var card=document.getElementById('ccard-'+type);
+        if(card){card.innerHTML=h;card.style.display='block';}
+        var fld=document.getElementById('fields-'+type);
+        if(fld) fld.style.display='none';
+        var pf={newOrder:'no',change:'ch',stop:'st',resume:'rs'};
+        var p=pf[type];
+        if(p){
+          var ne=document.getElementById(p+'-name');
+          var pe=document.getElementById(p+'-phone');
+          var ae=document.getElementById(p+'-address');
+          if(ne) ne.value=data.name||'';
+          if(pe) pe.value=data.phone||'';
+          if(ae) ae.value=data.address||'';
+        }
+        window._customerData={name:data.name||'',address:data.address||'',phone:data.phone||''};
+      }
+    }).catch(function(){});
+}
+
+/* ========== お弁当グリッド ========== */
+function buildBentoGrids(){
+  ['bento-grid-newOrder','bento-grid-resume'].forEach(function(gid){
+    var wrap=document.getElementById(gid); if(!wrap) return;
+    BENTO_LIST.forEach(function(name,idx){
+      var row=document.createElement('div');
+      row.className='bento-row'; row.id=gid+'-row-'+idx;
+      var cb=document.createElement('div'); cb.className='bento-check';
+      var cbInner=document.createElement('div'); cbInner.className='cb'; cbInner.id=gid+'-cb-'+idx;
+      cb.appendChild(cbInner);
+      (function(g,i){cb.onclick=function(){toggleBento(g,i);};})(gid,idx);
+      var na=document.createElement('div'); na.className='bento-name-area';
+      var nn=document.createElement('div'); nn.className='bento-name'; nn.textContent=name;
+      na.appendChild(nn);
+      (function(g,i){na.onclick=function(){toggleBento(g,i);};})(gid,idx);
+      var qa=document.createElement('div'); qa.className='bento-qty-area';
+      var bm=document.createElement('button'); bm.textContent='－';
+      (function(g,i){bm.onclick=function(){changeQty(g,i,-1);};})(gid,idx);
+      var qn=document.createElement('span'); qn.className='qty-num'; qn.id=gid+'-qty-'+idx; qn.textContent='1';
+      var bp=document.createElement('button'); bp.textContent='＋';
+      (function(g,i){bp.onclick=function(){changeQty(g,i,1);};})(gid,idx);
+      qa.appendChild(bm); qa.appendChild(qn); qa.appendChild(bp);
+      row.appendChild(cb); row.appendChild(na); row.appendChild(qa);
+      wrap.appendChild(row);
+    });
+  });
+}
+function toggleBento(gid,idx){document.getElementById(gid+'-row-'+idx).classList.toggle('selected');}
+function changeQty(gid,idx,delta){
+  var el=document.getElementById(gid+'-qty-'+idx);
+  var v=parseInt(el.textContent)+delta;
+  if(v<1)v=1;if(v>9)v=9;el.textContent=v;
+}
+function getBentoStr(gid){
+  var parts=[];
+  BENTO_LIST.forEach(function(name,idx){
+    var row=document.getElementById(gid+'-row-'+idx);
+    if(row&&row.classList.contains('selected'))
+      parts.push(name+' '+document.getElementById(gid+'-qty-'+idx).textContent+'食');
+  });
+  return parts.join('、');
+}
+
+/* ========== 曜日グリッド ========== */
+function buildDayGrids(){
+  [['day-grid','day-warn'],['day-grid-resume','day-warn-resume']].forEach(function(pair){
+    var wrap=document.getElementById(pair[0]); if(!wrap) return;
+    DAY_LABELS.forEach(function(d){
+      var btn=document.createElement('div'); btn.className='day-btn'; btn.textContent=d;
+      (function(b,g,w){b.onclick=function(){b.classList.toggle('selected');checkDayCount(g,w);};})(btn,pair[0],pair[1]);
+      wrap.appendChild(btn);
+    });
+  });
+}
+function checkDayCount(gid,warnId){
+  var cnt=document.getElementById(gid).querySelectorAll('.day-btn.selected').length;
+  var w=document.getElementById(warnId);
+  if(w) w.classList.toggle('hidden',cnt===0||cnt>=3);
+}
+function getSelectedDays(gid){
+  var d=[];
+  document.getElementById(gid).querySelectorAll('.day-btn.selected').forEach(function(b){d.push(b.textContent);});
+  return d.join('・');
+}
+
+/* ========== パターン切り替え ========== */
+function switchPattern(p){
+  currentPattern=p;
+  document.getElementById('tab-weekly').classList.toggle('active',p==='weekly');
+  document.getElementById('tab-specify').classList.toggle('active',p==='specify');
+  document.getElementById('pattern-weekly').classList.toggle('hidden',p!=='weekly');
+  document.getElementById('pattern-specify').classList.toggle('hidden',p!=='specify');
+}
+
+/* ========== 前回と同じ ========== */
+function toggleSameOrder(){
+  isSameOrder=!isSameOrder;
+  document.getElementById('rs-sameCheck').classList.toggle('checked',isSameOrder);
+  document.getElementById('rs-checkBox').textContent=isSameOrder?'✓':'';
+  document.getElementById('rs-newOrder-wrap').classList.toggle('hidden',isSameOrder);
+}
+function toggleSameOrderNew(){
+  isSameOrderNew=!isSameOrderNew;
+  document.getElementById('no-sameCheck').classList.toggle('checked',isSameOrderNew);
+  document.getElementById('no-checkBox').textContent=isSameOrderNew?'✓':'';
+  document.getElementById('no-newOrder-wrap').classList.toggle('hidden',isSameOrderNew);
+}
+
+/* ========== 変更タイプ ========== */
+function onChangeTypeChange(){
+  var val=document.getElementById('ch-changeType').value;
+  var isC=(val==='キャンセル');
+  document.getElementById('ch-cancelDate-wrap').style.display=isC?'block':'none';
+  document.getElementById('ch-startDate-wrap').style.display=isC?'none':'block';
+  document.getElementById('ch-detail-wrap').style.display=isC?'none':'block';
+}
+
+/* ========== フォーム送信 ========== */
+function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
+
+function submitForm(type){
+  var params=buildParams(type); if(!params) return;
+  params.type=type; params.userId=userId||'';
+  var btn=document.querySelector('#form-'+type+' .btn-submit');
+  btn.disabled=true; btn.textContent='送信中...';
+  var cbName='cb_'+Date.now();
+  params.action='formSubmit'; params.callback=cbName;
+  window[cbName]=function(){delete window[cbName];showComplete(type);};
+  var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+  var script=document.createElement('script');
+  script.src=GAS_URL+'?'+qs;
+  script.onerror=function(){delete window[cbName];showComplete(type);};
+  document.body.appendChild(script);
+  setTimeout(function(){if(window[cbName]){delete window[cbName];showComplete(type);}},5000);
+}
+
+function buildParams(type){
+  var p={};
+  var cd=window._customerData||{};
+  if(type==='newOrder'){
+    p.name=v('no-name')||cd.name||'';
+    p.address=v('no-address')||cd.address||'';
+    p.phone=v('no-phone')||cd.phone||'';
+    if(!p.name||!p.address||!p.phone){alert('お名前・ご住所・電話番号を入力してください');return null;}
+    p.sameOrder=isSameOrderNew?'true':'false';
+    var b=isSameOrderNew?'前回と同じ':getBentoStr('bento-grid-newOrder');
+    if(!isSameOrderNew&&!b){alert('お弁当の種類を選択してください');return null;}
+    var schedule='';
+    if(!isSameOrderNew){
+      if(currentPattern==='weekly'){
+        var sd=document.getElementById('day-grid').querySelectorAll('.day-btn.selected');
+        if(sd.length>0&&sd.length<3){alert('週3日からのご注文となります');return null;}
+        schedule='毎週：'+getSelectedDays('day-grid');
+      } else {
+        var sdates=(calState['cal-grid']&&calState['cal-grid'].selectedDates)||[];
+        if(sdates.length>0&&sdates.length<3){alert('週3日からのご注文となります');return null;}
+        schedule=sdates.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
+      }
+    }
+    p.bento=b;p.schedule=schedule;
+    p.startDate=document.getElementById('no-startDate').value||'';p.referral=v('no-referral');p.note=v('no-note');
+
+  } else if(type==='change'){
+    p.name=v('ch-name')||cd.name||'';
+    p.phone=v('ch-phone')||cd.phone||'';
+    p.address=cd.address||'';
+    p.changeType=v('ch-changeType');
+    if(!p.name||!p.phone){alert('お名前・電話番号を入力してください');return null;}
+    if(!p.changeType){alert('変更の種類を選択してください');return null;}
+    if(p.changeType==='キャンセル'){
+      p.detail=document.getElementById('ch-cancelDate').value||'';p.startDate='';
+    } else {
+      p.detail=v('ch-detail');
+      p.startDate=document.getElementById('ch-startDate').value||'';
+      if(!p.detail){alert('変更内容を入力してください');return null;}
+    }
     p.note=v('ch-note');
 
-  } else if (type==='stop') {
-    var cd3 = window._customerData || {};
-    p.name=v('st-name')||cd3.name||''; p.phone=v('st-phone')||cd3.phone||''; p.address=cd3.address||'';
-    if (!p.name||!p.phone) { alert('お名前・電話番号を入力してください'); return null; }
-    p.startDate=v('st-lastDate'); p.reason=v('st-reason'); p.note=v('st-note');
+  } else if(type==='stop'){
+    p.name=v('st-name')||cd.name||'';
+    p.phone=v('st-phone')||cd.phone||'';
+    p.address=cd.address||'';
+    if(!p.name||!p.phone){alert('お名前・電話番号を入力してください');return null;}
+    p.startDate=document.getElementById('st-lastDate').value||'';
+    p.reason=v('st-reason');p.note=v('st-note');
 
-  } else if (type==='resume') {
-    var cd4 = window._customerData || {};
-    p.name=v('rs-name')||cd4.name||''; p.phone=v('rs-phone')||cd4.phone||''; p.address=cd4.address||'';
-    if (!p.name||!p.phone) { alert('お名前・電話番号を入力してください'); return null; }
+  } else if(type==='resume'){
+    p.name=v('rs-name')||cd.name||'';
+    p.phone=v('rs-phone')||cd.phone||'';
+    p.address=cd.address||'';
+    if(!p.name||!p.phone){alert('お名前・電話番号を入力してください');return null;}
     p.sameOrder=isSameOrder?'true':'false';
-    if (!isSameOrder) {
+    if(!isSameOrder){
       p.bento=getBentoStr('bento-grid-resume');
-      var rsDays = document.getElementById('day-grid-resume').querySelectorAll('.day-btn.selected');
-      if (rsDays.length > 0 && rsDays.length < 3) { alert('週3日からのご注文となります'); return null; }
+      var rd=document.getElementById('day-grid-resume').querySelectorAll('.day-btn.selected');
+      if(rd.length>0&&rd.length<3){alert('週3日からのご注文となります');return null;}
       p.schedule='毎週：'+getSelectedDays('day-grid-resume');
     }
-    p.startDate=v('rs-startDate'); p.note=v('rs-note');
+    p.startDate=document.getElementById('rs-startDate').value||'';
+    p.note=v('rs-note');
 
-  } else if (type==='recruit') {
-    p.store=v('rc-store'); p.note=v('rc-message');
-    if (!p.note) { alert('メッセージを入力してください'); return null; }
+  } else if(type==='recruit'){
+    p.store=v('rc-store');p.note=v('rc-message');
+    if(!p.note){alert('メッセージを入力してください');return null;}
 
-  } else if (type==='inquiry') {
-    p.name=v('iq-name'); p.phone=v('iq-phone'); p.note=v('iq-message');
-    if (!p.note) { alert('お問い合わせ内容を入力してください'); return null; }
+  } else if(type==='inquiry'){
+    p.name=v('iq-name');p.phone=v('iq-phone');p.note=v('iq-message');
+    if(!p.note){alert('お問い合わせ内容を入力してください');return null;}
   }
   return p;
 }
 
-function v(id) { var el=document.getElementById(id); return el?el.value.trim():''; }
-
-// =====================
-// 完了画面（「担当者よりご連絡いたします」削除）
-// =====================
-function showComplete(type) {
+/* ========== 完了画面 ========== */
+function showComplete(type){
   hideAll();
-  var msgs = {
-    newOrder: 'ご注文を受け付けました。',
-    change:   '変更内容を受け付けました。\n内容を確認のうえ対応いたします。',
-    stop:     '利用停止のご連絡を受け付けました。\nご利用いただきありがとうございました。',
-    resume:   '再開のご連絡を受け付けました。\nまたよろしくお願いいたします！',
-    recruit:  '面接申込を受け付けました。',
-    inquiry:  'お問い合わせを受け付けました。\n内容を確認のうえご連絡いたします。'
+  var msgs={
+    newOrder:'ご注文を受け付けました。',
+    change:'変更内容を受け付けました。\n内容を確認のうえ対応いたします。',
+    stop:'利用停止のご連絡を受け付けました。\nご利用いただきありがとうございました。',
+    resume:'再開のご連絡を受け付けました。\nまたよろしくお願いいたします！',
+    recruit:'面接申込を受け付けました。',
+    inquiry:'お問い合わせを受け付けました。\n内容を確認のうえご連絡いたします。'
   };
-  document.getElementById('completeMsg').textContent = msgs[type]||'送信が完了しました。';
+  document.getElementById('completeMsg').textContent=msgs[type]||'送信が完了しました。';
   document.getElementById('completeWrap').classList.add('active');
 }
 </script>
