@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>今日の献立 | うちくる</title>
+<title>今週の献立 | うちくる</title>
 <style>
 :root {
   --orange: #E67E22;
@@ -27,41 +27,44 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
 .spinner { width: 36px; height: 36px; border: 3px solid #f0e0cc; border-top-color: var(--orange); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.date-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.date-badge { background: var(--orange); color: white; border-radius: 10px; padding: 8px 14px; text-align: center; flex-shrink: 0; }
-.date-badge .md { font-size: 20px; font-weight: 900; line-height: 1; }
-.date-badge .wd { font-size: 12px; margin-top: 2px; }
-.date-sub { font-size: 14px; color: var(--gray); }
+/* 献立カード */
+.menu-card {
+  background: white; border-radius: 14px; overflow: hidden;
+  margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+}
+.menu-card.today { border: 2px solid var(--orange); }
 
-.menu-card { background: white; border-radius: 14px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
-.menu-card-header { background: linear-gradient(135deg, var(--orange), var(--orange-light)); padding: 14px 18px; color: white; }
-.menu-card-header .label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.85; margin-bottom: 4px; }
-.menu-card-header .menu-name { font-size: 22px; font-weight: 900; line-height: 1.3; }
-.dish-list { padding: 12px 18px; font-size: 14px; color: #555; line-height: 1.9; }
-.dish-list .lbl { font-size: 11px; color: var(--orange); font-weight: 700; margin-bottom: 5px; }
+.card-date-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; background: var(--orange-pale);
+  border-bottom: 1px solid var(--border);
+}
+.card-date-bar.today-bar { background: var(--orange); }
+.date-badge {
+  background: var(--orange); color: white;
+  border-radius: 8px; padding: 4px 10px;
+  font-size: 14px; font-weight: 900; flex-shrink: 0;
+}
+.date-badge.today-badge { background: white; color: var(--orange); }
+.date-label { font-size: 14px; font-weight: 700; color: var(--brown); }
+.date-label.today-label { color: white; }
 
-.photo-card { background: white; border-radius: 14px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
-.photo-card .photo-hdr { padding: 12px 16px; font-size: 13px; font-weight: 700; color: var(--brown); border-bottom: 1px solid var(--border); }
-.photo-card img { width: 100%; display: block; max-height: 340px; object-fit: cover; }
-.photo-card .no-photo { padding: 24px; text-align: center; color: var(--gray); font-size: 14px; }
-.photo-card .no-photo a { color: var(--orange); }
+.menu-photo img { width: 100%; display: block; max-height: 280px; object-fit: cover; }
+.menu-photo .no-photo { padding: 20px; text-align: center; color: var(--gray); font-size: 13px; }
+.menu-photo .no-photo a { color: var(--orange); }
 
-.pdf-section { margin-bottom: 14px; }
-.section-title { font-size: 13px; font-weight: 700; color: var(--orange); padding-left: 8px; border-left: 3px solid var(--orange); margin-bottom: 12px; }
+.menu-info { padding: 14px 16px; }
+.menu-main-name { font-size: 19px; font-weight: 900; color: var(--brown); margin-bottom: 8px; }
+.dish-items { font-size: 13px; color: #666; line-height: 1.9; }
+.dish-items .dish-label { font-size: 11px; color: var(--orange); font-weight: 700; margin-bottom: 4px; }
 
-.month-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
-.month-btn { padding: 12px 4px; background: white; border: 2px solid var(--border); border-radius: 10px; text-align: center; font-size: 14px; font-weight: 700; color: var(--brown); cursor: pointer; transition: all 0.15s; }
-.month-btn:active { transform: scale(0.96); }
+/* 月間献立表 */
+.section-title { font-size: 13px; font-weight: 700; color: var(--orange); padding-left: 8px; border-left: 3px solid var(--orange); margin: 20px 0 12px; }
+.month-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
+.month-btn { padding: 14px 6px; background: white; border: 2px solid var(--border); border-radius: 10px; text-align: center; font-size: 15px; font-weight: 700; color: var(--brown); cursor: pointer; transition: all 0.15s; }
+.month-btn:active { transform: scale(0.97); }
 .month-btn.active { border-color: var(--orange); background: var(--orange-pale); color: var(--orange); }
-
-.pdf-open-btn { display: none; align-items: center; gap: 14px; background: var(--orange); color: white; text-decoration: none; border-radius: 14px; padding: 17px 18px; width: 100%; box-shadow: 0 4px 14px rgba(230,126,34,0.3); }
-.pdf-open-btn.visible { display: flex; }
-.pdf-open-btn .icon { font-size: 28px; flex-shrink: 0; }
-.pdf-open-btn .txt .title { font-size: 16px; font-weight: 700; }
-.pdf-open-btn .txt .sub { font-size: 12px; opacity: 0.85; margin-top: 3px; }
-.pdf-open-btn .arr { margin-left: auto; font-size: 24px; }
-
-.pdf-loading { text-align: center; padding: 14px; color: var(--gray); font-size: 14px; display: none; }
+.month-btn .btn-sub { font-size: 11px; font-weight: normal; opacity: 0.7; display: block; margin-top: 3px; }
 
 .error-card { background: #fff8f0; border: 1px solid #f0d0a0; border-radius: 12px; padding: 18px; text-align: center; font-size: 14px; color: var(--brown); line-height: 1.8; }
 .error-card a { color: var(--orange); }
@@ -71,7 +74,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
 
 <div class="header">
   <img src="https://uchikuru.jp/wp-content/uploads/2023/04/screenshot.png" alt="うちくる">
-  <div class="sub">今日の献立・月間献立表</div>
+  <div class="sub">今週の献立・月間献立表</div>
 </div>
 
 <div class="container">
@@ -81,38 +84,12 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
   </div>
 
   <div id="mainContent" style="display:none;">
-    <!-- 日付 -->
-    <div class="date-row">
-      <div class="date-badge">
-        <div class="md" id="dateDisplay"></div>
-        <div class="wd" id="weekdayDisplay"></div>
-      </div>
-      <div class="date-sub" id="menuDateDisplay">今日のお弁当🍱</div>
-    </div>
-
-    <!-- メニュー名・副菜 -->
-    <div class="menu-card">
-      <div class="menu-card-header">
-        <div class="label">🍽 TODAY'S MENU</div>
-        <div class="menu-name" id="menuName">―</div>
-      </div>
-      <div class="dish-list" id="dishListWrap" style="display:none;">
-        <div class="lbl">本日の副菜</div>
-        <div id="dishText"></div>
-      </div>
-    </div>
-
-    <!-- 献立写真 -->
-    <div class="photo-card">
-      <div class="photo-hdr">📷 今日の献立写真</div>
-      <div id="photoArea"><div class="no-photo">写真を読み込み中...</div></div>
-    </div>
+    <!-- 今週の献立一覧 -->
+    <div id="menuList"></div>
 
     <!-- 月間献立表 -->
-    <div class="pdf-section">
-      <div class="section-title">📋 月間献立表</div>
-      <div class="month-grid" id="monthGrid"></div>
-    </div>
+    <div class="section-title">📋 月間献立表</div>
+    <div class="month-grid" id="monthGrid"></div>
   </div>
 
   <div id="errorCard" class="error-card" style="display:none;">
@@ -126,10 +103,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
 var BASE = 'https://uchikuru.jp/wp-json/wp/v2';
 var DAYS = ['日','月','火','水','木','金','土'];
 var monthsData = [];
-
 var now = new Date();
-document.getElementById('dateDisplay').textContent = (now.getMonth()+1) + '/' + now.getDate();
-document.getElementById('weekdayDisplay').textContent = '（' + DAYS[now.getDay()] + '）';
 
 function extractImgSrc(h) {
   var m = h.match(/<img[^>]+src=["']([^"']+uchikuru\.jp[^"']+)["']/);
@@ -145,86 +119,133 @@ function stripTags(h) {
     .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
     .replace(/[ \t]+/g,' ').trim();
 }
+function formatDate(dateStr) {
+  var d = new Date(dateStr);
+  return (d.getMonth()+1) + '月' + d.getDate() + '日（' + DAYS[d.getDay()] + '）';
+}
+function isToday(dateStr) {
+  var d = new Date(dateStr);
+  return d.getFullYear()===now.getFullYear()
+    && d.getMonth()===now.getMonth()
+    && d.getDate()===now.getDate();
+}
 
 function loadAll() {
-  var menuUrl = BASE + '/posts?categories=104&per_page=1&_fields=id,title,date,link,content';
+  // 直近7件（約1週間分）の献立を取得
+  var menuUrl = BASE + '/posts?categories=104&per_page=7&_fields=id,title,date,link,content';
   var newsUrl = BASE + '/posts?categories=77&per_page=12&_fields=id,title,date,link,content';
 
-  var menuPromise = fetch(menuUrl).then(function(r){
-    if(!r.ok) throw new Error('menu fetch failed: ' + r.status);
-    return r.json();
-  });
-  var newsPromise = fetch(newsUrl).then(function(r){
-    if(!r.ok) throw new Error('news fetch failed: ' + r.status);
-    return r.json();
-  });
+  var menuP = fetch(menuUrl).then(function(r){ if(!r.ok) throw new Error('menu '+r.status); return r.json(); });
+  var newsP  = fetch(newsUrl).then(function(r){ if(!r.ok) throw new Error('news '+r.status); return r.json(); });
 
-  Promise.all([menuPromise, newsPromise])
+  Promise.all([menuP, newsP])
     .then(function(results){
-      var menuPosts = results[0];
-      var newsPosts = results[1];
-      if(!menuPosts || menuPosts.length === 0) throw new Error('no menu post');
-      showMenu(menuPosts[0]);
-      buildMonthButtons(newsPosts);
+      showMenuList(results[0]);
+      buildMonthButtons(results[1]);
       document.getElementById('loadingEl').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
     })
     .catch(function(err){
-      console.error('loadAll error:', err);
+      console.error(err);
       showError();
     });
 }
 
-function showMenu(post) {
-  var title = post.title && post.title.rendered
-    ? post.title.rendered.replace(/<[^>]+>/g,'') : '本日の献立';
-  document.getElementById('menuName').textContent = title;
-
-  var d = new Date(post.date);
-  if(!isNaN(d.getTime())) {
-    document.getElementById('menuDateDisplay').textContent =
-      (d.getMonth()+1)+'月'+d.getDate()+'日（'+DAYS[d.getDay()]+'）のお弁当🍱';
+function showMenuList(posts) {
+  var list = document.getElementById('menuList');
+  list.innerHTML = '';
+  if(!posts || posts.length === 0) {
+    list.innerHTML = '<div class="error-card">献立データが見つかりませんでした</div>';
+    return;
   }
 
-  var content = (post.content && post.content.rendered) ? post.content.rendered : '';
-  var text = stripTags(content);
-  var beforeSep = text.split('━')[0].split('@')[0];
-  var lines = beforeSep.split('\n').map(function(l){ return l.trim(); })
-    .filter(function(l){
-      return l && l.length > 0 && l.length < 30
-        && l !== title
-        && !l.match(/^[#＃🍱☑━@]/)
-        && !l.match(/円|kcal|食塩|15品目/);
-    });
-  if(lines[0] === title) lines.shift();
-  if(lines.length > 0){
-    document.getElementById('dishText').innerHTML = lines.slice(0,7).join('<br>');
-    document.getElementById('dishListWrap').style.display = 'block';
-  }
+  posts.forEach(function(post) {
+    var title = post.title && post.title.rendered
+      ? post.title.rendered.replace(/<[^>]+>/g,'') : '本日の献立';
+    var content = (post.content && post.content.rendered) ? post.content.rendered : '';
+    var todayPost = isToday(post.date);
 
-  var photoArea = document.getElementById('photoArea');
-  var imgUrl = content ? extractImgSrc(content) : '';
-  if(imgUrl){
-    var img = document.createElement('img');
-    img.alt = title;
-    img.onerror = function(){
-      photoArea.innerHTML = '<div class="no-photo">📷 写真は<a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで確認</a>できます</div>';
-    };
-    img.src = imgUrl;
-    photoArea.innerHTML = '';
-    photoArea.appendChild(img);
-  } else {
-    photoArea.innerHTML = '<div class="no-photo">📷 写真は<a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで確認</a>できます</div>';
-  }
+    // 副菜リスト抽出
+    var text = stripTags(content);
+    var beforeSep = text.split('━')[0].split('@')[0];
+    var lines = beforeSep.split('\n').map(function(l){ return l.trim(); })
+      .filter(function(l){
+        return l && l.length > 0 && l.length < 30
+          && l !== title
+          && !l.match(/^[#＃🍱☑━@]/)
+          && !l.match(/円|kcal|食塩|15品目/);
+      });
+    if(lines[0] === title) lines.shift();
+
+    // 画像
+    var imgUrl = content ? extractImgSrc(content) : '';
+
+    // カード生成
+    var card = document.createElement('div');
+    card.className = 'menu-card' + (todayPost ? ' today' : '');
+
+    // 日付バー
+    var dateBar = document.createElement('div');
+    dateBar.className = 'card-date-bar' + (todayPost ? ' today-bar' : '');
+
+    var badge = document.createElement('div');
+    badge.className = 'date-badge' + (todayPost ? ' today-badge' : '');
+    badge.textContent = todayPost ? '今日' : formatDate(post.date).split('（')[0];
+
+    var label = document.createElement('div');
+    label.className = 'date-label' + (todayPost ? ' today-label' : '');
+    label.textContent = todayPost
+      ? formatDate(post.date) + ' の献立'
+      : '（' + formatDate(post.date).match(/（(.+）)/)[1] + ' の献立';
+
+    dateBar.appendChild(badge);
+    dateBar.appendChild(label);
+    card.appendChild(dateBar);
+
+    // 写真
+    var photoDiv = document.createElement('div');
+    photoDiv.className = 'menu-photo';
+    if(imgUrl) {
+      var img = document.createElement('img');
+      img.alt = title;
+      img.onerror = function(){
+        photoDiv.innerHTML = '<div class="no-photo">📷 <a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで確認</a></div>';
+      };
+      img.src = imgUrl;
+      photoDiv.appendChild(img);
+    } else {
+      photoDiv.innerHTML = '<div class="no-photo">📷 <a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで写真を確認</a></div>';
+    }
+    card.appendChild(photoDiv);
+
+    // 献立名・副菜
+    var infoDiv = document.createElement('div');
+    infoDiv.className = 'menu-info';
+    var nameEl = document.createElement('div');
+    nameEl.className = 'menu-main-name';
+    nameEl.textContent = title;
+    infoDiv.appendChild(nameEl);
+
+    if(lines.length > 0) {
+      var dishDiv = document.createElement('div');
+      dishDiv.className = 'dish-items';
+      var dishLabel = document.createElement('div');
+      dishLabel.className = 'dish-label';
+      dishLabel.textContent = '副菜';
+      dishDiv.appendChild(dishLabel);
+      dishDiv.appendChild(document.createTextNode(lines.slice(0,7).join(' / ')));
+      infoDiv.appendChild(dishDiv);
+    }
+    card.appendChild(infoDiv);
+
+    list.appendChild(card);
+  });
 }
 
 function buildMonthButtons(posts) {
   var grid = document.getElementById('monthGrid');
   grid.innerHTML = '';
-  if(!posts || posts.length === 0){
-    grid.innerHTML = '<div style="font-size:13px;color:#aaa;grid-column:1/-1;padding:10px;text-align:center;">献立表データを取得できませんでした</div>';
-    return;
-  }
+  if(!posts || posts.length === 0) return;
 
   var thisYear  = now.getFullYear();
   var thisMonth = now.getMonth() + 1;
@@ -239,35 +260,33 @@ function buildMonthButtons(posts) {
     var postYear = new Date(post.date).getFullYear();
     if(postYear < thisYear - 1) return;
     var content = (post.content && post.content.rendered) ? post.content.rendered : '';
-    var pdfUrl = extractPdfUrl(content);
     allMonths.push({
       monthNum: parseInt(mMatch[1]),
       postYear: postYear,
       month: mMatch[1] + '月',
-      pdfUrl: pdfUrl,
+      pdfUrl: extractPdfUrl(content),
       postLink: post.link || 'https://uchikuru.jp/category/news/'
     });
   });
 
   function findMonth(target) {
     var found = allMonths.filter(function(m){ return m.monthNum===target && m.postYear===thisYear; });
-    if(found.length > 0) return found[0];
-    found = allMonths.filter(function(m){ return m.monthNum===target && m.postYear===thisYear-1; });
-    return found.length > 0 ? found[0] : null;
+    if(found.length) return found[0];
+    found = allMonths.filter(function(m){ return m.monthNum===target; });
+    return found.length ? found[0] : null;
   }
 
   monthsData = [];
-  var thisMonthData = findMonth(thisMonth);
-  var nextMonthData = findMonth(nextMonth);
-  if(thisMonthData) monthsData.push(thisMonthData);
-  if(nextMonthData && nextMonthData.postYear === thisYear) monthsData.push(nextMonthData);
+  var tm = findMonth(thisMonth);
+  var nm = findMonth(nextMonth);
+  if(tm) monthsData.push(tm);
+  if(nm && nm.postYear===thisYear) monthsData.push(nm);
   if(monthsData.length === 0) monthsData = allMonths.slice(0,1);
 
-  grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
   monthsData.forEach(function(m, idx){
     var btn = document.createElement('button');
     btn.className = 'month-btn';
-    btn.innerHTML = m.month + '<br><span style="font-size:11px;font-weight:normal;opacity:0.7;">献立表を見る</span>';
+    btn.innerHTML = m.month + '<span class="btn-sub">献立表を見る</span>';
     (function(i,b){ btn.onclick = function(){ selectMonth(i,b); }; })(idx, btn);
     grid.appendChild(btn);
   });
@@ -277,8 +296,7 @@ function selectMonth(idx, btn) {
   document.querySelectorAll('.month-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   var m = monthsData[idx];
-  var url = m.pdfUrl || m.postLink;
-  window.open(url, '_blank');
+  window.open(m.pdfUrl || m.postLink, '_blank');
 }
 
 function showError() {
@@ -286,11 +304,8 @@ function showError() {
   document.getElementById('errorCard').style.display = 'block';
 }
 
-// 8秒タイムアウト
 var loadTimeout = setTimeout(function(){
-  if(document.getElementById('loadingEl').style.display !== 'none'){
-    showError();
-  }
+  if(document.getElementById('loadingEl').style.display !== 'none') showError();
 }, 8000);
 
 loadAll();
