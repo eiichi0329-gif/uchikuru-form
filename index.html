@@ -135,8 +135,8 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <button class="menu-btn" onclick="loadAndShow('change')">
         <span class="icon">📝</span><span>注文内容の変更</span><span class="arrow">›</span>
       </button>
-      <button class="menu-btn" onclick="loadAndShow('stop')">
-        <span class="icon">🚫</span><span>利用停止</span><span class="arrow">›</span>
+      <button class="menu-btn" onclick="window.open('https://uchikuru-form-yddu.vercel.app/menu.html','_blank')">
+        <span class="icon">🍽</span><span>献立紹介</span><span class="arrow">›</span>
       </button>
       <button class="menu-btn" onclick="loadAndShow('resume')">
         <span class="icon">▶️</span><span>お届けを再開</span><span class="arrow">›</span>
@@ -248,6 +248,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
         <option>お弁当の種類・数量変更</option>
         <option>曜日・日程の変更</option>
         <option>キャンセル</option>
+        <option>利用停止</option>
         <option>その他</option>
       </select>
     </div>
@@ -272,6 +273,23 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
     <div class="date-tags" id="date-tags-cancel"></div>
     <input type="hidden" id="ch-cancelDate" value="">
 
+    </div>
+    <div id="ch-stopDate-wrap" style="display:none;">
+      <div class="sec-label">最終配達日</div>
+      <div class="calendar-wrap">
+        <div class="cal-header">
+          <button onclick="changeMonthCal('cal-grid-chstop',-1)">‹</button>
+          <span class="cal-title" id="cal-title-chstop"></span>
+          <button onclick="changeMonthCal('cal-grid-chstop',1)">›</button>
+        </div>
+        <div class="cal-days-header">
+          <span>日</span><span class="wd">月</span><span class="wd">火</span>
+          <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>
+        </div>
+        <div class="cal-grid" id="cal-grid-chstop"></div>
+      </div>
+      <div class="date-tags" id="date-tags-chstop"></div>
+      <input type="hidden" id="ch-stopDate" value="">
     </div>
     <div id="ch-startDate-wrap">
       <div class="sec-label">変更開始日<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
@@ -425,7 +443,7 @@ function getThisWeekMonday() {
 }
 
 function initAllCalendars() {
-  var ids = ['cal-grid','cal-grid-start','cal-grid-stop','cal-grid-change','cal-grid-cancel','cal-grid-resume'];
+  var ids = ['cal-grid','cal-grid-start','cal-grid-stop','cal-grid-chstop','cal-grid-change','cal-grid-cancel','cal-grid-resume'];
   var now = new Date();
   ids.forEach(function(id){
     calState[id] = {
@@ -479,8 +497,11 @@ function toggleDateCal(calId, ds) {
   var s = calState[calId]; if(!s) return;
   var inputMap = {
     'cal-grid-start':'no-startDate',
-    'cal-grid-stop':'st-lastDate','cal-grid-change':'ch-startDate',
-    'cal-grid-cancel':'ch-cancelDate','cal-grid-resume':'rs-startDate'
+    'cal-grid-stop':'st-lastDate',
+    'cal-grid-chstop':'ch-stopDate',
+    'cal-grid-change':'ch-startDate',
+    'cal-grid-cancel':'ch-cancelDate',
+    'cal-grid-resume':'rs-startDate'
   };
   if(s.singleSelect){
     s.selectedDates=[ds];
@@ -747,9 +768,16 @@ function toggleSameOrderNew(){
 function onChangeTypeChange(){
   var val=document.getElementById('ch-changeType').value;
   var isC=(val==='キャンセル');
+  var isS=(val==='利用停止');
+  // キャンセル日カレンダー：キャンセル時のみ表示
   document.getElementById('ch-cancelDate-wrap').style.display=isC?'block':'none';
-  document.getElementById('ch-startDate-wrap').style.display=isC?'none':'block';
-  document.getElementById('ch-detail-wrap').style.display=isC?'none':'block';
+  // 変更開始日カレンダー：キャンセル・利用停止以外で表示
+  document.getElementById('ch-startDate-wrap').style.display=(!isC&&!isS)?'block':'none';
+  // 詳細テキスト：キャンセル・利用停止以外で表示
+  document.getElementById('ch-detail-wrap').style.display=(!isC&&!isS)?'block':'none';
+  // 最終配達日カレンダー：利用停止時のみ表示
+  var stopWrap=document.getElementById('ch-stopDate-wrap');
+  if(stopWrap) stopWrap.style.display=isS?'block':'none';
 }
 
 /* ========== フォーム送信 ========== */
@@ -806,6 +834,9 @@ function buildParams(type){
     if(!p.changeType){alert('変更の種類を選択してください');return null;}
     if(p.changeType==='キャンセル'){
       p.detail=document.getElementById('ch-cancelDate').value||'';p.startDate='';
+    } else if(p.changeType==='利用停止'){
+      p.detail='';
+      p.startDate=document.getElementById('ch-stopDate').value||'';
     } else {
       p.detail=v('ch-detail');
       p.startDate=document.getElementById('ch-startDate').value||'';
