@@ -1,1 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>動画で見る | うちくる</title>
+<style>
+:root {
+  --orange: #E67E22;
+  --orange-light: #F5A623;
+  --orange-pale: #FFF8F0;
+  --brown: #3a2a1a;
+  --cream: #f9f4ef;
+  --gray: #888;
+  --border: #f0e8df;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(--cream); min-height: 100vh; }
 
+.header { background: white; padding: 14px 20px; text-align: center; border-bottom: 3px solid var(--orange); }
+.header img { height: 52px; width: auto; }
+.header .sub { font-size: 13px; color: var(--gray); margin-top: 3px; font-weight: 600; }
+
+.container { padding: 16px; max-width: 500px; margin: 0 auto; }
+
+.intro { background: var(--orange-pale); border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; font-size: 14px; color: var(--brown); line-height: 1.7; border-left: 4px solid var(--orange); }
+
+/* 動画カード */
+.video-card {
+  background: white; border-radius: 14px; overflow: hidden;
+  margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  cursor: pointer; transition: transform 0.15s;
+}
+.video-card:active { transform: scale(0.98); }
+
+/* サムネイル */
+.thumb-wrap { position: relative; width: 100%; padding-top: 56.25%; background: #000; overflow: hidden; }
+.thumb-wrap img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.play-btn {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 64px; height: 64px; background: rgba(230,126,34,0.92);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transition: transform 0.15s;
+}
+.play-btn::after { content: ''; border-style: solid; border-width: 12px 0 12px 22px; border-color: transparent transparent transparent white; margin-left: 4px; }
+.video-card:hover .play-btn { transform: translate(-50%, -50%) scale(1.1); }
+
+/* 動画再生中のiframe */
+.iframe-wrap { position: relative; width: 100%; padding-top: 56.25%; display: none; }
+.iframe-wrap iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+.iframe-wrap.active { display: block; }
+.thumb-wrap.hidden { display: none; }
+
+/* テキスト部分 */
+.video-info { padding: 14px 16px; }
+.video-num { font-size: 11px; color: var(--orange); font-weight: 700; letter-spacing: 0.08em; margin-bottom: 5px; }
+.video-title { font-size: 16px; font-weight: 700; color: var(--brown); line-height: 1.4; }
+.video-desc { font-size: 13px; color: var(--gray); margin-top: 6px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="https://uchikuru.jp/wp-content/uploads/2023/04/screenshot.png" alt="うちくる">
+  <div class="sub">動画で見る うちくるのサービス</div>
+</div>
+
+<div class="container">
+
+  <div class="intro">
+    🎬 うちくる夕食宅配サービスについて、動画でわかりやすくご紹介しています。
+  </div>
+
+  <!-- 動画1 -->
+  <div class="video-card" onclick="playVideo(this, 'MVC594lt0qM')">
+    <div class="thumb-wrap">
+      <img src="https://img.youtube.com/vi/MVC594lt0qM/maxresdefault.jpg"
+           onerror="this.src='https://img.youtube.com/vi/MVC594lt0qM/hqdefault.jpg'"
+           alt="調理からお届けまで">
+      <div class="play-btn"></div>
+    </div>
+    <div class="iframe-wrap"></div>
+    <div class="video-info">
+      <div class="video-num">▶ VIDEO 01</div>
+      <div class="video-title">調理からお届けまで</div>
+      <div class="video-desc">毎日の調理からご自宅へのお届けまでの流れを動画でご紹介します</div>
+    </div>
+  </div>
+
+  <!-- 動画2 -->
+  <div class="video-card" onclick="playVideo(this, 'y-3rwyy3JmM')">
+    <div class="thumb-wrap">
+      <img src="https://img.youtube.com/vi/y-3rwyy3JmM/maxresdefault.jpg"
+           onerror="this.src='https://img.youtube.com/vi/y-3rwyy3JmM/hqdefault.jpg'"
+           alt="ご利用方法のご案内">
+      <div class="play-btn"></div>
+    </div>
+    <div class="iframe-wrap"></div>
+    <div class="video-info">
+      <div class="video-num">▶ VIDEO 02</div>
+      <div class="video-title">ご利用方法のご案内</div>
+      <div class="video-desc">うちくる夕食宅配サービスのご利用方法について詳しくご案内します</div>
+    </div>
+  </div>
+
+  <!-- 動画3 -->
+  <div class="video-card" onclick="playVideo(this, 'O4wVL_fWF-Y')">
+    <div class="thumb-wrap">
+      <img src="https://img.youtube.com/vi/O4wVL_fWF-Y/maxresdefault.jpg"
+           onerror="this.src='https://img.youtube.com/vi/O4wVL_fWF-Y/hqdefault.jpg'"
+           alt="ブランドメッセージ">
+      <div class="play-btn"></div>
+    </div>
+    <div class="iframe-wrap"></div>
+    <div class="video-info">
+      <div class="video-num">▶ VIDEO 03</div>
+      <div class="video-title">もう一つの台所から、あなたを想う食事を</div>
+      <div class="video-desc">うちくるのブランドメッセージをパラパラ漫画で表現しました🎨</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function playVideo(card, videoId) {
+  var thumbWrap  = card.querySelector('.thumb-wrap');
+  var iframeWrap = card.querySelector('.iframe-wrap');
+
+  // すでに再生中なら何もしない
+  if (iframeWrap.classList.contains('active')) return;
+
+  // サムネイルを非表示にしてiframeを表示
+  thumbWrap.classList.add('hidden');
+  iframeWrap.classList.add('active');
+
+  var iframe = document.createElement('iframe');
+  iframe.src = 'https://www.youtube.com/embed/' + videoId + '?autoplay=1&rel=0&playsinline=1';
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+  iframe.allowFullscreen = true;
+  iframeWrap.appendChild(iframe);
+}
+</script>
+</body>
+</html>
