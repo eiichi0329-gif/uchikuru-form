@@ -144,9 +144,19 @@ function extractPdfUrl(html) {
   return m ? m[1] : '';
 }
 
-// タグを除去してテキスト取得
+// タグを除去してテキスト取得（brタグは改行に変換）
 function stripTags(html) {
-  return html.replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#8212;/g,'—').replace(/\s+/g,' ').trim();
+  return html
+    .replace(/<br\s*\/?>/gi, '
+')
+    .replace(/<\/p>/gi, '
+')
+    .replace(/<\/li>/gi, '
+')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#8212;/g,'—')
+    .replace(/[ 	]+/g,' ')
+    .trim();
 }
 
 // メイン処理
@@ -206,10 +216,18 @@ function showMenu(post) {
   var text = stripTags(content);
   // 「━」「@」より前の部分を取得して副菜名を抽出
   var beforeSep = text.split('━')[0].split('@')[0];
-  var lines = beforeSep.split(/[\n,，、\r]/).map(function(l){ return l.trim(); })
-    .filter(function(l){ return l && l.length > 0 && l.length < 25 && l !== title && !l.match(/^[#＃🍱☑]/); });
+  var lines = beforeSep.split(/
+/).map(function(l){ return l.trim(); })
+    .filter(function(l){
+      return l && l.length > 0 && l.length < 30
+        && l !== title
+        && !l.match(/^[#＃🍱☑━@]/)
+        && !l.match(/円|kcal|食塩|15品目/);
+    });
   if (lines.length > 0) {
-    document.getElementById('dishText').innerHTML = lines.slice(0, 6).join('<br>');
+    // 1行目がメインメニュー名と同じ場合は除く
+    if (lines[0] === title) lines.shift();
+    document.getElementById('dishText').innerHTML = lines.slice(0, 7).join('<br>');
     document.getElementById('dishListWrap').style.display = 'block';
   }
 
@@ -248,39 +266,50 @@ function buildMonthButtons(posts) {
     return;
   }
 
-  // 全月データをパース
+  // 全月データをパース（当年・前年まで対象）
   var allMonths = [];
+  var thisYear = now.getFullYear();
   posts.forEach(function(post) {
     var rawTitle = post.title.rendered.replace(/<[^>]+>/g,'');
     var mMatch = rawTitle.match(/(\d+)月/);
     if (!mMatch) return;
+    // 投稿年を確認（古すぎる投稿は除外）
+    var postYear = new Date(post.date).getFullYear();
+    if (postYear < thisYear - 1) return; // 2年以上前は除外
     var content = post.content ? post.content.rendered : '';
     var pdfUrl = extractPdfUrl(content);
     allMonths.push({
       monthNum: parseInt(mMatch[1]),
+      postYear: postYear,
       month: mMatch[1] + '月',
       pdfUrl: pdfUrl,
       postLink: post.link || 'https://uchikuru.jp/category/news/'
     });
   });
 
-  // 当月・次月のみ抽出
   var thisMonth = now.getMonth() + 1;
   var nextMonth = thisMonth === 12 ? 1 : thisMonth + 1;
 
-  monthsData = allMonths.filter(function(m) {
-    return m.monthNum === thisMonth || m.monthNum === nextMonth;
-  });
+  // 当月・次月を当年優先で抽出
+  function findMonth(targetMonth) {
+    // 当年を優先
+    var found = allMonths.filter(function(m){ return m.monthNum === targetMonth && m.postYear === thisYear; });
+    if (found.length > 0) return found[0];
+    // 当年になければ昨年
+    found = allMonths.filter(function(m){ return m.monthNum === targetMonth && m.postYear === thisYear - 1; });
+    return found.length > 0 ? found[0] : null;
+  }
 
-  // 当月・次月が見つからない場合は最新2件を表示
-  if (monthsData.length === 0) monthsData = allMonths.slice(0, 2);
+  monthsData = [];
+  var thisMonthData = findMonth(thisMonth);
+  var nextMonthData = findMonth(nextMonth);
 
-  // 当月が先、次月が後になるよう並び替え
-  monthsData.sort(function(a, b) {
-    if (a.monthNum === thisMonth) return -1;
-    if (b.monthNum === thisMonth) return 1;
-    return 0;
-  });
+  // 次月は当年分のみ表示（まだ投稿されていない場合は表示しない）
+  if (thisMonthData) monthsData.push(thisMonthData);
+  if (nextMonthData && nextMonthData.postYear === thisYear) monthsData.push(nextMonthData);
+
+  // 見つからない場合は最新1件を表示
+  if (monthsData.length === 0) monthsData = allMonths.slice(0, 1);
 
   // ボタンを2列グリッドで表示
   grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
