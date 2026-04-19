@@ -291,6 +291,12 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <div class="date-tags" id="date-tags-chstop"></div>
       <input type="hidden" id="ch-stopDate" value="">
     </div>
+    <div id="ch-stopReason-wrap" style="display:none;">
+      <div class="sec-label">停止理由<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
+      <div class="field">
+        <textarea id="ch-stopReason" placeholder="退会理由をご自由にお書きください"></textarea>
+      </div>
+    </div>
     <div id="ch-startDate-wrap">
       <div class="sec-label">変更開始日<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
       <div class="calendar-wrap">
@@ -778,6 +784,9 @@ function onChangeTypeChange(){
   // 最終配達日カレンダー：利用停止時のみ表示
   var stopWrap=document.getElementById('ch-stopDate-wrap');
   if(stopWrap) stopWrap.style.display=isS?'block':'none';
+  // 停止理由：利用停止時のみ表示
+  var stopReasonWrap=document.getElementById('ch-stopReason-wrap');
+  if(stopReasonWrap) stopReasonWrap.style.display=isS?'block':'none';
 }
 
 /* ========== フォーム送信 ========== */
@@ -835,7 +844,7 @@ function buildParams(type){
     if(p.changeType==='キャンセル'){
       p.detail=document.getElementById('ch-cancelDate').value||'';p.startDate='';
     } else if(p.changeType==='利用停止'){
-      p.detail='';
+      p.detail=v('ch-stopReason');
       p.startDate=document.getElementById('ch-stopDate').value||'';
     } else {
       p.detail=v('ch-detail');
