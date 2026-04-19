@@ -255,8 +255,8 @@ function buildMonthButtons(posts) {
     // 当年優先
     var found=allMonths.filter(function(m){return m.monthNum===target&&m.postYear===thisYear;});
     if(found.length){
-      // 既知PDFで上書き補完
-      if(knownPdfs[target]&&!found[0].pdfUrl) found[0].pdfUrl=knownPdfs[target].pdfUrl;
+      // knownPdfsが設定されていれば常に上書き（APIのキャッシュより優先）
+      if(knownPdfs[target]) found[0].pdfUrl=knownPdfs[target].pdfUrl;
       return found[0];
     }
     // APIで見つからない場合も既知PDFがあれば仮エントリを作成
