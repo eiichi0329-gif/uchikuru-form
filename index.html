@@ -238,6 +238,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
     <div id="fields-change">
       <div class="sec-label">お客様情報</div>
       <div class="field"><label>お名前<span class="req">*</span></label><input type="text" id="ch-name" placeholder="例：田中 花子"></div>
+      <div class="field"><label>ご住所<span class="req">*</span></label><input type="text" id="ch-address" placeholder="例：北九州市小倉北区〇〇1-2-3"></div>
       <div class="field"><label>電話番号<span class="req">*</span></label><input type="tel" id="ch-phone" placeholder="例：090-1234-5678"></div>
     </div>
     <div class="sec-label">変更内容</div>
@@ -859,7 +860,7 @@ function buildParams(type){
   } else if(type==='change'){
     p.name=v('ch-name')||cd.name||'';
     p.phone=v('ch-phone')||cd.phone||'';
-    p.address=cd.address||'';
+    p.address=v('ch-address')||cd.address||'';
     p.changeType=v('ch-changeType');
     if(!p.name||!p.phone){alert('お名前・電話番号を入力してください');return null;}
     if(!p.changeType){alert('変更の種類を選択してください');return null;}
