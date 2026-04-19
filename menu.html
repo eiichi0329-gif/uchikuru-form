@@ -162,22 +162,17 @@ function stripTags(html) {
 // メイン処理
 async function loadAll() {
   try {
-    // 1. カテゴリーIDを取得
-    var catRes = await fetch(BASE + '/categories?slug=menu,news&per_page=20');
-    if (!catRes.ok) throw new Error('categories fetch failed');
-    var cats = await catRes.json();
+    // カテゴリーIDを直接指定（menu=104, news=77）
+    var menuCatId = 104;
+    var newsCatId = 77;
 
-    var menuCatId = null, newsCatId = null;
-    cats.forEach(function(c) {
-      if (c.slug === 'menu') menuCatId = c.id;
-      if (c.slug === 'news') newsCatId = c.id;
-    });
-    if (!menuCatId || !newsCatId) throw new Error('category not found');
-
-    // 2. 今日の献立（最新1件）とニュース（最新12件）を並列取得
+    // 今日の献立（最新1件）とニュース（最新12件）を並列取得
+    // _fields で必要なフィールドのみ取得して軽量化
     var results = await Promise.all([
-      fetch(BASE + '/posts?categories=' + menuCatId + '&per_page=1&_embed=true').then(function(r){ return r.json(); }),
-      fetch(BASE + '/posts?categories=' + newsCatId + '&per_page=12').then(function(r){ return r.json(); })
+      fetch(BASE + '/posts?categories=' + menuCatId + '&per_page=1&_fields=id,title,date,link,content,_links&_embed=wp:featuredmedia')
+        .then(function(r){ return r.json(); }),
+      fetch(BASE + '/posts?categories=' + newsCatId + '&per_page=12&_fields=id,title,date,link,content')
+        .then(function(r){ return r.json(); })
     ]);
 
     var menuPosts = results[0];
@@ -231,17 +226,17 @@ function showMenu(post) {
     document.getElementById('dishListWrap').style.display = 'block';
   }
 
-  // 写真
+  // 写真：コンテンツから直接取得（確実な方法）
   var photoArea = document.getElementById('photoArea');
   var imgUrl = '';
 
-  // featured_media から取得
-  if (post._embedded && post._embedded['wp:featuredmedia'] && post._embedded['wp:featuredmedia'][0]) {
-    imgUrl = post._embedded['wp:featuredmedia'][0].source_url || '';
-  }
-  // コンテンツから取得（fallback）
-  if (!imgUrl && content) {
+  // コンテンツHTMLから最初のuchikuru.jp画像を取得
+  if (content) {
     imgUrl = extractImgSrc(content);
+  }
+  // featured_media からも試みる（fallback）
+  if (!imgUrl && post._embedded && post._embedded['wp:featuredmedia'] && post._embedded['wp:featuredmedia'][0]) {
+    imgUrl = post._embedded['wp:featuredmedia'][0].source_url || '';
   }
 
   if (imgUrl) {
