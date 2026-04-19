@@ -27,6 +27,39 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
 .spinner { width: 36px; height: 36px; border: 3px solid #f0e0cc; border-top-color: var(--orange); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* 月間献立表カード */
+.section-title { font-size: 14px; font-weight: 700; color: var(--orange); padding-left: 8px; border-left: 3px solid var(--orange); margin-bottom: 12px; }
+
+.month-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+
+.month-card {
+  background: white; border-radius: 14px; overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  cursor: pointer; border: 2px solid var(--border);
+  transition: transform 0.15s, border-color 0.15s;
+}
+.month-card:active { transform: scale(0.97); }
+.month-card.active { border-color: var(--orange); }
+
+.month-thumb {
+  width: 100%; aspect-ratio: 4/3; overflow: hidden;
+  background: var(--orange-pale); position: relative;
+}
+.month-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.month-thumb .no-thumb {
+  width: 100%; height: 100%; display: flex; align-items: center;
+  justify-content: center; font-size: 36px; flex-direction: column; gap: 6px;
+}
+.month-thumb .loading-overlay {
+  position: absolute; inset: 0; background: rgba(255,255,255,0.8);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--gray);
+}
+
+.month-info { padding: 10px 12px; }
+.month-label { font-size: 17px; font-weight: 900; color: var(--brown); }
+.month-sub { font-size: 12px; color: var(--orange); margin-top: 3px; font-weight: 600; }
+
 /* 献立カード */
 .menu-card {
   background: white; border-radius: 14px; overflow: hidden;
@@ -40,11 +73,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
   border-bottom: 1px solid var(--border);
 }
 .card-date-bar.today-bar { background: var(--orange); }
-.date-badge {
-  background: var(--orange); color: white;
-  border-radius: 8px; padding: 4px 10px;
-  font-size: 14px; font-weight: 900; flex-shrink: 0;
-}
+.date-badge { background: var(--orange); color: white; border-radius: 8px; padding: 4px 10px; font-size: 14px; font-weight: 900; flex-shrink: 0; }
 .date-badge.today-badge { background: white; color: var(--orange); }
 .date-label { font-size: 14px; font-weight: 700; color: var(--brown); }
 .date-label.today-label { color: white; }
@@ -56,15 +85,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
 .menu-info { padding: 14px 16px; }
 .menu-main-name { font-size: 19px; font-weight: 900; color: var(--brown); margin-bottom: 8px; }
 .dish-items { font-size: 13px; color: #666; line-height: 1.9; }
-.dish-items .dish-label { font-size: 11px; color: var(--orange); font-weight: 700; margin-bottom: 4px; }
-
-/* 月間献立表 */
-.section-title { font-size: 13px; font-weight: 700; color: var(--orange); padding-left: 8px; border-left: 3px solid var(--orange); margin: 20px 0 12px; }
-.month-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
-.month-btn { padding: 14px 6px; background: white; border: 2px solid var(--border); border-radius: 10px; text-align: center; font-size: 15px; font-weight: 700; color: var(--brown); cursor: pointer; transition: all 0.15s; }
-.month-btn:active { transform: scale(0.97); }
-.month-btn.active { border-color: var(--orange); background: var(--orange-pale); color: var(--orange); }
-.month-btn .btn-sub { font-size: 11px; font-weight: normal; opacity: 0.7; display: block; margin-top: 3px; }
+.dish-label { font-size: 11px; color: var(--orange); font-weight: 700; margin-bottom: 4px; }
 
 .error-card { background: #fff8f0; border: 1px solid #f0d0a0; border-radius: 12px; padding: 18px; text-align: center; font-size: 14px; color: var(--brown); line-height: 1.8; }
 .error-card a { color: var(--orange); }
@@ -89,7 +110,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(
     <div class="month-grid" id="monthGrid"></div>
 
     <!-- 今週の献立一覧 -->
-    <div class="section-title" style="margin-top:20px;">🍱 今週の献立</div>
+    <div class="section-title">🍱 今週の献立</div>
     <div id="menuList"></div>
   </div>
 
@@ -111,204 +132,209 @@ function extractImgSrc(h) {
   return m ? m[1] : '';
 }
 function extractPdfUrl(h) {
-  var m = h.match(/href=["'](https:\/\/uchikuru\.jp\/wp-content\/uploads\/[^"']+\.pdf)["']/);
+  var m = h.match(/href=["'](https?:\/\/uchikuru\.jp\/wp-content\/uploads\/[^"']+\.pdf)["']/);
   return m ? m[1] : '';
 }
 function stripTags(h) {
-  return h
-    .replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n').replace(/<[^>]+>/g,'')
-    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
-    .replace(/[ \t]+/g,' ').trim();
+  return h.replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n').replace(/<[^>]+>/g,'')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/[ \t]+/g,' ').trim();
 }
 function formatDate(dateStr) {
   var d = new Date(dateStr);
-  return (d.getMonth()+1) + '月' + d.getDate() + '日（' + DAYS[d.getDay()] + '）';
+  return (d.getMonth()+1)+'月'+d.getDate()+'日（'+DAYS[d.getDay()]+'）';
 }
 function isToday(dateStr) {
   var d = new Date(dateStr);
-  return d.getFullYear()===now.getFullYear()
-    && d.getMonth()===now.getMonth()
-    && d.getDate()===now.getDate();
+  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
 }
 
 function loadAll() {
-  // 直近7件（約1週間分）の献立を取得
-  var menuUrl = BASE + '/posts?categories=104&per_page=7&_fields=id,title,date,link,content';
-  var newsUrl = BASE + '/posts?categories=77&per_page=12&_fields=id,title,date,link,content';
-
-  var menuP = fetch(menuUrl).then(function(r){ if(!r.ok) throw new Error('menu '+r.status); return r.json(); });
-  var newsP  = fetch(newsUrl).then(function(r){ if(!r.ok) throw new Error('news '+r.status); return r.json(); });
+  var menuP = fetch(BASE+'/posts?categories=104&per_page=7&_fields=id,title,date,link,content')
+    .then(function(r){ if(!r.ok) throw new Error('menu'); return r.json(); });
+  var newsP  = fetch(BASE+'/posts?categories=77&per_page=12&_fields=id,title,date,link,content')
+    .then(function(r){ if(!r.ok) throw new Error('news'); return r.json(); });
 
   Promise.all([menuP, newsP])
-    .then(function(results){
-      showMenuList(results[0]);
-      buildMonthButtons(results[1]);
-      document.getElementById('loadingEl').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
+    .then(function(res){
+      showMenuList(res[0]);
+      buildMonthButtons(res[1]);
+      document.getElementById('loadingEl').style.display='none';
+      document.getElementById('mainContent').style.display='block';
     })
-    .catch(function(err){
-      console.error(err);
-      showError();
-    });
+    .catch(function(err){ console.error(err); showError(); });
 }
 
+/* ===== 今週の献立一覧 ===== */
 function showMenuList(posts) {
   var list = document.getElementById('menuList');
-  list.innerHTML = '';
-  if(!posts || posts.length === 0) {
-    list.innerHTML = '<div class="error-card">献立データが見つかりませんでした</div>';
-    return;
-  }
+  list.innerHTML='';
+  if(!posts||posts.length===0){ list.innerHTML='<div class="error-card">献立データが見つかりませんでした</div>'; return; }
+  posts.forEach(function(post){
+    var title=(post.title&&post.title.rendered)?post.title.rendered.replace(/<[^>]+>/g,''):'本日の献立';
+    var content=(post.content&&post.content.rendered)?post.content.rendered:'';
+    var todayPost=isToday(post.date);
+    var text=stripTags(content);
+    var beforeSep=text.split('━')[0].split('@')[0];
+    var lines=beforeSep.split('\n').map(function(l){return l.trim();})
+      .filter(function(l){return l&&l.length>0&&l.length<30&&l!==title&&!l.match(/^[#＃🍱☑━@]/)&&!l.match(/円|kcal|食塩|15品目/);});
+    if(lines[0]===title)lines.shift();
+    var imgUrl=content?extractImgSrc(content):'';
 
-  posts.forEach(function(post) {
-    var title = post.title && post.title.rendered
-      ? post.title.rendered.replace(/<[^>]+>/g,'') : '本日の献立';
-    var content = (post.content && post.content.rendered) ? post.content.rendered : '';
-    var todayPost = isToday(post.date);
+    var card=document.createElement('div');
+    card.className='menu-card'+(todayPost?' today':'');
 
-    // 副菜リスト抽出
-    var text = stripTags(content);
-    var beforeSep = text.split('━')[0].split('@')[0];
-    var lines = beforeSep.split('\n').map(function(l){ return l.trim(); })
-      .filter(function(l){
-        return l && l.length > 0 && l.length < 30
-          && l !== title
-          && !l.match(/^[#＃🍱☑━@]/)
-          && !l.match(/円|kcal|食塩|15品目/);
-      });
-    if(lines[0] === title) lines.shift();
-
-    // 画像
-    var imgUrl = content ? extractImgSrc(content) : '';
-
-    // カード生成
-    var card = document.createElement('div');
-    card.className = 'menu-card' + (todayPost ? ' today' : '');
-
-    // 日付バー
-    var dateBar = document.createElement('div');
-    dateBar.className = 'card-date-bar' + (todayPost ? ' today-bar' : '');
-
-    var badge = document.createElement('div');
-    badge.className = 'date-badge' + (todayPost ? ' today-badge' : '');
-    badge.textContent = todayPost ? '今日' : formatDate(post.date).split('（')[0];
-
-    var label = document.createElement('div');
-    label.className = 'date-label' + (todayPost ? ' today-label' : '');
-    label.textContent = todayPost
-      ? formatDate(post.date) + ' の献立'
-      : '（' + formatDate(post.date).match(/（(.+）)/)[1] + ' の献立';
-
-    dateBar.appendChild(badge);
-    dateBar.appendChild(label);
+    var dateBar=document.createElement('div');
+    dateBar.className='card-date-bar'+(todayPost?' today-bar':'');
+    var badge=document.createElement('div');
+    badge.className='date-badge'+(todayPost?' today-badge':'');
+    var d=new Date(post.date);
+    badge.textContent=todayPost?'今日':(d.getMonth()+1)+'/'+d.getDate();
+    var lbl=document.createElement('div');
+    lbl.className='date-label'+(todayPost?' today-label':'');
+    lbl.textContent=formatDate(post.date)+(todayPost?' の献立':'');
+    dateBar.appendChild(badge); dateBar.appendChild(lbl);
     card.appendChild(dateBar);
 
-    // 写真
-    var photoDiv = document.createElement('div');
-    photoDiv.className = 'menu-photo';
-    if(imgUrl) {
-      var img = document.createElement('img');
-      img.alt = title;
-      img.onerror = function(){
-        photoDiv.innerHTML = '<div class="no-photo">📷 <a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで確認</a></div>';
-      };
-      img.src = imgUrl;
-      photoDiv.appendChild(img);
-    } else {
-      photoDiv.innerHTML = '<div class="no-photo">📷 <a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで写真を確認</a></div>';
-    }
+    var photoDiv=document.createElement('div'); photoDiv.className='menu-photo';
+    if(imgUrl){
+      var img=document.createElement('img'); img.alt=title;
+      img.onerror=function(){photoDiv.innerHTML='<div class="no-photo">📷 <a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで確認</a></div>';};
+      img.src=imgUrl; photoDiv.appendChild(img);
+    }else{ photoDiv.innerHTML='<div class="no-photo">📷 <a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで確認</a></div>'; }
     card.appendChild(photoDiv);
 
-    // 献立名・副菜
-    var infoDiv = document.createElement('div');
-    infoDiv.className = 'menu-info';
-    var nameEl = document.createElement('div');
-    nameEl.className = 'menu-main-name';
-    nameEl.textContent = title;
-    infoDiv.appendChild(nameEl);
-
-    if(lines.length > 0) {
-      var dishDiv = document.createElement('div');
-      dishDiv.className = 'dish-items';
-      var dishLabel = document.createElement('div');
-      dishLabel.className = 'dish-label';
-      dishLabel.textContent = '副菜';
-      dishDiv.appendChild(dishLabel);
-      dishDiv.appendChild(document.createTextNode(lines.slice(0,7).join(' / ')));
-      infoDiv.appendChild(dishDiv);
+    var info=document.createElement('div'); info.className='menu-info';
+    var nm=document.createElement('div'); nm.className='menu-main-name'; nm.textContent=title;
+    info.appendChild(nm);
+    if(lines.length>0){
+      var dish=document.createElement('div'); dish.className='dish-items';
+      var dl=document.createElement('div'); dl.className='dish-label'; dl.textContent='副菜';
+      dish.appendChild(dl);
+      dish.appendChild(document.createTextNode(lines.slice(0,7).join(' / ')));
+      info.appendChild(dish);
     }
-    card.appendChild(infoDiv);
-
+    card.appendChild(info);
     list.appendChild(card);
   });
 }
 
+/* ===== 月間献立表ボタン（サムネイル付き） ===== */
 function buildMonthButtons(posts) {
-  var grid = document.getElementById('monthGrid');
-  grid.innerHTML = '';
-  if(!posts || posts.length === 0) return;
+  var grid=document.getElementById('monthGrid');
+  grid.innerHTML='';
+  if(!posts||posts.length===0) return;
 
-  var thisYear  = now.getFullYear();
-  var thisMonth = now.getMonth() + 1;
-  var nextMonth = thisMonth === 12 ? 1 : thisMonth + 1;
-  var allMonths = [];
+  var thisYear=now.getFullYear(), thisMonth=now.getMonth()+1;
+  var nextMonth=thisMonth===12?1:thisMonth+1;
+  var allMonths=[];
 
   posts.forEach(function(post){
-    var rawTitle = post.title && post.title.rendered
-      ? post.title.rendered.replace(/<[^>]+>/g,'') : '';
-    var mMatch = rawTitle.match(/(\d+)月/);
+    var rawTitle=(post.title&&post.title.rendered)?post.title.rendered.replace(/<[^>]+>/g,''):'';
+    var mMatch=rawTitle.match(/(\d+)月/);
     if(!mMatch) return;
-    var postYear = new Date(post.date).getFullYear();
-    if(postYear < thisYear - 1) return;
-    var content = (post.content && post.content.rendered) ? post.content.rendered : '';
+    var postYear=new Date(post.date).getFullYear();
+    if(postYear<thisYear-1) return;
+    var content=(post.content&&post.content.rendered)?post.content.rendered:'';
     allMonths.push({
-      monthNum: parseInt(mMatch[1]),
-      postYear: postYear,
-      month: mMatch[1] + '月',
-      pdfUrl: extractPdfUrl(content),
-      postLink: post.link || 'https://uchikuru.jp/category/news/'
+      monthNum:parseInt(mMatch[1]), postYear:postYear,
+      month:mMatch[1]+'月',
+      thumbUrl:extractImgSrc(content),
+      pdfUrl:extractPdfUrl(content),
+      postLink:post.link||'https://uchikuru.jp/category/news/',
+      postId:post.id
     });
   });
 
-  function findMonth(target) {
-    var found = allMonths.filter(function(m){ return m.monthNum===target && m.postYear===thisYear; });
-    if(found.length) return found[0];
-    found = allMonths.filter(function(m){ return m.monthNum===target; });
-    return found.length ? found[0] : null;
+  // 既知のPDF URLマップ（APIキャッシュ回避のため直接指定）
+  var knownPdfs = {
+    4: { pdfUrl:'https://uchikuru.jp/wp-content/uploads/2026/03/920500fda15b93d6f422ca911c741d59.pdf' },
+    5: { pdfUrl:'https://uchikuru.jp/wp-content/uploads/2026/04/0895588be246a93e81d8ddff5ce9188f.pdf' }
+  };
+
+  function findMonth(target){
+    // 当年優先
+    var found=allMonths.filter(function(m){return m.monthNum===target&&m.postYear===thisYear;});
+    if(found.length){
+      // 既知PDFで上書き補完
+      if(knownPdfs[target]&&!found[0].pdfUrl) found[0].pdfUrl=knownPdfs[target].pdfUrl;
+      return found[0];
+    }
+    // APIで見つからない場合も既知PDFがあれば仮エントリを作成
+    if(knownPdfs[target]){
+      return {
+        monthNum:target, postYear:thisYear,
+        month:target+'月',
+        thumbUrl:'', pdfUrl:knownPdfs[target].pdfUrl,
+        postLink:'https://uchikuru.jp/category/news/', postId:null
+      };
+    }
+    // 昨年
+    found=allMonths.filter(function(m){return m.monthNum===target&&m.postYear===thisYear-1;});
+    return found.length?found[0]:null;
   }
 
-  monthsData = [];
-  var tm = findMonth(thisMonth);
-  var nm = findMonth(nextMonth);
+  monthsData=[];
+  var tm=findMonth(thisMonth), nm=findMonth(nextMonth);
   if(tm) monthsData.push(tm);
-  if(nm && nm.postYear===thisYear) monthsData.push(nm);
-  if(monthsData.length === 0) monthsData = allMonths.slice(0,1);
+  if(nm) monthsData.push(nm);
+  if(monthsData.length===0) monthsData=allMonths.slice(0,1);
 
-  monthsData.forEach(function(m, idx){
-    var btn = document.createElement('button');
-    btn.className = 'month-btn';
-    btn.innerHTML = m.month + '<span class="btn-sub">献立表を見る</span>';
-    (function(i,b){ btn.onclick = function(){ selectMonth(i,b); }; })(idx, btn);
-    grid.appendChild(btn);
+  monthsData.forEach(function(m,idx){
+    var card=document.createElement('div');
+    card.className='month-card';
+
+    // サムネイル
+    var thumb=document.createElement('div'); thumb.className='month-thumb';
+    if(m.thumbUrl){
+      var img=document.createElement('img'); img.alt=m.month+'の献立表';
+      img.onerror=function(){
+        thumb.innerHTML='<div class="no-thumb" style="flex-direction:column;gap:6px;font-size:14px;color:var(--orange);font-weight:700;"><span style="font-size:32px;">📋</span>'+m.month+'の献立表</div>';
+      };
+      img.src=m.thumbUrl; thumb.appendChild(img);
+    }else{
+      thumb.innerHTML='<div class="no-thumb" style="flex-direction:column;gap:6px;font-size:14px;color:var(--orange);font-weight:700;"><span style="font-size:32px;">📋</span>'+m.month+'の献立表</div>';
+    }
+    card.appendChild(thumb);
+
+    // テキスト
+    var info=document.createElement('div'); info.className='month-info';
+    var label=document.createElement('div'); label.className='month-label'; label.textContent=m.month;
+    var sub=document.createElement('div'); sub.className='month-sub'; sub.textContent='タップしてPDFを開く';
+    info.appendChild(label); info.appendChild(sub);
+    card.appendChild(info);
+
+    // クリック時：PDFを開く（なければ個別フェッチ）
+    (function(data,c){
+      c.onclick=function(){
+        c.classList.add('active');
+        if(data.pdfUrl){
+          window.open(data.pdfUrl,'_blank');
+          return;
+        }
+        // PDF URLが取れていない場合は個別フェッチ
+        var overlay=document.createElement('div'); overlay.className='loading-overlay'; overlay.textContent='取得中...';
+        c.querySelector('.month-thumb').appendChild(overlay);
+        fetch(BASE+'/posts/'+data.postId+'?_fields=content')
+          .then(function(r){return r.json();})
+          .then(function(p){
+            overlay.remove();
+            var pdf=extractPdfUrl((p.content&&p.content.rendered)?p.content.rendered:'');
+            if(pdf){ data.pdfUrl=pdf; window.open(pdf,'_blank'); }
+            else{ window.open(data.postLink,'_blank'); }
+          })
+          .catch(function(){overlay.remove();window.open(data.postLink,'_blank');});
+      };
+    })(m,card);
+
+    grid.appendChild(card);
   });
 }
 
-function selectMonth(idx, btn) {
-  document.querySelectorAll('.month-btn').forEach(function(b){ b.classList.remove('active'); });
-  btn.classList.add('active');
-  var m = monthsData[idx];
-  window.open(m.pdfUrl || m.postLink, '_blank');
+function showError(){
+  document.getElementById('loadingEl').style.display='none';
+  document.getElementById('errorCard').style.display='block';
 }
-
-function showError() {
-  document.getElementById('loadingEl').style.display = 'none';
-  document.getElementById('errorCard').style.display = 'block';
-}
-
-var loadTimeout = setTimeout(function(){
-  if(document.getElementById('loadingEl').style.display !== 'none') showError();
-}, 8000);
-
+setTimeout(function(){if(document.getElementById('loadingEl').style.display!=='none')showError();},8000);
 loadAll();
 </script>
 </body>
