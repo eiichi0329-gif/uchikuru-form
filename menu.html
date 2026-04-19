@@ -127,122 +127,87 @@ var BASE = 'https://uchikuru.jp/wp-json/wp/v2';
 var DAYS = ['日','月','火','水','木','金','土'];
 var monthsData = [];
 
-// 日付表示
 var now = new Date();
 document.getElementById('dateDisplay').textContent = (now.getMonth()+1) + '/' + now.getDate();
 document.getElementById('weekdayDisplay').textContent = '（' + DAYS[now.getDay()] + '）';
 
-// HTML文字列から最初のimgのsrcを取得
-function extractImgSrc(html) {
-  var m = html.match(/<img[^>]+src=["']([^"']+)["']/);
+function extractImgSrc(h) {
+  var m = h.match(/<img[^>]+src=["']([^"']+uchikuru\.jp[^"']+)["']/);
   return m ? m[1] : '';
 }
-
-// HTML文字列からPDF URLを取得
-function extractPdfUrl(html) {
-  var m = html.match(/href=["'](https:\/\/uchikuru\.jp\/wp-content\/uploads\/[^"']+\.pdf)["']/);
+function extractPdfUrl(h) {
+  var m = h.match(/href=["'](https:\/\/uchikuru\.jp\/wp-content\/uploads\/[^"']+\.pdf)["']/);
   return m ? m[1] : '';
 }
-
-// タグを除去してテキスト取得（brタグは改行に変換）
-function stripTags(html) {
-  return html
-    .replace(/<br\s*\/?>/gi, '
-')
-    .replace(/<\/p>/gi, '
-')
-    .replace(/<\/li>/gi, '
-')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#8212;/g,'—')
-    .replace(/[ 	]+/g,' ')
-    .trim();
+function stripTags(h) {
+  return h
+    .replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n').replace(/<[^>]+>/g,'')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/[ \t]+/g,' ').trim();
 }
 
-// メイン処理
-async function loadAll() {
-  try {
-    // カテゴリーIDを直接指定（menu=104, news=77）
-    var menuCatId = 104;
-    var newsCatId = 77;
+function loadAll() {
+  var menuUrl = BASE + '/posts?categories=104&per_page=1&_fields=id,title,date,link,content';
+  var newsUrl = BASE + '/posts?categories=77&per_page=12&_fields=id,title,date,link,content';
 
-    // 今日の献立（最新1件）とニュース（最新12件）を並列取得
-    // _fields で必要なフィールドのみ取得して軽量化
-    var results = await Promise.all([
-      fetch(BASE + '/posts?categories=' + menuCatId + '&per_page=1&_fields=id,title,date,link,content,_links&_embed=wp:featuredmedia')
-        .then(function(r){ return r.json(); }),
-      fetch(BASE + '/posts?categories=' + newsCatId + '&per_page=12&_fields=id,title,date,link,content')
-        .then(function(r){ return r.json(); })
-    ]);
+  var menuPromise = fetch(menuUrl).then(function(r){
+    if(!r.ok) throw new Error('menu fetch failed: ' + r.status);
+    return r.json();
+  });
+  var newsPromise = fetch(newsUrl).then(function(r){
+    if(!r.ok) throw new Error('news fetch failed: ' + r.status);
+    return r.json();
+  });
 
-    var menuPosts = results[0];
-    var newsPosts = results[1];
-
-    if (!menuPosts || menuPosts.length === 0) throw new Error('no menu post');
-
-    // 今日の献立を表示
-    showMenu(menuPosts[0]);
-
-    // 月間献立表ボタンを生成
-    buildMonthButtons(newsPosts);
-
-    document.getElementById('loadingEl').style.display = 'none';
-    document.getElementById('mainContent').style.display = 'block';
-
-  } catch(e) {
-    console.error(e);
-    document.getElementById('loadingEl').style.display = 'none';
-    document.getElementById('errorCard').style.display = 'block';
-  }
+  Promise.all([menuPromise, newsPromise])
+    .then(function(results){
+      var menuPosts = results[0];
+      var newsPosts = results[1];
+      if(!menuPosts || menuPosts.length === 0) throw new Error('no menu post');
+      showMenu(menuPosts[0]);
+      buildMonthButtons(newsPosts);
+      document.getElementById('loadingEl').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+    })
+    .catch(function(err){
+      console.error('loadAll error:', err);
+      showError();
+    });
 }
 
 function showMenu(post) {
-  // タイトル（メニュー名）
-  var title = post.title.rendered.replace(/<[^>]+>/g,'');
+  var title = post.title && post.title.rendered
+    ? post.title.rendered.replace(/<[^>]+>/g,'') : '本日の献立';
   document.getElementById('menuName').textContent = title;
 
-  // 投稿日
   var d = new Date(post.date);
-  document.getElementById('menuDateDisplay').textContent =
-    (d.getMonth()+1) + '月' + d.getDate() + '日（' + DAYS[d.getDay()] + '）のお弁当🍱';
+  if(!isNaN(d.getTime())) {
+    document.getElementById('menuDateDisplay').textContent =
+      (d.getMonth()+1)+'月'+d.getDate()+'日（'+DAYS[d.getDay()]+'）のお弁当🍱';
+  }
 
-  // 副菜リスト（コンテンツから抽出）
-  var content = post.content ? post.content.rendered : '';
+  var content = (post.content && post.content.rendered) ? post.content.rendered : '';
   var text = stripTags(content);
-  // 「━」「@」より前の部分を取得して副菜名を抽出
   var beforeSep = text.split('━')[0].split('@')[0];
-  var lines = beforeSep.split(/
-/).map(function(l){ return l.trim(); })
+  var lines = beforeSep.split('\n').map(function(l){ return l.trim(); })
     .filter(function(l){
       return l && l.length > 0 && l.length < 30
         && l !== title
         && !l.match(/^[#＃🍱☑━@]/)
         && !l.match(/円|kcal|食塩|15品目/);
     });
-  if (lines.length > 0) {
-    // 1行目がメインメニュー名と同じ場合は除く
-    if (lines[0] === title) lines.shift();
-    document.getElementById('dishText').innerHTML = lines.slice(0, 7).join('<br>');
+  if(lines[0] === title) lines.shift();
+  if(lines.length > 0){
+    document.getElementById('dishText').innerHTML = lines.slice(0,7).join('<br>');
     document.getElementById('dishListWrap').style.display = 'block';
   }
 
-  // 写真：コンテンツから直接取得（確実な方法）
   var photoArea = document.getElementById('photoArea');
-  var imgUrl = '';
-
-  // コンテンツHTMLから最初のuchikuru.jp画像を取得
-  if (content) {
-    imgUrl = extractImgSrc(content);
-  }
-  // featured_media からも試みる（fallback）
-  if (!imgUrl && post._embedded && post._embedded['wp:featuredmedia'] && post._embedded['wp:featuredmedia'][0]) {
-    imgUrl = post._embedded['wp:featuredmedia'][0].source_url || '';
-  }
-
-  if (imgUrl) {
+  var imgUrl = content ? extractImgSrc(content) : '';
+  if(imgUrl){
     var img = document.createElement('img');
     img.alt = title;
-    img.onerror = function() {
+    img.onerror = function(){
       photoArea.innerHTML = '<div class="no-photo">📷 写真は<a href="https://www.instagram.com/uchikuru_takuhai/" target="_blank">Instagramで確認</a>できます</div>';
     };
     img.src = imgUrl;
@@ -256,22 +221,24 @@ function showMenu(post) {
 function buildMonthButtons(posts) {
   var grid = document.getElementById('monthGrid');
   grid.innerHTML = '';
-  if (!posts || posts.length === 0) {
+  if(!posts || posts.length === 0){
     grid.innerHTML = '<div style="font-size:13px;color:#aaa;grid-column:1/-1;padding:10px;text-align:center;">献立表データを取得できませんでした</div>';
     return;
   }
 
-  // 全月データをパース（当年・前年まで対象）
+  var thisYear  = now.getFullYear();
+  var thisMonth = now.getMonth() + 1;
+  var nextMonth = thisMonth === 12 ? 1 : thisMonth + 1;
   var allMonths = [];
-  var thisYear = now.getFullYear();
-  posts.forEach(function(post) {
-    var rawTitle = post.title.rendered.replace(/<[^>]+>/g,'');
+
+  posts.forEach(function(post){
+    var rawTitle = post.title && post.title.rendered
+      ? post.title.rendered.replace(/<[^>]+>/g,'') : '';
     var mMatch = rawTitle.match(/(\d+)月/);
-    if (!mMatch) return;
-    // 投稿年を確認（古すぎる投稿は除外）
+    if(!mMatch) return;
     var postYear = new Date(post.date).getFullYear();
-    if (postYear < thisYear - 1) return; // 2年以上前は除外
-    var content = post.content ? post.content.rendered : '';
+    if(postYear < thisYear - 1) return;
+    var content = (post.content && post.content.rendered) ? post.content.rendered : '';
     var pdfUrl = extractPdfUrl(content);
     allMonths.push({
       monthNum: parseInt(mMatch[1]),
@@ -282,38 +249,26 @@ function buildMonthButtons(posts) {
     });
   });
 
-  var thisMonth = now.getMonth() + 1;
-  var nextMonth = thisMonth === 12 ? 1 : thisMonth + 1;
-
-  // 当月・次月を当年優先で抽出
-  function findMonth(targetMonth) {
-    // 当年を優先
-    var found = allMonths.filter(function(m){ return m.monthNum === targetMonth && m.postYear === thisYear; });
-    if (found.length > 0) return found[0];
-    // 当年になければ昨年
-    found = allMonths.filter(function(m){ return m.monthNum === targetMonth && m.postYear === thisYear - 1; });
+  function findMonth(target) {
+    var found = allMonths.filter(function(m){ return m.monthNum===target && m.postYear===thisYear; });
+    if(found.length > 0) return found[0];
+    found = allMonths.filter(function(m){ return m.monthNum===target && m.postYear===thisYear-1; });
     return found.length > 0 ? found[0] : null;
   }
 
   monthsData = [];
   var thisMonthData = findMonth(thisMonth);
   var nextMonthData = findMonth(nextMonth);
+  if(thisMonthData) monthsData.push(thisMonthData);
+  if(nextMonthData && nextMonthData.postYear === thisYear) monthsData.push(nextMonthData);
+  if(monthsData.length === 0) monthsData = allMonths.slice(0,1);
 
-  // 次月は当年分のみ表示（まだ投稿されていない場合は表示しない）
-  if (thisMonthData) monthsData.push(thisMonthData);
-  if (nextMonthData && nextMonthData.postYear === thisYear) monthsData.push(nextMonthData);
-
-  // 見つからない場合は最新1件を表示
-  if (monthsData.length === 0) monthsData = allMonths.slice(0, 1);
-
-  // ボタンを2列グリッドで表示
   grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
-
-  monthsData.forEach(function(m, idx) {
+  monthsData.forEach(function(m, idx){
     var btn = document.createElement('button');
     btn.className = 'month-btn';
     btn.innerHTML = m.month + '<br><span style="font-size:11px;font-weight:normal;opacity:0.7;">献立表を見る</span>';
-    (function(i, b){ btn.onclick = function(){ selectMonth(i, b); }; })(idx, btn);
+    (function(i,b){ btn.onclick = function(){ selectMonth(i,b); }; })(idx, btn);
     grid.appendChild(btn);
   });
 }
@@ -321,12 +276,22 @@ function buildMonthButtons(posts) {
 function selectMonth(idx, btn) {
   document.querySelectorAll('.month-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
-
   var m = monthsData[idx];
   var url = m.pdfUrl || m.postLink;
-  // タップしたらそのままPDFを開く
   window.open(url, '_blank');
 }
+
+function showError() {
+  document.getElementById('loadingEl').style.display = 'none';
+  document.getElementById('errorCard').style.display = 'block';
+}
+
+// 8秒タイムアウト
+var loadTimeout = setTimeout(function(){
+  if(document.getElementById('loadingEl').style.display !== 'none'){
+    showError();
+  }
+}, 8000);
 
 loadAll();
 </script>
