@@ -138,8 +138,8 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <button class="menu-btn" onclick="window.open('https://uchikuru-form-yddu.vercel.app/menu.html','_blank')">
         <span class="icon">🍽</span><span>献立紹介</span><span class="arrow">›</span>
       </button>
-      <button class="menu-btn" onclick="loadAndShow('resume')">
-        <span class="icon">▶️</span><span>お届けを再開</span><span class="arrow">›</span>
+      <button class="menu-btn" onclick="window.open('https://uchikuru-form-yddu.vercel.app/videos.html','_blank')">
+        <span class="icon">🎬</span><span>動画でご案内</span><span class="arrow">›</span>
       </button>
       <button class="menu-btn" onclick="loadAndShow('recruit')">
         <span class="icon">👥</span><span>求人・面接のお申込み</span><span class="arrow">›</span>
@@ -834,78 +834,74 @@ function submitForm(type){
 function buildParams(type){
   var p={};
   var cd=window._customerData||{};
+  var errors=[];
+
   if(type==='newOrder'){
     p.name=v('no-name')||cd.name||'';
     p.address=v('no-address')||cd.address||'';
     p.phone=v('no-phone')||cd.phone||'';
-    if(!p.name||!p.address||!p.phone){alert('お名前・ご住所・電話番号を入力してください');return null;}
+    if(!p.name) errors.push('お名前');
+    if(!p.address) errors.push('ご住所');
+    if(!p.phone) errors.push('電話番号');
+    if(errors.length){alert('入力漏れがあります\n\n【未入力項目】\n・'+errors.join('\n・'));return null;}
+
     p.sameOrder=isSameOrderNew?'true':'false';
     var b=isSameOrderNew?'前回と同じ':getBentoStr('bento-grid-newOrder');
-    if(!isSameOrderNew&&!b){alert('お弁当の種類を選択してください');return null;}
+    if(!isSameOrderNew&&!b){alert('入力漏れがあります\n\n【未入力項目】\n・お弁当の種類（1つ以上選択してください）');return null;}
+
     var schedule='';
     if(!isSameOrderNew){
       if(currentPattern==='weekly'){
         var sd=document.getElementById('day-grid').querySelectorAll('.day-btn.selected');
-        if(sd.length>0&&sd.length<3){alert('週3日からのご注文となります');return null;}
+        if(sd.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達曜日（週3日以上選択してください）');return null;}
+        if(sd.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達曜日は週3日以上選択してください');return null;}
         schedule='毎週：'+getSelectedDays('day-grid');
       } else {
         var sdates=(calState['cal-grid']&&calState['cal-grid'].selectedDates)||[];
-        if(sdates.length>0&&sdates.length<3){alert('週3日からのご注文となります');return null;}
+        if(sdates.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達日（週3日以上選択してください）');return null;}
+        if(sdates.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達日は週3日以上選択してください');return null;}
         schedule=sdates.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
       }
     }
+    if(!isSameOrderNew&&!document.getElementById('no-startDate').value){
+      alert('入力漏れがあります\n\n【未入力項目】\n・配達開始日');return null;
+    }
     p.bento=b;p.schedule=schedule;
-    p.startDate=document.getElementById('no-startDate').value||'';p.referral=v('no-referral');p.note=v('no-note');
+    p.startDate=document.getElementById('no-startDate').value||'';
+    p.referral=v('no-referral');p.note=v('no-note');
 
   } else if(type==='change'){
     p.name=v('ch-name')||cd.name||'';
     p.phone=v('ch-phone')||cd.phone||'';
     p.address=v('ch-address')||cd.address||'';
     p.changeType=v('ch-changeType');
-    if(!p.name||!p.phone){alert('お名前・電話番号を入力してください');return null;}
-    if(!p.changeType){alert('変更の種類を選択してください');return null;}
+    if(!p.name) errors.push('お名前');
+    if(!p.phone) errors.push('電話番号');
+    if(!p.changeType) errors.push('変更の種類');
+    if(errors.length){alert('入力漏れがあります\n\n【未入力項目】\n・'+errors.join('\n・'));return null;}
+
     if(p.changeType==='キャンセル'){
-      p.detail=document.getElementById('ch-cancelDate').value||'';p.startDate='';
+      p.detail=document.getElementById('ch-cancelDate').value||'';
+      if(!p.detail){alert('入力漏れがあります\n\n【未入力項目】\n・キャンセル日');return null;}
+      p.startDate='';
     } else if(p.changeType==='利用停止'){
       p.detail=v('ch-stopReason');
       p.startDate=document.getElementById('ch-stopDate').value||'';
+      if(!p.startDate){alert('入力漏れがあります\n\n【未入力項目】\n・最終配達日');return null;}
     } else {
       p.detail=v('ch-detail');
       p.startDate=document.getElementById('ch-startDate').value||'';
-      if(!p.detail){alert('変更内容を入力してください');return null;}
+      if(!p.detail){alert('入力漏れがあります\n\n【未入力項目】\n・変更内容の詳細');return null;}
     }
     p.note=v('ch-note');
 
-  } else if(type==='stop'){
-    p.name=v('st-name')||cd.name||'';
-    p.phone=v('st-phone')||cd.phone||'';
-    p.address=cd.address||'';
-    if(!p.name||!p.phone){alert('お名前・電話番号を入力してください');return null;}
-    p.startDate=document.getElementById('st-lastDate').value||'';
-    p.reason=v('st-reason');p.note=v('st-note');
-
-  } else if(type==='resume'){
-    p.name=v('rs-name')||cd.name||'';
-    p.phone=v('rs-phone')||cd.phone||'';
-    p.address=cd.address||'';
-    if(!p.name||!p.phone){alert('お名前・電話番号を入力してください');return null;}
-    p.sameOrder=isSameOrder?'true':'false';
-    if(!isSameOrder){
-      p.bento=getBentoStr('bento-grid-resume');
-      var rd=document.getElementById('day-grid-resume').querySelectorAll('.day-btn.selected');
-      if(rd.length>0&&rd.length<3){alert('週3日からのご注文となります');return null;}
-      p.schedule='毎週：'+getSelectedDays('day-grid-resume');
-    }
-    p.startDate=document.getElementById('rs-startDate').value||'';
-    p.note=v('rs-note');
-
   } else if(type==='recruit'){
     p.store=v('rc-store');p.note=v('rc-message');
-    if(!p.note){alert('メッセージを入力してください');return null;}
+    if(!p.note){alert('入力漏れがあります\n\n【未入力項目】\n・お名前・連絡先・メッセージ');return null;}
 
   } else if(type==='inquiry'){
     p.name=v('iq-name');p.phone=v('iq-phone');p.note=v('iq-message');
-    if(!p.note){alert('お問い合わせ内容を入力してください');return null;}
+    if(!p.note){alert('入力漏れがあります\n\n【未入力項目】\n・お問い合わせ内容');return null;}
   }
   return p;
 }
