@@ -687,8 +687,9 @@ function loadCustomerInfoThen(type, callback) {
     .then(function(r){ return r.json(); })
     .then(function(data){
 
-      // 「未登録」「未入力」「なし」「―」などは空扱い
-      var EMPTY_VALS = ['未登録','未入力','なし','ー','―','-','−','未','なし','ない'];
+      // 空・未登録扱いの文字列リスト（カッコあり・なし両対応）
+      var EMPTY_VALS = ['未登録','(未登録)','（未登録）','未入力','(未入力)','（未入力）',
+                        'なし','ー','―','-','−','未','ない','なし','none','null','undefined'];
       function cleanVal(v){
         var s = String(v || '').trim();
         return EMPTY_VALS.indexOf(s) !== -1 ? '' : s;
@@ -706,22 +707,22 @@ function loadCustomerInfoThen(type, callback) {
       var px = prefix[type] || '';
       var fld = document.getElementById('fields-'+type);
 
+      // 登録済みカードを表示
       if(nm || ad || ph){
-        // 登録済みのお客様 → カードに表示
         var h = '<div class="card-label">登録済みのお客様情報</div>';
         if(nm) h += '<div class="info-row"><span class="lbl">お名前</span><span>'+nm+'</span></div>';
         if(ad) h += '<div class="info-row"><span class="lbl">ご住所</span><span>'+ad+'</span></div>';
         if(ph) h += '<div class="info-row"><span class="lbl">電話番号</span><span>'+ph+'</span></div>';
-        if(missing > 0) h += '<div style="font-size:12px;color:#E67E22;margin-top:6px;">※ 不足している情報があります。下の入力欄にご入力ください。</div>';
+        if(missing > 0){
+          h += '<div style="font-size:12px;color:#E67E22;margin-top:6px;">※下の欄に不足している情報をご入力ください</div>';
+        }
         var card = document.getElementById('ccard-'+type);
         if(card){ card.innerHTML = h; card.style.display = 'block'; }
-
-        // 「何で知ったか」を非表示
         var rw = document.getElementById('referral-wrap');
         if(rw) rw.style.display = 'none';
       }
 
-      // 入力フィールドに値をセット
+      // 全フィールドに値をセット（入力欄自体は全て値を保持）
       if(px){
         var elN = document.getElementById(px+'-name');
         var elA = document.getElementById(px+'-address');
@@ -734,11 +735,32 @@ function loadCustomerInfoThen(type, callback) {
       // 入力エリアの表示制御
       if(fld){
         if(missing === 0){
+          // 全て揃っている → 入力欄を非表示
           fld.style.display = 'none';
         } else {
+          // 不足あり → 入力欄を表示
           fld.style.display = 'block';
           var sl = fld.querySelector('.sec-label');
           if(sl) sl.textContent = '不足している情報をご入力ください（'+missing+'項目）＊';
+
+          // ★入力済みのフィールドのみ非表示にする
+          if(px){
+            var fieldMap = {name: px+'-name', address: px+'-address', phone: px+'-phone'};
+            var vals     = {name: nm, address: ad, phone: ph};
+            Object.keys(fieldMap).forEach(function(key){
+              var el = document.getElementById(fieldMap[key]);
+              if(!el) return;
+              // 親の.field divを探す
+              var wrap = el.parentElement;
+              while(wrap && wrap.className.indexOf('field') === -1){ wrap = wrap.parentElement; }
+              if(!wrap) return;
+              if(vals[key]){
+                wrap.style.display = 'none'; // 入力済み → 非表示
+              } else {
+                wrap.style.display = '';     // 未入力 → 表示
+              }
+            });
+          }
         }
       }
 
