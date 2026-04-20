@@ -686,61 +686,66 @@ function loadCustomerInfoThen(type, callback) {
   fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
     .then(function(r){ return r.json(); })
     .then(function(data){
-      var nm = data.name    || '';
-      var ad = data.address || '';
-      var ph = data.phone   || '';
+
+      var nm = String(data.name    || '').trim();
+      var ad = String(data.address || '').trim();
+      var ph = String(data.phone   || '').trim();
 
       window._customerData = {name:nm, address:ad, phone:ph};
+
+      // ★先にmissingを計算
+      var missing = (nm?0:1) + (ad?0:1) + (ph?0:1);
+
+      // デバッグ表示
+      var dbg = document.getElementById('debug-info');
+      if(dbg) dbg.textContent = '取得: 名前['+(nm||'なし')+'] 住所['+(ad||'なし')+'] 電話['+(ph||'なし')+'] 不足:'+missing+'件';
 
       var prefix = {newOrder:'no', change:'ch', stop:'st', resume:'rs'};
       var px = prefix[type] || '';
       var fld = document.getElementById('fields-'+type);
 
       if(nm || ad || ph){
-        // 登録済みのお客様 → カードに表示 + 入力欄に自動入力
-        var h = '<div class="card-label">登録済みのお客様情報（内容はご確認ください）</div>';
+        // 登録済みのお客様 → カードに表示
+        var h = '<div class="card-label">登録済みのお客様情報</div>';
         if(nm) h += '<div class="info-row"><span class="lbl">お名前</span><span>'+nm+'</span></div>';
         if(ad) h += '<div class="info-row"><span class="lbl">ご住所</span><span>'+ad+'</span></div>';
         if(ph) h += '<div class="info-row"><span class="lbl">電話番号</span><span>'+ph+'</span></div>';
         var card = document.getElementById('ccard-'+type);
         if(card){ card.innerHTML = h; card.style.display = 'block'; }
 
-        // デバッグ：取得内容を表示（確認後に削除予定）
-        var dbg = document.getElementById('debug-info');
-        if(dbg) dbg.innerHTML = '[取得] 名前:'+nm+' / 住所:'+ad+' / 電話:'+ph+' / 不足:'+missing;
-
-        // 入力欄に自動入力
-        if(px){
-          var elN = document.getElementById(px+'-name');
-          var elA = document.getElementById(px+'-address');
-          var elP = document.getElementById(px+'-phone');
-          if(elN) elN.value = nm;
-          if(elA) elA.value = ad;
-          if(elP) elP.value = ph;
-        }
-
-        // 不足チェック
-        var missing = (!nm ? 1:0) + (!ad ? 1:0) + (!ph ? 1:0);
-        if(missing === 0){
-          // 全て揃っている → 入力欄エリアを非表示
-          if(fld) fld.style.display = 'none';
-        } else {
-          // 不足あり → 入力欄を表示してラベル変更
-          if(fld){
-            fld.style.display = 'block';
-            var sl = fld.querySelector('.sec-label');
-            if(sl) sl.textContent = '不足している情報をご入力ください ＊';
-          }
-        }
-
-        // リピーター→「何で知ったか」を非表示
+        // 「何で知ったか」を非表示
         var rw = document.getElementById('referral-wrap');
         if(rw) rw.style.display = 'none';
       }
 
+      // 入力フィールドに値をセット
+      if(px){
+        var elN = document.getElementById(px+'-name');
+        var elA = document.getElementById(px+'-address');
+        var elP = document.getElementById(px+'-phone');
+        if(elN) elN.value = nm;
+        if(elA) elA.value = ad;
+        if(elP) elP.value = ph;
+      }
+
+      // 入力エリアの表示制御
+      if(fld){
+        if(missing === 0){
+          fld.style.display = 'none';
+        } else {
+          fld.style.display = 'block';
+          var sl = fld.querySelector('.sec-label');
+          if(sl) sl.textContent = '不足している情報をご入力ください（'+missing+'項目）';
+        }
+      }
+
       if(callback) callback();
     })
-    .catch(function(){ if(callback) callback(); });
+    .catch(function(err){
+      var dbg = document.getElementById('debug-info');
+      if(dbg) dbg.textContent = 'GAS取得エラー: '+err;
+      if(callback) callback();
+    });
 }
 
 
