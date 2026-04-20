@@ -876,6 +876,7 @@ function buildParams(type){
     p.address=v('ch-address')||cd.address||'';
     p.changeType=v('ch-changeType');
     if(!p.name) errors.push('お名前');
+    if(!p.address) errors.push('ご住所');
     if(!p.phone) errors.push('電話番号');
     if(!p.changeType) errors.push('変更の種類');
     if(errors.length){alert('入力漏れがあります\n\n【未入力項目】\n・'+errors.join('\n・'));return null;}
