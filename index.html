@@ -651,7 +651,7 @@ function loadCustomerInfoThen(type, callback) {
     .then(function(data){
       var hasAny = data.name||data.address||data.phone;
       if(hasAny){
-        // 取得済みの情報をカードに表示
+        // 登録済み情報をカードに表示
         var h='<div class="card-label">登録済みのお客様情報</div>';
         if(data.name)    h+='<div class="info-row"><span class="lbl">お名前</span><span>'+data.name+'</span></div>';
         if(data.address) h+='<div class="info-row"><span class="lbl">ご住所</span><span>'+data.address+'</span></div>';
@@ -664,7 +664,7 @@ function loadCustomerInfoThen(type, callback) {
         var fld=document.getElementById('fields-'+type);
         var missing=0;
 
-        if(p){
+        if(p && fld){
           var ne=document.getElementById(p+'-name');
           var pe=document.getElementById(p+'-phone');
           var ae=document.getElementById(p+'-address');
@@ -672,14 +672,15 @@ function loadCustomerInfoThen(type, callback) {
           if(ne) ne.value=data.name||'';
           if(pe) pe.value=data.phone||'';
           if(ae) ae.value=data.address||'';
-          // 揃っているフィールドの入力欄を非表示、欠けているものは表示
-          if(ne&&ne.closest('.field')){ if(data.name){ ne.closest('.field').style.display='none'; }else{ missing++; } }
-          if(pe&&pe.closest('.field')){ if(data.phone){ pe.closest('.field').style.display='none'; }else{ missing++; } }
-          if(ae&&ae.closest('.field')){ if(data.address){ ae.closest('.field').style.display='none'; }else{ missing++; } }
+          // 揃っているフィールドのラベル行を非表示、欠けているものは表示
+          function hideField(el){ if(el){ var f=el.parentElement; while(f&&!f.classList.contains('field')){f=f.parentElement;} if(f) f.style.display='none'; } }
+          if(data.name){  hideField(ne); }else{ missing++; }
+          if(data.phone){ hideField(pe); }else{ missing++; }
+          if(data.address){hideField(ae);}else{ missing++; }
         }
 
         if(missing > 0){
-          // 不足あり：入力欄エリアを表示してsec-labelを変更
+          // 不足あり：入力欄エリアを表示
           if(fld){
             fld.style.display='block';
             var sl=fld.querySelector('.sec-label');
@@ -852,7 +853,8 @@ function buildParams(type){
     var schedule='';
     if(!isSameOrderNew){
       if(currentPattern==='weekly'){
-        var sd=document.getElementById('day-grid').querySelectorAll('.day-btn.selected');
+        var dayGridEl=document.getElementById('day-grid');
+        var sd=dayGridEl?dayGridEl.querySelectorAll('.day-btn.selected'):[];
         if(sd.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達曜日（週3日以上選択してください）');return null;}
         if(sd.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達曜日は週3日以上選択してください');return null;}
         schedule='毎週：'+getSelectedDays('day-grid');
@@ -861,6 +863,20 @@ function buildParams(type){
         if(sdates.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達日（週3日以上選択してください）');return null;}
         if(sdates.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達日は週3日以上選択してください');return null;}
         schedule=sdates.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
+      }
+    } else {
+      // 前回と同じでもスケジュールは必須
+      if(currentPattern==='weekly'){
+        var dayGridEl2=document.getElementById('day-grid');
+        var sd2=dayGridEl2?dayGridEl2.querySelectorAll('.day-btn.selected'):[];
+        if(sd2.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達曜日（週3日以上選択してください）');return null;}
+        if(sd2.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達曜日は週3日以上選択してください');return null;}
+        schedule='毎週：'+getSelectedDays('day-grid');
+      } else {
+        var sdates2=(calState['cal-grid']&&calState['cal-grid'].selectedDates)||[];
+        if(sdates2.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達日（週3日以上選択してください）');return null;}
+        if(sdates2.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達日は週3日以上選択してください');return null;}
+        schedule=sdates2.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
       }
     }
     if(!document.getElementById('no-startDate').value){
