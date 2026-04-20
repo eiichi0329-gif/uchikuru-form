@@ -687,18 +687,20 @@ function loadCustomerInfoThen(type, callback) {
     .then(function(r){ return r.json(); })
     .then(function(data){
 
-      var nm = String(data.name    || '').trim();
-      var ad = String(data.address || '').trim();
-      var ph = String(data.phone   || '').trim();
+      // 「未登録」「未入力」「なし」「―」などは空扱い
+      var EMPTY_VALS = ['未登録','未入力','なし','ー','―','-','−','未','なし','ない'];
+      function cleanVal(v){
+        var s = String(v || '').trim();
+        return EMPTY_VALS.indexOf(s) !== -1 ? '' : s;
+      }
+
+      var nm = cleanVal(data.name);
+      var ad = cleanVal(data.address);
+      var ph = cleanVal(data.phone);
 
       window._customerData = {name:nm, address:ad, phone:ph};
 
-      // ★先にmissingを計算
       var missing = (nm?0:1) + (ad?0:1) + (ph?0:1);
-
-      // デバッグ表示
-      var dbg = document.getElementById('debug-info');
-      if(dbg) dbg.textContent = '取得: 名前['+(nm||'なし')+'] 住所['+(ad||'なし')+'] 電話['+(ph||'なし')+'] 不足:'+missing+'件';
 
       var prefix = {newOrder:'no', change:'ch', stop:'st', resume:'rs'};
       var px = prefix[type] || '';
@@ -710,6 +712,7 @@ function loadCustomerInfoThen(type, callback) {
         if(nm) h += '<div class="info-row"><span class="lbl">お名前</span><span>'+nm+'</span></div>';
         if(ad) h += '<div class="info-row"><span class="lbl">ご住所</span><span>'+ad+'</span></div>';
         if(ph) h += '<div class="info-row"><span class="lbl">電話番号</span><span>'+ph+'</span></div>';
+        if(missing > 0) h += '<div style="font-size:12px;color:#E67E22;margin-top:6px;">※ 不足している情報があります。下の入力欄にご入力ください。</div>';
         var card = document.getElementById('ccard-'+type);
         if(card){ card.innerHTML = h; card.style.display = 'block'; }
 
@@ -735,17 +738,13 @@ function loadCustomerInfoThen(type, callback) {
         } else {
           fld.style.display = 'block';
           var sl = fld.querySelector('.sec-label');
-          if(sl) sl.textContent = '不足している情報をご入力ください（'+missing+'項目）';
+          if(sl) sl.textContent = '不足している情報をご入力ください（'+missing+'項目）＊';
         }
       }
 
       if(callback) callback();
     })
-    .catch(function(err){
-      var dbg = document.getElementById('debug-info');
-      if(dbg) dbg.textContent = 'GAS取得エラー: '+err;
-      if(callback) callback();
-    });
+    .catch(function(){ if(callback) callback(); });
 }
 
 
