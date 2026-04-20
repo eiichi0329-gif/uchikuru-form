@@ -183,7 +183,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
   <div id="form-newOrder" class="form-wrap">
     <div class="form-title">🍱 新規ご注文</div>
     <div class="customer-card" id="ccard-newOrder" style="display:none;"></div>
-    <div id="fields-newOrder" style="display:none;">
+    <div id="fields-newOrder">
       <div class="sec-label">お客様情報</div>
       <div class="field"><label>お名前<span class="req">*</span></label><input type="text" id="no-name" placeholder="例：田中 花子"></div>
       <div class="field"><label>ご住所<span class="req">*</span></label><input type="text" id="no-address" placeholder="例：北九州市小倉北区〇〇1-2-3"></div>
@@ -264,7 +264,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
   <div id="form-change" class="form-wrap">
     <div class="form-title">📝 注文内容の変更</div>
     <div class="customer-card" id="ccard-change" style="display:none;"></div>
-    <div id="fields-change" style="display:none;">
+    <div id="fields-change">
       <div class="sec-label">お客様情報</div>
       <div class="field"><label>お名前<span class="req">*</span></label><input type="text" id="ch-name" placeholder="例：田中 花子"></div>
       <div class="field"><label>ご住所<span class="req">*</span></label><input type="text" id="ch-address" placeholder="例：北九州市小倉北区〇〇1-2-3"></div>
@@ -681,81 +681,84 @@ function hideAll(){
 
 /* ========== 顧客情報 ========== */
 function loadCustomerInfoThen(type, callback) {
+  // userIdがない場合はそのまま表示
   if(!userId){ if(callback) callback(); return; }
 
   fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
     .then(function(r){ return r.json(); })
     .then(function(data){
-
-      var nm  = data.name    || '';
-      var ad  = data.address || '';
-      var ph  = data.phone   || '';
-      var prefix = {newOrder:'no', change:'ch', stop:'st', resume:'rs'};
-      var px = prefix[type] || '';
-      var fld = document.getElementById('fields-'+type);
-
-      // 登録済み情報カードを表示
-      if(nm || ad || ph){
-        var h = '<div class="card-label">登録済みのお客様情報</div>';
-        if(nm) h += '<div class="info-row"><span class="lbl">お名前</span><span>'+nm+'</span></div>';
-        if(ad) h += '<div class="info-row"><span class="lbl">ご住所</span><span>'+ad+'</span></div>';
-        if(ph) h += '<div class="info-row"><span class="lbl">電話番号</span><span>'+ph+'</span></div>';
-        var card = document.getElementById('ccard-'+type);
-        if(card){ card.innerHTML = h; card.style.display = 'block'; }
-        // リピーター→「何で知ったか」を非表示
-        var rw = document.getElementById('referral-wrap');
-        if(rw) rw.style.display = 'none';
-      }
-
-      window._customerData = { name:nm, address:ad, phone:ph };
-
-      // 欠けているフィールドを特定して入力欄の表示を制御
-      if(px && fld){
-        var missing = 0;
-        var fields = ['name','address','phone'];
-        var vals   = { name:nm, address:ad, phone:ph };
-        var ids    = { name:px+'-name', address:px+'-address', phone:px+'-phone' };
-
-        // まずフィールドの値をセット
-        fields.forEach(function(key){
-          var el = document.getElementById(ids[key]);
-          if(el) el.value = vals[key];
-        });
-
-        // 各フィールドの表示/非表示を制御
-        fields.forEach(function(key){
-          var el = document.getElementById(ids[key]);
-          if(!el) return;
-          // .field 親要素を取得
-          var wrap = el;
-          while(wrap && wrap.tagName !== 'DIV'){ wrap = wrap.parentElement; }
-          while(wrap && wrap.className.indexOf('field') === -1){ wrap = wrap.parentElement; }
-
-          if(vals[key]){
-            // データあり → 入力欄を非表示
-            if(wrap) wrap.style.display = 'none';
-          } else {
-            // データなし → 入力欄を表示（必須）
-            if(wrap) wrap.style.display = '';
-            missing++;
-          }
-        });
-
-        if(missing > 0){
-          // 不足あり：入力欄エリアを表示・ラベル変更
-          fld.style.display = 'block';
-          var sl = fld.querySelector('.sec-label');
-          if(sl) sl.textContent = '不足している情報をご入力ください ＊';
-        } else {
-          // 全て揃っている：入力欄エリアを非表示
-          fld.style.display = 'none';
-        }
-      }
-
+      applyCustomerData(type, data);
       if(callback) callback();
     })
-    .catch(function(){ if(callback) callback(); });
+    .catch(function(){
+      // 取得失敗時は全フィールドを表示したまま
+      if(callback) callback();
+    });
 }
+
+function applyCustomerData(type, data) {
+  var nm = data.name    || '';
+  var ad = data.address || '';
+  var ph = data.phone   || '';
+
+  // 登録済み情報をカードに表示
+  if(nm || ad || ph){
+    var h = '<div class="card-label">登録済みのお客様情報</div>';
+    if(nm) h += '<div class="info-row"><span class="lbl">お名前</span><span>'+nm+'</span></div>';
+    if(ad) h += '<div class="info-row"><span class="lbl">ご住所</span><span>'+ad+'</span></div>';
+    if(ph) h += '<div class="info-row"><span class="lbl">電話番号</span><span>'+ph+'</span></div>';
+    var card = document.getElementById('ccard-'+type);
+    if(card){ card.innerHTML = h; card.style.display = 'block'; }
+    // リピーター→「何で知ったか」を非表示
+    var rw = document.getElementById('referral-wrap');
+    if(rw) rw.style.display = 'none';
+  }
+
+  window._customerData = {name:nm, address:ad, phone:ph};
+
+  // フィールドIDのマッピング
+  var prefix = {newOrder:'no', change:'ch', stop:'st', resume:'rs'};
+  var px = prefix[type];
+  if(!px) return;
+
+  // 各フィールドに値をセット
+  var elName    = document.getElementById(px+'-name');
+  var elAddress = document.getElementById(px+'-address');
+  var elPhone   = document.getElementById(px+'-phone');
+  if(elName)    elName.value    = nm;
+  if(elAddress) elAddress.value = ad;
+  if(elPhone)   elPhone.value   = ph;
+
+  // 欠けているフィールドを確認
+  var missing = (!nm ? 1 : 0) + (!ad ? 1 : 0) + (!ph ? 1 : 0);
+  var fld = document.getElementById('fields-'+type);
+  if(!fld) return;
+
+  if(missing === 0){
+    // 全て揃っている→入力エリアを非表示
+    fld.style.display = 'none';
+  } else {
+    // 不足あり→入力エリアを表示
+    fld.style.display = 'block';
+    // ヘッダーテキストを変更
+    var sl = fld.querySelector('.sec-label');
+    if(sl) sl.textContent = '不足している情報をご入力ください ＊';
+    // 入力済みのフィールドを非表示にする
+    if(nm && elName && elName.closest){
+      var fw = elName.closest('.field');
+      if(fw) fw.style.display = 'none';
+    }
+    if(ad && elAddress && elAddress.closest){
+      var fw2 = elAddress.closest('.field');
+      if(fw2) fw2.style.display = 'none';
+    }
+    if(ph && elPhone && elPhone.closest){
+      var fw3 = elPhone.closest('.field');
+      if(fw3) fw3.style.display = 'none';
+    }
+  }
+}
+
 
 // 後方互換
 function loadCustomerInfo(type){ loadCustomerInfoThen(type, null); }
