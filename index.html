@@ -863,7 +863,7 @@ function buildParams(type){
         schedule=sdates.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
       }
     }
-    if(!isSameOrderNew&&!document.getElementById('no-startDate').value){
+    if(!document.getElementById('no-startDate').value){
       alert('入力漏れがあります\n\n【未入力項目】\n・配達開始日');return null;
     }
     p.bento=b;p.schedule=schedule;
