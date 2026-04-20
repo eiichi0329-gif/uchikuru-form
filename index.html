@@ -681,82 +681,66 @@ function hideAll(){
 
 /* ========== 顧客情報 ========== */
 function loadCustomerInfoThen(type, callback) {
-  // userIdがない場合はそのまま表示
   if(!userId){ if(callback) callback(); return; }
 
   fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
     .then(function(r){ return r.json(); })
     .then(function(data){
-      applyCustomerData(type, data);
+      var nm = data.name    || '';
+      var ad = data.address || '';
+      var ph = data.phone   || '';
+
+      window._customerData = {name:nm, address:ad, phone:ph};
+
+      var prefix = {newOrder:'no', change:'ch', stop:'st', resume:'rs'};
+      var px = prefix[type] || '';
+      var fld = document.getElementById('fields-'+type);
+
+      if(nm || ad || ph){
+        // 登録済みのお客様 → カードに表示 + 入力欄に自動入力
+        var h = '<div class="card-label">登録済みのお客様情報（内容はご確認ください）</div>';
+        if(nm) h += '<div class="info-row"><span class="lbl">お名前</span><span>'+nm+'</span></div>';
+        if(ad) h += '<div class="info-row"><span class="lbl">ご住所</span><span>'+ad+'</span></div>';
+        if(ph) h += '<div class="info-row"><span class="lbl">電話番号</span><span>'+ph+'</span></div>';
+        var card = document.getElementById('ccard-'+type);
+        if(card){ card.innerHTML = h; card.style.display = 'block'; }
+
+        // デバッグ：取得内容を表示（確認後に削除予定）
+        var dbg = document.getElementById('debug-info');
+        if(dbg) dbg.innerHTML = '[取得] 名前:'+nm+' / 住所:'+ad+' / 電話:'+ph+' / 不足:'+missing;
+
+        // 入力欄に自動入力
+        if(px){
+          var elN = document.getElementById(px+'-name');
+          var elA = document.getElementById(px+'-address');
+          var elP = document.getElementById(px+'-phone');
+          if(elN) elN.value = nm;
+          if(elA) elA.value = ad;
+          if(elP) elP.value = ph;
+        }
+
+        // 不足チェック
+        var missing = (!nm ? 1:0) + (!ad ? 1:0) + (!ph ? 1:0);
+        if(missing === 0){
+          // 全て揃っている → 入力欄エリアを非表示
+          if(fld) fld.style.display = 'none';
+        } else {
+          // 不足あり → 入力欄を表示してラベル変更
+          if(fld){
+            fld.style.display = 'block';
+            var sl = fld.querySelector('.sec-label');
+            if(sl) sl.textContent = '不足している情報をご入力ください ＊';
+          }
+        }
+
+        // リピーター→「何で知ったか」を非表示
+        var rw = document.getElementById('referral-wrap');
+        if(rw) rw.style.display = 'none';
+      }
+
       if(callback) callback();
     })
-    .catch(function(){
-      // 取得失敗時は全フィールドを表示したまま
-      if(callback) callback();
-    });
-}
-
-function applyCustomerData(type, data) {
-  var nm = data.name    || '';
-  var ad = data.address || '';
-  var ph = data.phone   || '';
-
-  // 登録済み情報をカードに表示
-  if(nm || ad || ph){
-    var h = '<div class="card-label">登録済みのお客様情報</div>';
-    if(nm) h += '<div class="info-row"><span class="lbl">お名前</span><span>'+nm+'</span></div>';
-    if(ad) h += '<div class="info-row"><span class="lbl">ご住所</span><span>'+ad+'</span></div>';
-    if(ph) h += '<div class="info-row"><span class="lbl">電話番号</span><span>'+ph+'</span></div>';
-    var card = document.getElementById('ccard-'+type);
-    if(card){ card.innerHTML = h; card.style.display = 'block'; }
-    // リピーター→「何で知ったか」を非表示
-    var rw = document.getElementById('referral-wrap');
-    if(rw) rw.style.display = 'none';
-  }
-
-  window._customerData = {name:nm, address:ad, phone:ph};
-
-  // フィールドIDのマッピング
-  var prefix = {newOrder:'no', change:'ch', stop:'st', resume:'rs'};
-  var px = prefix[type];
-  if(!px) return;
-
-  // 各フィールドに値をセット
-  var elName    = document.getElementById(px+'-name');
-  var elAddress = document.getElementById(px+'-address');
-  var elPhone   = document.getElementById(px+'-phone');
-  if(elName)    elName.value    = nm;
-  if(elAddress) elAddress.value = ad;
-  if(elPhone)   elPhone.value   = ph;
-
-  // 欠けているフィールドを確認
-  var missing = (!nm ? 1 : 0) + (!ad ? 1 : 0) + (!ph ? 1 : 0);
-  var fld = document.getElementById('fields-'+type);
-  if(!fld) return;
-
-  if(missing === 0){
-    // 全て揃っている→入力エリアを非表示
-    fld.style.display = 'none';
-  } else {
-    // 不足あり→入力エリアを表示
-    fld.style.display = 'block';
-    // ヘッダーテキストを変更
-    var sl = fld.querySelector('.sec-label');
-    if(sl) sl.textContent = '不足している情報をご入力ください ＊';
-    // 入力済みのフィールドを非表示にする
-    if(nm && elName && elName.closest){
-      var fw = elName.closest('.field');
-      if(fw) fw.style.display = 'none';
-    }
-    if(ad && elAddress && elAddress.closest){
-      var fw2 = elAddress.closest('.field');
-      if(fw2) fw2.style.display = 'none';
-    }
-    if(ph && elPhone && elPhone.closest){
-      var fw3 = elPhone.closest('.field');
-      if(fw3) fw3.style.display = 'none';
-    }
-  }
+    .catch(function(){ if(callback) callback(); });
 }
 
 
