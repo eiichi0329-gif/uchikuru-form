@@ -844,24 +844,24 @@ function buildParams(type){
     if(!p.name) errors.push('お名前');
     if(!p.address) errors.push('ご住所');
     if(!p.phone) errors.push('電話番号');
-    if(errors.length){alert('入力漏れがあります\n\n【未入力項目】\n・'+errors.join('\n・'));return null;}
+    if(errors.length){alert('ご入力をお願いします 🙏\n\n以下の項目をご確認ください：\n\n・'+errors.join('\n・')+'\n\nご確認のうえ、再度送信してください。');return null;}
 
     p.sameOrder=isSameOrderNew?'true':'false';
     var b=isSameOrderNew?'前回と同じ':getBentoStr('bento-grid-newOrder');
-    if(!isSameOrderNew&&!b){alert('入力漏れがあります\n\n【未入力項目】\n・お弁当の種類（1つ以上選択してください）');return null;}
+    if(!isSameOrderNew&&!b){alert('お弁当の種類が選ばれていません 🍱\n\nご希望のお弁当を1つ以上選択してください。');return null;}
 
     var schedule='';
     if(!isSameOrderNew){
       if(currentPattern==='weekly'){
         var dayGridEl=document.getElementById('day-grid');
         var sd=dayGridEl?dayGridEl.querySelectorAll('.day-btn.selected'):[];
-        if(sd.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達曜日（週3日以上選択してください）');return null;}
-        if(sd.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達曜日は週3日以上選択してください');return null;}
+        if(sd.length===0){alert('配達曜日が選ばれていません 📅\n\n配達をご希望の曜日を選択してください。\n（週3日以上のご指定が必要です）');return null;}
+        if(sd.length<3){alert('配達曜日は週3日以上選択してください 📅\n\nお手数ですが、もう少し曜日を追加してください。');return null;}
         schedule='毎週：'+getSelectedDays('day-grid');
       } else {
         var sdates=(calState['cal-grid']&&calState['cal-grid'].selectedDates)||[];
-        if(sdates.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達日（週3日以上選択してください）');return null;}
-        if(sdates.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達日は週3日以上選択してください');return null;}
+        if(sdates.length===0){alert('配達日が選ばれていません 📅\n\nカレンダーから配達をご希望の日付を選択してください。\n（週3日以上のご指定が必要です）');return null;}
+        if(sdates.length<3){alert('配達日は週3日以上選択してください 📅\n\nお手数ですが、もう少し日付を追加してください。');return null;}
         schedule=sdates.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
       }
     } else {
@@ -869,18 +869,18 @@ function buildParams(type){
       if(currentPattern==='weekly'){
         var dayGridEl2=document.getElementById('day-grid');
         var sd2=dayGridEl2?dayGridEl2.querySelectorAll('.day-btn.selected'):[];
-        if(sd2.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達曜日（週3日以上選択してください）');return null;}
-        if(sd2.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達曜日は週3日以上選択してください');return null;}
+        if(sd2.length===0){alert('配達曜日が選ばれていません 📅\n\n配達をご希望の曜日を選択してください。\n（週3日以上のご指定が必要です）');return null;}
+        if(sd2.length<3){alert('配達曜日は週3日以上選択してください 📅\n\nお手数ですが、もう少し曜日を追加してください。');return null;}
         schedule='毎週：'+getSelectedDays('day-grid');
       } else {
         var sdates2=(calState['cal-grid']&&calState['cal-grid'].selectedDates)||[];
-        if(sdates2.length===0){alert('入力漏れがあります\n\n【未入力項目】\n・配達日（週3日以上選択してください）');return null;}
-        if(sdates2.length<3){alert('入力漏れがあります\n\n【条件未達】\n・配達日は週3日以上選択してください');return null;}
+        if(sdates2.length===0){alert('配達日が選ばれていません 📅\n\nカレンダーから配達をご希望の日付を選択してください。\n（週3日以上のご指定が必要です）');return null;}
+        if(sdates2.length<3){alert('配達日は週3日以上選択してください 📅\n\nお手数ですが、もう少し日付を追加してください。');return null;}
         schedule=sdates2.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
       }
     }
     if(!document.getElementById('no-startDate').value){
-      alert('入力漏れがあります\n\n【未入力項目】\n・配達開始日');return null;
+      alert('配達開始日が選ばれていません 📆\n\nカレンダーから配達を始める日付を選択してください。');return null;
     }
     p.bento=b;p.schedule=schedule;
     p.startDate=document.getElementById('no-startDate').value||'';
@@ -895,30 +895,30 @@ function buildParams(type){
     if(!p.address) errors.push('ご住所');
     if(!p.phone) errors.push('電話番号');
     if(!p.changeType) errors.push('変更の種類');
-    if(errors.length){alert('入力漏れがあります\n\n【未入力項目】\n・'+errors.join('\n・'));return null;}
+    if(errors.length){alert('ご入力をお願いします 🙏\n\n以下の項目をご確認ください：\n\n・'+errors.join('\n・')+'\n\nご確認のうえ、再度送信してください。');return null;}
 
     if(p.changeType==='キャンセル'){
       p.detail=document.getElementById('ch-cancelDate').value||'';
-      if(!p.detail){alert('入力漏れがあります\n\n【未入力項目】\n・キャンセル日');return null;}
+      if(!p.detail){alert('キャンセル日が選ばれていません 📆\n\nカレンダーからキャンセルをご希望の日付を選択してください。');return null;}
       p.startDate='';
     } else if(p.changeType==='利用停止'){
       p.detail=v('ch-stopReason');
       p.startDate=document.getElementById('ch-stopDate').value||'';
-      if(!p.startDate){alert('入力漏れがあります\n\n【未入力項目】\n・最終配達日');return null;}
+      if(!p.startDate){alert('最終配達日が選ばれていません 📆\n\nカレンダーから最後にお届けをご希望の日付を選択してください。');return null;}
     } else {
       p.detail=v('ch-detail');
       p.startDate=document.getElementById('ch-startDate').value||'';
-      if(!p.detail){alert('入力漏れがあります\n\n【未入力項目】\n・変更内容の詳細');return null;}
+      if(!p.detail){alert('変更内容の詳細が入力されていません ✏️\n\nどのような変更をご希望か、具体的にご記入ください。');return null;}
     }
     p.note=v('ch-note');
 
   } else if(type==='recruit'){
     p.store=v('rc-store');p.note=v('rc-message');
-    if(!p.note){alert('入力漏れがあります\n\n【未入力項目】\n・お名前・連絡先・メッセージ');return null;}
+    if(!p.note){alert('お名前・ご連絡先・メッセージが入力されていません 📝\n\nお手数ですが、必要事項をご記入ください。');return null;}
 
   } else if(type==='inquiry'){
     p.name=v('iq-name');p.phone=v('iq-phone');p.note=v('iq-message');
-    if(!p.note){alert('入力漏れがあります\n\n【未入力項目】\n・お問い合わせ内容');return null;}
+    if(!p.note){alert('お問い合わせ内容が入力されていません 💬\n\nお気軽にご質問・ご要望をご記入ください。');return null;}
   }
   return p;
 }
