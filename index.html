@@ -949,7 +949,7 @@ function buildParams(type){
         schedule=sdates2.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
       }
     }
-    if(!document.getElementById('no-startDate').value){
+    if(currentPattern==='weekly' && !document.getElementById('no-startDate').value){
       showModal('📆', '配達開始日を選んでください', 'カレンダーから配達を始める日付を選択してください。');return null;
     }
     p.bento=b;p.schedule=schedule;
