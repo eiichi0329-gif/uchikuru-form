@@ -485,7 +485,7 @@ function initAllCalendars() {
     calState[id] = {
       year: now.getFullYear(), month: now.getMonth(),
       selectedDates: [],
-      singleSelect: (id!=='cal-grid' && id!=='cal-grid-cancel')
+      singleSelect: (id!=='cal-grid')
     };
     renderCalendarById(id);
   });
