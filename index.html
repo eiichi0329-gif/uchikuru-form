@@ -485,7 +485,7 @@ function initAllCalendars() {
     calState[id] = {
       year: now.getFullYear(), month: now.getMonth(),
       selectedDates: [],
-      singleSelect: (id!=='cal-grid')
+      singleSelect: (id!=='cal-grid' && id!=='cal-grid-cancel')
     };
     renderCalendarById(id);
   });
@@ -968,8 +968,10 @@ function buildParams(type){
     if(errors.length){showModal('🙏', 'ご入力をお願いします', '以下の項目をご確認ください：\n\n・'+errors.join('\n・')+'\n\nご確認のうえ、再度お試しください。');return null;}
 
     if(p.changeType==='キャンセル'){
-      p.detail=document.getElementById('ch-cancelDate').value||'';
-      if(!p.detail){showModal('📆', 'キャンセル日を選んでください', 'カレンダーからキャンセルをご希望の日付を選択してください。');return null;}
+      // 複数選択対応：calStateから直接日付リストを取得
+      var cancelDates=(calState['cal-grid-cancel']&&calState['cal-grid-cancel'].selectedDates)||[];
+      if(cancelDates.length===0){showModal('📆', 'キャンセル日を選んでください', 'カレンダーからキャンセルをご希望の日付を選択してください。');return null;}
+      p.detail=cancelDates.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
       p.startDate='';
     } else if(p.changeType==='利用停止'){
       p.detail=v('ch-stopReason');
