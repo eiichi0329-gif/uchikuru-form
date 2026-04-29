@@ -275,11 +275,13 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <label>変更の種類<span class="req">*</span></label>
       <select id="ch-changeType" onchange="onChangeTypeChange()">
         <option value="">選択してください</option>
-        <option>お弁当の種類・数量変更</option>
-        <option>曜日・日程の変更</option>
-        <option>キャンセル</option>
-        <option>利用停止</option>
-        <option>その他</option>
+        <option value="address_change">住所変更</option>
+        <option value="phone_change">電話番号変更</option>
+        <option value="schedule_change">曜日・数量変更</option>
+        <option value="suspend">一時停止</option>
+        <option value="resume">再開</option>
+        <option value="cancel">利用停止（退会）</option>
+        <option value="other">その他</option>
       </select>
     </div>
     <div class="field" id="ch-detail-wrap">
@@ -321,11 +323,45 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
       <div class="date-tags" id="date-tags-chstop"></div>
       <input type="hidden" id="ch-stopDate" value="">
     </div>
+    <div id="ch-endDate-wrap" style="display:none;">
+      <div class="sec-label">停止終了日<span class="req">*</span></div>
+      <div class="calendar-wrap">
+        <div class="cal-header">
+          <button onclick="changeMonthCal('cal-grid-chend',-1)">‹</button>
+          <span class="cal-title" id="cal-title-chend"></span>
+          <button onclick="changeMonthCal('cal-grid-chend',1)">›</button>
+        </div>
+        <div class="cal-days-header">
+          <span>日</span><span class="wd">月</span><span class="wd">火</span>
+          <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>
+        </div>
+        <div class="cal-grid" id="cal-grid-chend"></div>
+      </div>
+      <div class="date-tags" id="date-tags-chend"></div>
+      <input type="hidden" id="ch-endDate" value="">
+    </div>
     <div id="ch-stopReason-wrap" style="display:none;">
       <div class="sec-label">停止理由<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
       <div class="field">
         <textarea id="ch-stopReason" placeholder="退会理由をご自由にお書きください"></textarea>
       </div>
+    </div>
+    <!-- 住所変更用 -->
+    <div id="ch-address-wrap" style="display:none;">
+      <div class="sec-label">新しい住所<span class="req">*</span></div>
+      <div class="field"><input type="text" id="ch-new-address" placeholder="例：北九州市小倉北区〇〇1-2-3"></div>
+    </div>
+    <!-- 電話番号変更用 -->
+    <div id="ch-phone-wrap" style="display:none;">
+      <div class="sec-label">新しい電話番号<span class="req">*</span></div>
+      <div class="field"><input type="tel" id="ch-new-phone" placeholder="例：090-1234-5678"></div>
+    </div>
+    <!-- 曜日・数量変更用 -->
+    <div id="ch-schedule-wrap" style="display:none;">
+      <div class="sec-label">新しい配達曜日<span class="req">*</span></div>
+      <div class="day-grid" id="day-grid-change" style="margin-top:8px;"></div>
+      <div class="sec-label" style="margin-top:12px;">新しいお弁当・数量<span class="req">*</span></div>
+      <div class="bento-grid" id="bento-grid-change"></div>
     </div>
     <div id="ch-startDate-wrap">
       <div class="sec-label">変更開始日<span style="font-size:12px;color:#aaa;font-weight:normal;"> (任意)</span></div>
@@ -457,7 +493,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
 </div>
 
 <script>
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbzRl66llFEWsXIWD0pYV12-t9Rt5JqfeeBavwScm3GjjiNJRORkvF84hIEZdDgOD0IOCA/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbzjCGzA3GDvk-_MasHkAM4IrNi1ZrDeKXw2CWpcYRTdbdse1OZzd3IFMAZvqnV2r4mOcQ/exec';
 var userId = '';
 var isSameOrder = false;
 var isSameOrderNew = false;
@@ -479,7 +515,7 @@ function getThisWeekMonday() {
 }
 
 function initAllCalendars() {
-  var ids = ['cal-grid','cal-grid-start','cal-grid-stop','cal-grid-chstop','cal-grid-change','cal-grid-cancel','cal-grid-resume'];
+  var ids = ['cal-grid','cal-grid-start','cal-grid-stop','cal-grid-chstop','cal-grid-chend','cal-grid-change','cal-grid-cancel','cal-grid-resume'];
   var now = new Date();
   ids.forEach(function(id){
     calState[id] = {
@@ -535,6 +571,7 @@ function toggleDateCal(calId, ds) {
     'cal-grid-start':'no-startDate',
     'cal-grid-stop':'st-lastDate',
     'cal-grid-chstop':'ch-stopDate',
+    'cal-grid-chend':'ch-endDate',
     'cal-grid-change':'ch-startDate',
     'cal-grid-cancel':'ch-cancelDate',
     'cal-grid-resume':'rs-startDate'
@@ -775,7 +812,7 @@ function loadCustomerInfo(type){ loadCustomerInfoThen(type, null); }
 
 /* ========== お弁当グリッド ========== */
 function buildBentoGrids(){
-  ['bento-grid-newOrder','bento-grid-resume'].forEach(function(gid){
+  ['bento-grid-newOrder','bento-grid-resume','bento-grid-change'].forEach(function(gid){
     var wrap=document.getElementById(gid); if(!wrap) return;
     BENTO_LIST.forEach(function(name,idx){
       var row=document.createElement('div');
@@ -818,7 +855,7 @@ function getBentoStr(gid){
 
 /* ========== 曜日グリッド ========== */
 function buildDayGrids(){
-  [['day-grid','day-warn'],['day-grid-resume','day-warn-resume']].forEach(function(pair){
+  [['day-grid','day-warn'],['day-grid-resume','day-warn-resume'],['day-grid-change','']].forEach(function(pair){
     var wrap=document.getElementById(pair[0]); if(!wrap) return;
     DAY_LABELS.forEach(function(d){
       var btn=document.createElement('div'); btn.className='day-btn'; btn.textContent=d;
@@ -867,21 +904,40 @@ function toggleSameOrderNew(){
 /* ========== 変更タイプ ========== */
 function onChangeTypeChange(){
   var val=document.getElementById('ch-changeType').value;
-  var isC=(val==='キャンセル');
-  var isS=(val==='利用停止');
-  // キャンセル日カレンダー：キャンセル時のみ表示
-  document.getElementById('ch-cancelDate-wrap').style.display=isC?'block':'none';
-  // 変更開始日カレンダー：キャンセル・利用停止以外で表示
-  document.getElementById('ch-startDate-wrap').style.display=(!isC&&!isS)?'block':'none';
-  // 詳細テキスト：キャンセル・利用停止以外で表示
-  document.getElementById('ch-detail-wrap').style.display=(!isC&&!isS)?'block':'none';
-  // 最終配達日カレンダー：利用停止時のみ表示
-  var stopWrap=document.getElementById('ch-stopDate-wrap');
-  if(stopWrap) stopWrap.style.display=isS?'block':'none';
-  // 停止理由：利用停止時のみ表示
-  var stopReasonWrap=document.getElementById('ch-stopReason-wrap');
-  if(stopReasonWrap) stopReasonWrap.style.display=isS?'block':'none';
+
+  // 全セクションをリセット
+  var sections=['ch-cancelDate-wrap','ch-startDate-wrap','ch-endDate-wrap',
+    'ch-detail-wrap','ch-stopDate-wrap','ch-stopReason-wrap',
+    'ch-address-wrap','ch-phone-wrap','ch-schedule-wrap'];
+  sections.forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.style.display='none';
+  });
+
+  if(val==='address_change'){
+    // 住所変更：新住所入力 + 変更開始日
+    show('ch-address-wrap'); show('ch-startDate-wrap');
+  } else if(val==='phone_change'){
+    // 電話番号変更：新電話番号 + 変更開始日
+    show('ch-phone-wrap'); show('ch-startDate-wrap');
+  } else if(val==='schedule_change'){
+    // 曜日・数量変更：スケジュール入力 + 変更開始日
+    show('ch-schedule-wrap'); show('ch-startDate-wrap');
+  } else if(val==='suspend'){
+    // 一時停止：停止開始日 + 停止終了日 + 理由
+    show('ch-stopDate-wrap'); show('ch-endDate-wrap'); show('ch-stopReason-wrap');
+  } else if(val==='resume'){
+    // 再開：再開希望日
+    show('ch-startDate-wrap');
+  } else if(val==='cancel'){
+    // 利用停止（退会）：最終配達日 + 理由
+    show('ch-cancelDate-wrap'); show('ch-stopReason-wrap');
+  } else if(val==='other'){
+    // その他：詳細テキスト
+    show('ch-detail-wrap');
+  }
 }
+function show(id){ var el=document.getElementById(id); if(el) el.style.display='block'; }
 
 /* ========== フォーム送信 ========== */
 function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
@@ -967,19 +1023,37 @@ function buildParams(type){
     if(!p.changeType) errors.push('変更の種類');
     if(errors.length){showModal('🙏', 'ご入力をお願いします', '以下の項目をご確認ください：\n\n・'+errors.join('\n・')+'\n\nご確認のうえ、再度お試しください。');return null;}
 
-    if(p.changeType==='キャンセル'){
-      // 複数選択対応：calStateから直接日付リストを取得
-      var cancelDates=(calState['cal-grid-cancel']&&calState['cal-grid-cancel'].selectedDates)||[];
-      if(cancelDates.length===0){showModal('📆', 'キャンセル日を選んでください', 'カレンダーからキャンセルをご希望の日付を選択してください。');return null;}
-      p.detail=cancelDates.map(function(d){var pp=d.split('-');return parseInt(pp[1])+'月'+parseInt(pp[2])+'日';}).join('・');
-      p.startDate='';
-    } else if(p.changeType==='利用停止'){
-      p.detail=v('ch-stopReason');
-      p.startDate=document.getElementById('ch-stopDate').value||'';
-      if(!p.startDate){showModal('📆', '最終配達日を選んでください', 'カレンダーから最後にお届けをご希望の日付を選択してください。');return null;}
-    } else {
-      p.detail=v('ch-detail');
+    if(p.changeType==='address_change'){
+      p.detail=v('ch-new-address');
       p.startDate=document.getElementById('ch-startDate').value||'';
+      if(!p.detail){showModal('✏️', '新しい住所をご入力ください', '変更後の住所をご記入ください。');return null;}
+    } else if(p.changeType==='phone_change'){
+      p.detail=v('ch-new-phone');
+      p.startDate=document.getElementById('ch-startDate').value||'';
+      if(!p.detail){showModal('✏️', '新しい電話番号をご入力ください', '変更後の電話番号をご記入ください。');return null;}
+    } else if(p.changeType==='schedule_change'){
+      var chDays=document.getElementById('day-grid-change').querySelectorAll('.day-btn.selected');
+      if(chDays.length<3){showModal('📅', '曜日を週3日以上選択してください', 'お手数ですが、もう少し曜日を追加してください。');return null;}
+      var chBento=getBentoStr('bento-grid-change');
+      if(!chBento){showModal('🍱', 'お弁当の種類を選んでください', 'ご希望のお弁当を1つ以上選択してください。');return null;}
+      p.detail='曜日：'+getSelectedDays('day-grid-change')+' / '+chBento;
+      p.startDate=document.getElementById('ch-startDate').value||'';
+    } else if(p.changeType==='suspend'){
+      p.startDate=document.getElementById('ch-stopDate').value||'';
+      p.endDate=document.getElementById('ch-endDate').value||'';
+      p.detail=v('ch-stopReason');
+      if(!p.startDate){showModal('📆', '停止開始日を選んでください', 'カレンダーから一時停止を始める日付を選択してください。');return null;}
+      if(!p.endDate){showModal('📆', '停止終了日を選んでください', 'カレンダーから一時停止を終える日付を選択してください。');return null;}
+    } else if(p.changeType==='resume'){
+      p.startDate=document.getElementById('ch-startDate').value||'';
+      if(!p.startDate){showModal('📆', '再開希望日を選んでください', 'カレンダーから再開をご希望の日付を選択してください。');return null;}
+    } else if(p.changeType==='cancel'){
+      var cancelDates=(calState['cal-grid-cancel']&&calState['cal-grid-cancel'].selectedDates)||[];
+      if(cancelDates.length===0){showModal('📆', '最終配達日を選んでください', 'カレンダーから最終配達日を選択してください。');return null;}
+      p.startDate=cancelDates[0]||'';
+      p.detail=v('ch-stopReason');
+    } else if(p.changeType==='other'){
+      p.detail=v('ch-detail');
       if(!p.detail){showModal('✏️', '変更内容をご記入ください', 'どのような変更をご希望か、具体的にご記入ください。');return null;}
     }
     p.note=v('ch-note');
