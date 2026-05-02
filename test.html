@@ -611,7 +611,7 @@ window.onload = function() {
   var params=new URLSearchParams(window.location.search);
   if(params.get('uid')) userId=params.get('uid');
 
-  debugLogToGAS('LIFF onload URL=' + window.location.href + ' uid_param=' + (params.get('uid')||'(none)'));
+  debugLogToGAS('LIFF onload host=' + window.location.host + window.location.pathname + ' uid_param=' + (params.get('uid')||'(none)'));
 
   // URLから直接typeを取得
   var type=params.get('type')||'';
@@ -627,15 +627,46 @@ window.onload = function() {
     }
   }
 
+  // context_tokenからLIFF IDを抽出（実際にこのページが開かれているLIFFのID）
+  var actualLiffId='';
+  try{
+    var hashStr=window.location.hash||'';
+    var ctxMatch=hashStr.match(/context_token=([^&]+)/);
+    if(ctxMatch){
+      var ctxToken=ctxMatch[1];
+      var parts=ctxToken.split('.');
+      if(parts.length>=2){
+        var payload=parts[1].replace(/-/g,'+').replace(/_/g,'/');
+        while(payload.length%4) payload+='=';
+        var decoded=JSON.parse(atob(payload));
+        actualLiffId=decoded.liffId||'';
+      }
+    }
+  }catch(e){
+    debugLogToGAS('context_token decode error: ' + e);
+  }
+
+  // typeが取れない場合、context_tokenのliffIdから逆引き
+  if(!type && actualLiffId){
+    var idTypeMap={
+      '2009932062-S6WFaYdg':'newOrder',
+      '2009776168-LOBLun0h':'change',
+      '2009776168-N6vne4xP':'stop',
+      '2009776168-sHfyz86X':'resume'
+    };
+    if(idTypeMap[actualLiffId]) type=idTypeMap[actualLiffId];
+  }
+
+  // liff.init用のID：実際に開かれているLIFF IDを優先（無ければtypeから決定）
   var liffIdMap={
     'newOrder':'2009932062-S6WFaYdg',
     'change':  '2009776168-LOBLun0h',
     'stop':    '2009776168-N6vne4xP',
     'resume':  '2009776168-sHfyz86X'
   };
-  var liffId=liffIdMap[type]||'2009776168-RIJ6LPoI';
+  var liffId = actualLiffId || liffIdMap[type] || '2009932062-S6WFaYdg';
 
-  debugLogToGAS('LIFF init type=' + type + ' liffId=' + liffId);
+  debugLogToGAS('LIFF init type=' + type + ' actualLiffId=' + actualLiffId + ' useLiffId=' + liffId);
 
   if(typeof liff!=='undefined'){
     document.getElementById('statusMsg').textContent='お客様情報を確認中...';
@@ -652,7 +683,7 @@ window.onload = function() {
         if(!liff.isLoggedIn()){
           debugLogToGAS('Not logged in, calling liff.login()');
           liff.login({redirectUri: window.location.href});
-          return; // ログイン後にリダイレクトされるのでここで終了
+          return;
         }
 
         // init後にliff.stateからtypeを再取得
@@ -670,7 +701,7 @@ window.onload = function() {
         liff.getProfile()
           .then(function(profile){
             userId=profile.userId;
-            debugLogToGAS('getProfile OK userId=' + userId);
+            debugLogToGAS('getProfile OK userId=' + userId + ' type=' + type);
             loadAndShow(type);
           })
           .catch(function(err){
@@ -682,7 +713,7 @@ window.onload = function() {
       .catch(function(err){
         clearTimeout(liffTimeout);
         var em = (err && err.message) ? err.message : String(err);
-        debugLogToGAS('liff.init ERROR: ' + em);
+        debugLogToGAS('liff.init ERROR: ' + em + ' (used liffId=' + liffId + ')');
         loadAndShow(type);
       });
   } else {
