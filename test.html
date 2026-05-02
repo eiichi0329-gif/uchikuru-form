@@ -694,13 +694,6 @@ window.onload = function() {
         clearTimeout(liffTimeout);
         debugLogToGAS('liff.init OK isInClient=' + liff.isInClient() + ' isLoggedIn=' + liff.isLoggedIn());
 
-        // 未ログインの場合はログイン画面にリダイレクト
-        if(!liff.isLoggedIn()){
-          debugLogToGAS('Not logged in, calling liff.login()');
-          liff.login({redirectUri: window.location.href});
-          return;
-        }
-
         // init後にliff.stateからtypeを再取得
         if(!type){
           try{
@@ -713,6 +706,23 @@ window.onload = function() {
           }catch(e){}
         }
 
+        // 未ログインの場合
+        if(!liff.isLoggedIn()){
+          // 外部ブラウザならログイン必須
+          if(!liff.isInClient()){
+            debugLogToGAS('External browser + Not logged in -> liff.login()');
+            try{
+              liff.login({redirectUri: window.location.href});
+            }catch(e){
+              debugLogToGAS('liff.login() failed: ' + e);
+              loadAndShow(type);
+            }
+            return;
+          }
+          // LINE内なのにisLoggedIn=falseは異常。getProfileを試す
+          debugLogToGAS('In LINE client but not logged in - trying getProfile anyway');
+        }
+
         liff.getProfile()
           .then(function(profile){
             userId=profile.userId;
@@ -721,7 +731,11 @@ window.onload = function() {
           })
           .catch(function(err){
             var em = (err && err.message) ? err.message : String(err);
-            debugLogToGAS('getProfile ERROR: ' + em);
+            debugLogToGAS('getProfile ERROR: ' + em + ' isInClient=' + liff.isInClient() + ' isLoggedIn=' + liff.isLoggedIn());
+            // ログインしていなければ最後の手段としてliff.login
+            if(!liff.isLoggedIn()){
+              try{ liff.login({redirectUri: window.location.href}); return; }catch(e){}
+            }
             loadAndShow(type);
           });
       })
