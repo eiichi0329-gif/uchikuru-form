@@ -458,6 +458,7 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
 
 <script>
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbxMBvhOmr-drzbavraNiyNGiRsHJYVszGBpbQ2X8hs6g_LjvmfHgGHSP-51O3YpfXpH/exec';
+var INDEX_VERSION = 'V3-2026-05-02';
 var userId = '';
 var isSameOrder = false;
 var isSameOrderNew = false;
@@ -468,11 +469,25 @@ var DAY_LABELS = ['月','火','水','木','金'];
 
 /* ========== デバッグログ送信（GASのlogシートに記録） ========== */
 function debugLogToGAS(msg) {
+  var fullMsg = '[' + INDEX_VERSION + '] ' + msg;
+  // fetch優先（LINE WebViewでも動く）
   try {
-    var img = new Image();
-    img.src = GAS_URL + '?action=debugLog&t=' + Date.now() + '&msg=' + encodeURIComponent(msg);
-  } catch(e) {}
+    fetch(GAS_URL + '?action=debugLog&t=' + Date.now() + '&msg=' + encodeURIComponent(fullMsg), {
+      method: 'GET',
+      mode: 'no-cors',
+      cache: 'no-store'
+    }).catch(function(){});
+  } catch(e) {
+    // フォールバック：Imageタグ方式
+    try {
+      var img = new Image();
+      img.src = GAS_URL + '?action=debugLog&t=' + Date.now() + '&msg=' + encodeURIComponent(fullMsg);
+    } catch(e2) {}
+  }
 }
+
+// ページ読み込み直後に必ず実行されるログ（ここが出ればコードは反映されている）
+debugLogToGAS('SCRIPT LOADED ' + window.location.host + window.location.pathname);
 
 /* ========== カレンダー ========== */
 var calState = {};
