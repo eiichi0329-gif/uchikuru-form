@@ -2370,6 +2370,46 @@ function showModalWithAction(icon, title, msg, action) {
   overlay.classList.add('show');
 }
 
+// ★マイページ拡張: 既存顧客自動振り分け
+// userId が顧客データに既に登録済み(name/address/phone のいずれかあり)なら type='usage' で起動、
+// それ以外(完全新規 or 通信失敗)は元のまま showMenu() に流す。
+function checkExistingCustomerThenLoad(currentType) {
+  // 既に明示的な type が指定されている場合はそのまま loadAndShow へ
+  if (currentType) { loadAndShow(currentType); return; }
+  if (!userId)     { loadAndShow(''); return; }
+
+  // 4秒で諦める(getCustomer の通信失敗時にメニュー表示まで待たせない)
+  var done = false;
+  var fallbackTimer = setTimeout(function(){
+    if (done) return;
+    done = true;
+    loadAndShow('');
+  }, 4000);
+
+  fetch(GAS_URL + '?action=getCustomer&userId=' + encodeURIComponent(userId))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (done) return;
+      done = true;
+      clearTimeout(fallbackTimer);
+      var nm = String((data && data.name)    || '').trim();
+      var ad = String((data && data.address) || '').trim();
+      var ph = String((data && data.phone)   || '').trim();
+      // 「未登録」等のダミー文字列除去
+      var EMPTY_VALS = ['未登録','(未登録)','(未登録)','未入力','(未入力)','(未入力)',
+                        'なし','ー','―','-','−','未','none','null','undefined'];
+      function isReal(s){ return s && EMPTY_VALS.indexOf(s) === -1; }
+      var isExisting = isReal(nm) || isReal(ad) || isReal(ph);
+      loadAndShow(isExisting ? 'usage' : '');
+    })
+    .catch(function(){
+      if (done) return;
+      done = true;
+      clearTimeout(fallbackTimer);
+      loadAndShow('');
+    });
+}
+
 window.onload = function() {
   buildBentoGrids();
   buildDayGrids();
@@ -2420,8 +2460,8 @@ window.onload = function() {
           }catch(e){}
         }
         liff.getProfile()
-          .then(function(profile){userId=profile.userId;loadAndShow(type);})
-          .catch(function(){loadAndShow(type);});
+          .then(function(profile){userId=profile.userId;checkExistingCustomerThenLoad(type);})
+          .catch(function(){checkExistingCustomerThenLoad(type);});
       })
       .catch(function(){clearTimeout(liffTimeout);loadAndShow(type);});
   } else { loadAndShow(type); }
