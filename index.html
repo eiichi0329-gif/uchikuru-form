@@ -2553,8 +2553,9 @@ function renderCustomerInfoCard() {
   var mainEl    = document.getElementById('usage-main');
   if (!welcomeEl || !mainEl) return;
 
-  // 全項目(支払い方法含む)揃っている場合のみ「登録済み」
-  var isComplete = nm && ad && ph && pm;
+  // 名前・住所・電話が揃っていれば「登録済み」とみなす
+  // (※支払い方法は顧客データシートに保存されないため、判定から除外)
+  var isComplete = nm && ad && ph;
 
   if (isComplete) {
     welcomeEl.style.display = 'none';
