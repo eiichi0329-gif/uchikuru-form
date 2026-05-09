@@ -1169,7 +1169,9 @@ body.cancel-mode-active {
             <span class="cust-info-lbl">電話番号</span>
             <span class="cust-info-val" id="cust-info-phone">―</span>
           </div>
-          <div class="cust-info-row" id="cust-info-payment-row">
+          <div class="cust-info-row" id="cust-info-payment-row" style="display:none;">
+            <!-- お支払い方法はカード上では非表示。編集モーダルでは引き続き表示・編集可能。 -->
+            <!-- 将来 bento_delivery 側に payment_method 取得APIが実装されたらこのstyleを外す -->
             <span class="cust-info-lbl">お支払い</span>
             <span class="cust-info-val" id="cust-info-payment">―</span>
           </div>
