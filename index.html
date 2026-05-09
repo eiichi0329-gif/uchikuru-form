@@ -3220,7 +3220,7 @@ function renderUsageContent() {
     html += '<button class="op-btn-main" onclick="actionNewOrder()">新規注文</button>';
     html += '<button class="op-btn-main" onclick="actionTypeChange()">数量の変更</button>';
     html += '<button class="op-btn-main" onclick="actionCancel()">キャンセル</button>';
-    html += '<button class="op-btn-main" onclick="actionEndService()">利用の終了</button>';
+    html += '<button class="op-btn-main" onclick="actionEndService()">配達ストップ</button>';
     html += '</div>';
   } else {
     // 操作可能週がなくても新規注文はできるようにする
@@ -4606,15 +4606,99 @@ function applyGohanAutoCancel(dateFilter) {
    ============================================================ */
 function openEndServiceModal() {
   modalState.view = 'endService';
-  modalState.esStep = 'pick';   // 'pick' | 'confirm'
+  modalState.esStep = 'kinds';   // 'kinds' | 'pick' | 'confirm'
   modalState.esWeekIdx = null;  // 選択した週のindex
   modalState.esDate = '';        // 最終利用日(週金曜)
   modalState.esReason = '';
+  modalState.esBentoTypes = [];  // 停止する弁当種類(デフォルト未選択)
   renderEndServiceStep();
 }
 function renderEndServiceStep() {
-  if (modalState.esStep === 'pick') renderEndServicePickStep();
-  else renderEndServiceConfirmStep();
+  if (modalState.esStep === 'kinds')   return renderEndServiceKindsStep();
+  if (modalState.esStep === 'pick')    return renderEndServicePickStep();
+  if (modalState.esStep === 'confirm') return renderEndServiceConfirmStep();
+}
+
+// ★Step1: 停止する弁当種類を選ぶ(デフォルト未選択、必ず1つ以上選択)
+function renderEndServiceKindsStep() {
+  // 現在利用中の種類を取得(active / pending_add / pending_change)
+  var typesMap = {};
+  Object.keys(usageData || {}).forEach(function(monthKey) {
+    if (!usageData[monthKey].hasData) return;
+    usageData[monthKey].days.forEach(function(day) {
+      day.items.forEach(function(it) {
+        if (it.status !== 'active' && it.status !== 'pending_add' && it.status !== 'pending_change') return;
+        var nm = (it.status === 'pending_change' && it.pendingChange) ? it.pendingChange.name : it.name;
+        if (nm) typesMap[nm] = true;
+      });
+    });
+  });
+  var activeTypes = BENTO_LIST.filter(function(b) { return typesMap[b]; });
+
+  var html = '';
+  html += '<div class="op-modal-title">🛑 配達ストップ</div>';
+  html += '<div class="op-modal-subtitle">どのお弁当をストップしますか?</div>';
+
+  if (activeTypes.length === 0) {
+    html += '<div class="op-info-box" style="background:#fff5f5;border-color:#c0392b;color:#444;">';
+    html += '現在ご利用中のお弁当が見つかりません。';
+    html += '</div>';
+    html += '<button class="op-modal-cancel" onclick="closeOpModal()">閉じる</button>';
+    document.getElementById('op-modal-content').innerHTML = html;
+    openOpModal(false);
+    return;
+  }
+
+  html += '<div class="op-info-box" style="background:#fff5f5;border-color:#c0392b;color:#444;">';
+  html += '<b style="color:#c0392b;">ご注意</b><br>';
+  html += '選択したお弁当の最終配達日以降のご注文がキャンセルされます。<br>';
+  html += '<b>すべて選択 = ご利用終了</b>(全配達停止)<br>';
+  html += '一部のみ選択 = その種類だけ停止、他は継続';
+  html += '</div>';
+
+  html += '<div class="es-kinds-list" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;">';
+  activeTypes.forEach(function(name) {
+    var checked = (modalState.esBentoTypes || []).indexOf(name) !== -1 ? 'checked' : '';
+    html += '<label class="es-kind-row" style="display:flex;align-items:center;gap:12px;padding:14px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-size:16px;background:#fff;">';
+    html += '<input type="checkbox" value="' + escapeHtml(name) + '" ' + checked + ' onchange="toggleEndServiceKind(this)" style="width:20px;height:20px;flex-shrink:0;">';
+    html += '<span>' + escapeHtml(name) + '</span>';
+    html += '</label>';
+  });
+  html += '</div>';
+
+  // 全種類選択時の補足
+  var selectedCount = (modalState.esBentoTypes || []).length;
+  if (selectedCount > 0 && selectedCount === activeTypes.length) {
+    html += '<div style="text-align:center;color:#c0392b;font-weight:bold;margin:8px 0;">→ ご利用終了として処理されます</div>';
+  } else if (selectedCount > 0) {
+    html += '<div style="text-align:center;color:#666;font-size:14px;margin:8px 0;">→ ' + selectedCount + '種類のみ停止します</div>';
+  }
+
+  var disabled = (selectedCount > 0) ? '' : 'disabled';
+  html += '<button class="op-modal-confirm" style="background:#c0392b;" ' + disabled + ' onclick="goEndServicePick()">次へ:最終配達週を選ぶ</button>';
+  html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="closeOpModal()">キャンセル</button>';
+
+  document.getElementById('op-modal-content').innerHTML = html;
+  openOpModal(false);
+}
+
+function toggleEndServiceKind(cb) {
+  if (!Array.isArray(modalState.esBentoTypes)) modalState.esBentoTypes = [];
+  var v = cb.value;
+  var idx = modalState.esBentoTypes.indexOf(v);
+  if (cb.checked) {
+    if (idx === -1) modalState.esBentoTypes.push(v);
+  } else {
+    if (idx !== -1) modalState.esBentoTypes.splice(idx, 1);
+  }
+  // 再描画して「すべて選択」表示や次へボタンの状態を更新
+  renderEndServiceKindsStep();
+}
+
+function goEndServicePick() {
+  if (!Array.isArray(modalState.esBentoTypes) || modalState.esBentoTypes.length === 0) return;
+  modalState.esStep = 'pick';
+  renderEndServiceStep();
 }
 
 function renderEndServicePickStep() {
@@ -4664,7 +4748,7 @@ function renderEndServicePickStep() {
 
   var disabled = (typeof modalState.esWeekIdx === 'number') ? '' : 'disabled';
   html += '<button class="op-modal-confirm" style="background:#c0392b;" ' + disabled + ' onclick="goEndServiceConfirm()">この内容で確認に進む</button>';
-  html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="closeOpModal()">キャンセル</button>';
+  html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="modalState.esStep=\'kinds\';renderEndServiceStep();">‹ 戻る(種類選択)</button>';
 
   document.getElementById('op-modal-content').innerHTML = html;
   openOpModal(false);
@@ -4719,27 +4803,59 @@ function renderEndServiceConfirmStep() {
   var dt = new Date(parseInt(pp[0]), parseInt(pp[1])-1, parseInt(pp[2]));
   var dateLabel = parseInt(pp[1]) + '月' + parseInt(pp[2]) + '日(' + dows[dt.getDay()] + ')';
 
+  // 全種類停止か部分停止かを判定
+  var typesMap = {};
+  Object.keys(usageData || {}).forEach(function(monthKey) {
+    if (!usageData[monthKey].hasData) return;
+    usageData[monthKey].days.forEach(function(day) {
+      day.items.forEach(function(it) {
+        if (it.status !== 'active' && it.status !== 'pending_add' && it.status !== 'pending_change') return;
+        var nm = (it.status === 'pending_change' && it.pendingChange) ? it.pendingChange.name : it.name;
+        if (nm) typesMap[nm] = true;
+      });
+    });
+  });
+  var activeTypes  = BENTO_LIST.filter(function(b) { return typesMap[b]; });
+  var selected     = modalState.esBentoTypes || [];
+  var isFullStop   = (selected.length > 0 && selected.length === activeTypes.length);
+  var modeLabel    = isFullStop ? 'ご利用終了(全配達停止)' : '配達ストップ(' + selected.length + '種類)';
+  var titleLabel   = isFullStop ? '🛑 ご利用終了の確認'    : '🛑 配達ストップの確認';
+  var actionLabel  = isFullStop ? 'ご利用終了を確定する'   : '配達ストップを確定する';
+
   var html = '';
-  html += '<div class="op-modal-title">🛑 ご利用終了の確認</div>';
+  html += '<div class="op-modal-title">' + titleLabel + '</div>';
   html += '<div class="op-modal-subtitle">以下の内容で申請します</div>';
 
   html += '<div style="background:#fff5f5;border:2px solid #c0392b;border-radius: 7px;padding:16px;margin-bottom:14px;">';
-  html += '<div style="font-size:13px;color:#888;margin-bottom:4px;">最終配達日</div>';
+  // 停止する種類
+  html += '<div style="font-size:13px;color:#888;margin-bottom:4px;">対象</div>';
+  html += '<div style="font-size:16px;font-weight:bold;color:#c0392b;margin-bottom:10px;">' + escapeHtml(modeLabel) + '</div>';
+  html += '<div style="font-size:14px;color:#333;margin-bottom:12px;line-height:1.7;">' +
+          selected.map(function(s){ return '・' + escapeHtml(s); }).join('<br>') + '</div>';
+  // 最終配達日
+  html += '<div style="border-top:1px dashed #c0392b;margin-top:12px;padding-top:10px;font-size:13px;color:#888;margin-bottom:4px;">最終配達日</div>';
   html += '<div style="font-size:22px;font-weight:bold;color:#c0392b;">' + dateLabel + '</div>';
   if (modalState.esReason) {
-    html += '<div style="border-top:1px dashed #c0392b;margin-top:12px;padding-top:10px;font-size:13px;color:#888;margin-bottom:4px;">ご終了の理由</div>';
+    html += '<div style="border-top:1px dashed #c0392b;margin-top:12px;padding-top:10px;font-size:13px;color:#888;margin-bottom:4px;">理由</div>';
     html += '<div style="font-size:14px;color:#333;line-height:1.6;white-space:pre-wrap;">' + escapeHtml(modalState.esReason) + '</div>';
   }
   html += '</div>';
 
   html += '<div class="op-info-box" style="background:#fff5f5;border-color:#c0392b;">';
   html += '<b style="color:#c0392b;">ご確認ください</b><br>';
-  html += '・最終配達日の翌日以降のご注文はすべてキャンセル扱いとなります<br>';
-  html += '・お支払いは月末締めにて請求いたします<br>';
-  html += '・再開時は新規ご注文ページよりお手続きください';
+  if (isFullStop) {
+    html += '・最終配達日の翌日以降のご注文はすべてキャンセル扱いとなります<br>';
+    html += '・お支払いは月末締めにて請求いたします<br>';
+    html += '・再開時は新規ご注文ページよりお手続きください';
+  } else {
+    html += '・最終配達日の翌日以降、選択したお弁当のみキャンセル扱いとなります<br>';
+    html += '・選択していないお弁当はそのまま配達を継続します<br>';
+    html += '・お支払いは月末締めにて請求いたします<br>';
+    html += '・再開時は新規ご注文ページよりお手続きください';
+  }
   html += '</div>';
 
-  html += '<button class="op-modal-confirm" style="background:#c0392b;" onclick="submitEndService()">ご利用終了を確定する</button>';
+  html += '<button class="op-modal-confirm" style="background:#c0392b;" onclick="submitEndService()">' + actionLabel + '</button>';
   html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="modalState.esStep=\'pick\';renderEndServiceStep();">‹ 戻る</button>';
 
   document.getElementById('op-modal-content').innerHTML = html;
@@ -4749,6 +4865,22 @@ function submitEndService() {
   // ★ローカル状態の即時書き換えは廃止(B方式: 承認制を保つため、bento_delivery 側の pending_changes に従う)
   // 旧: ここで pending_cancel に書き換え + applyGohanAutoCancel() していた
 
+  // 全種類停止か部分停止かを再判定(完了モーダルの文言とログ用)
+  var typesMap = {};
+  Object.keys(usageData || {}).forEach(function(monthKey) {
+    if (!usageData[monthKey].hasData) return;
+    usageData[monthKey].days.forEach(function(day) {
+      day.items.forEach(function(it) {
+        if (it.status !== 'active' && it.status !== 'pending_add' && it.status !== 'pending_change') return;
+        var nm = (it.status === 'pending_change' && it.pendingChange) ? it.pendingChange.name : it.name;
+        if (nm) typesMap[nm] = true;
+      });
+    });
+  });
+  var activeTypes = BENTO_LIST.filter(function(b) { return typesMap[b]; });
+  var selected    = modalState.esBentoTypes || [];
+  var isFullStop  = (selected.length > 0 && selected.length === activeTypes.length);
+
   // === API 送信 ===
   if (USE_API) {
     var apiPayload = {
@@ -4757,6 +4889,7 @@ function submitEndService() {
       client_request_id: genRequestId('end'),
       client_timestamp: new Date().toISOString(),
       last_delivery_date: modalState.esDate || '',
+      bento_types: selected.slice(),     // ★停止する弁当種類
       reason: modalState.esReason || ''
     };
     apiPost(apiPayload, function(){
@@ -4769,8 +4902,17 @@ function submitEndService() {
 
   closeOpModal();
   renderUsageContent();
-  showModal('✅', 'ご利用終了を承りました',
-    '店舗にて確認後、最終配達日以降のご予定をキャンセルいたします。\n再度ご注文がございましたら、ご注文ページからご連絡をお願いいたします。');
+
+  // 完了モーダルの文言は全停止/部分停止で出し分け
+  if (isFullStop) {
+    showModal('✅', 'ご利用終了を承りました',
+      '店舗にて確認後、最終配達日以降のご予定をキャンセルいたします。\n再度ご注文がございましたら、ご注文ページからご連絡をお願いいたします。');
+  } else {
+    showModal('✅', '配達ストップを承りました',
+      '店舗にて確認後、最終配達日以降の以下のお弁当をキャンセルいたします。\n\n' +
+      selected.join('・') +
+      '\n\n他のお弁当はそのまま配達を継続いたします。');
+  }
 }
 
 // 数量変更ビュー
@@ -5695,9 +5837,18 @@ function finalizeCustomerInfoSave(nm, ad, ph, pm, cardLast4) {
 
   closeOpModal();
   renderCustomerInfoCard();
-  showModal('✅', isRegister ? 'ご登録ありがとうございます' : '更新を承りました',
-    isRegister ? 'もう一つの台所から、\nあなたを想う食事を\nお届けさせていただきます。'
-               : 'お客様情報の変更を申請しました。\n店舗にて確認後、反映いたします。');
+  if (isRegister) {
+    // 新規登録 → 完了モーダル → OK で「新規ご注文」画面に自動遷移
+    // (新規登録だけだと顧客管理システムにデータが残らないため、注文まで進めてもらう)
+    showModalWithAction('✅', 'ご登録ありがとうございます',
+      'もう一つの台所から、\nあなたを想う食事を\nお届けさせていただきます。\n\n続いてご注文へお進みください。',
+      function() {
+        loadAndShow('newOrder');
+      });
+  } else {
+    showModal('✅', '更新を承りました',
+      'お客様情報の変更を申請しました。\n店舗にて確認後、反映いたします。');
+  }
 }
 
 // HTMLエスケープ
