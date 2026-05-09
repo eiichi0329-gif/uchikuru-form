@@ -553,6 +553,18 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
   display: flex; align-items: center; gap: 8px;
 }
 
+/* ご利用状況カード内の承認待ち注記(集計値が承認済データのみのため) */
+.usage-pending-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fff8e1;
+  border-left: 4px solid #f5a623;
+  color: #8b4513;
+  font-size: 13px;
+  line-height: 1.6;
+  border-radius: 4px;
+}
+
 /* 申請中一覧モーダル */
 .pending-list-modal {
   display: flex; flex-direction: column; gap: 10px;
@@ -1129,11 +1141,11 @@ body.cancel-mode-active {
         <div class="welcome-desc">
           すでにご利用中の方も、これからの方も、<br>こちらからお手続きいただけます。
         </div>
-        <button class="welcome-cta-btn" style="background:#F08300;color:white;margin-bottom:10px;" onclick="openExistingCustomerCheck()">
-          現在ご利用中の方
-        </button>
-        <button class="welcome-cta-btn" style="background:white;color:#F08300;border:2px solid #F08300;" onclick="openCustomerRegisterModal()">
+        <button class="welcome-cta-btn" style="background:#F08300;color:white;margin-bottom:10px;" onclick="openCustomerRegisterModal()">
           初めての方(新規登録)
+        </button>
+        <button class="welcome-cta-btn" style="background:white;color:#F08300;border:2px solid #F08300;" onclick="openExistingCustomerCheck()">
+          現在ご利用中の方
         </button>
       </div>
     </div>
@@ -3302,6 +3314,14 @@ function renderUsageContent() {
     html += '<div class="usage-total">';
     html += '<span class="usage-total-label">ご利用代金 <span class="usage-total-tax">(税込)</span></span>';
     html += '<span class="usage-total-amount">¥' + totalAmount.toLocaleString() + '</span>';
+    html += '</div>';
+  }
+
+  // ★承認待ち変更がある場合の注記(集計値は承認済データのみで、申請中変更は反映されない仕様のため)
+  if (Array.isArray(pendingChanges) && pendingChanges.length > 0) {
+    html += '<div class="usage-pending-note">';
+    html += '⚠️ 承認待ちの変更が <b>' + pendingChanges.length + '件</b> あります。<br>';
+    html += '承認後に上記の食数・金額が変わる可能性があります。';
     html += '</div>';
   }
 
