@@ -493,6 +493,84 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
   font-weight: bold;
 }
 
+/* ===== 承認待ちバッジ(pending_changes 用) ===== */
+.usage-cell.has-pending {
+  /* セル全体に黄色の薄いオーバーレイ */
+  box-shadow: inset 0 0 0 2px #f5a623;
+  background-color: #fff8e1 !important;
+}
+.usage-cell.has-pending.editable { background-color: #fff3cd !important; }
+.pending-badge {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  right: 3px;
+  background: #f5a623;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  padding: 2px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.pending-badge.type-quantity_change { background: #f5a623; }  /* 黄 */
+.pending-badge.type-date_cancel    { background: #e74c3c; }  /* 赤 */
+.pending-badge.type-cancel         { background: #555;     }  /* 黒灰(以降ずっと利用終了) */
+
+/* カレンダー上部の申請中サマリーバナー */
+.pending-summary-bar {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe9a8 100%);
+  border: 2px solid #f5a623;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #8b4513;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(245, 166, 35, 0.2);
+}
+.pending-summary-bar .icon { font-size: 18px; }
+.pending-summary-bar .arrow { margin-left: auto; color: #c87f0a; font-size: 18px; }
+
+/* プロフィール変更申請中の上部バナー */
+.pending-profile-banner {
+  background: #e3f2fd;
+  border: 2px solid #2196F3;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #1565c0;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* 申請中一覧モーダル */
+.pending-list-modal {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 50vh; overflow-y: auto;
+}
+.pending-list-item {
+  background: #fff8e1; border-left: 4px solid #f5a623;
+  padding: 10px 12px; border-radius: 6px;
+}
+.pending-list-item.type-date_cancel    { border-left-color: #e74c3c; background: #ffebee; }
+.pending-list-item.type-cancel         { border-left-color: #555;    background: #f5f5f5; }
+.pending-list-item.type-profile_change { border-left-color: #2196F3; background: #e3f2fd; }
+.pending-list-item .pli-type {
+  font-size: 12px; color: #8b4513; font-weight: bold; margin-bottom: 4px;
+}
+.pending-list-item .pli-summary { font-size: 14px; color: #333; line-height: 1.5; }
+.pending-list-item .pli-time { font-size: 11px; color: #888; margin-top: 4px; }
+
 /* ===== ご利用状況カード(オシャレ版) ===== */
 .usage-card {
   background: linear-gradient(135deg, #fff8f0 0%, #fff0e0 100%);
@@ -1585,6 +1663,10 @@ var BRAND_LOGO_URI = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 var billingData = null;
 var usageData = null;
 
+// ★pending_changes(bento_delivery 側で承認待ちの変更)を保持
+// 形: [{id, type, received_at, summary, affected_dates: ["YYYY-MM-DD",...]}]
+var pendingChanges = [];
+
 // === キャンセル選択モード state ===
 // active時はカレンダーチップタップで選択、画面下部に確定バー表示
 var cancelMode = {
@@ -1981,13 +2063,18 @@ function submitTypeChangeMode() {
       client_timestamp: new Date().toISOString(),
       changes: changesList
     };
-    apiPost(apiPayload, function(){}, function(err){
+    apiPost(apiPayload, function(){
+      // ★送信成功後、サーバから最新の承認済データ + pending_changes を再フェッチ
+      reloadUsageDataAfterSubmit();
+    }, function(err){
       console.error('quantityChange API error:', err);
+      // 失敗時は再フェッチして元の状態に戻す(申請中ではない、エラーなので)
+      reloadUsageDataAfterSubmit();
     });
   }
 
   var n = keys.length;
-  // モード解除
+  // モード解除(ローカルカートをクリア)
   clearTypeChangeMode();
   document.body.classList.remove('type-change-mode-active');
   removeTypeChangeModeBar();
@@ -1995,6 +2082,15 @@ function submitTypeChangeMode() {
 
   showModal('✅', '変更を承りました',
     n + '件の数量変更を店舗にお送りいたしました。\n店舗にて確認後、反映いたします。');
+}
+
+// ★送信成功後にサーバから最新を再取得して画面を更新
+function reloadUsageDataAfterSubmit() {
+  if (!USE_API || !userId) return;
+  loadUsageData(function(d) {
+    usageData = d;
+    renderUsageContent();
+  });
 }
 
 function enterCancelMode() {
@@ -2129,36 +2225,9 @@ function submitCancelMode() {
     return { date: ds, items: items };
   });
 
-  var affectedDates = {};
-  keys.forEach(function(k) {
-    var pp = k.split('|');
-    var ds = pp[0]; var itemId = pp[1];
-    affectedDates[ds] = true;
-    var item = findItem(ds, itemId);
-    if (!item) return;
-    if (item.status === 'pending_add') {
-      // 物理削除
-      Object.keys(usageData).forEach(function(monthKey) {
-        if (!usageData[monthKey].hasData) return;
-        usageData[monthKey].days.forEach(function(day) {
-          if (day.date !== ds) return;
-          day.items = day.items.filter(function(it){ return it.id !== itemId; });
-        });
-      });
-    } else {
-      item.status = 'pending_cancel';
-      delete item.pendingChange;
-    }
-  });
-
-  // 空の日を削除
-  Object.keys(usageData).forEach(function(monthKey) {
-    if (!usageData[monthKey].hasData) return;
-    usageData[monthKey].days = usageData[monthKey].days.filter(function(day){ return day.items.length > 0; });
-  });
-
-  // ごはん自動連動
-  applyGohanAutoCancel(Object.keys(affectedDates));
+  // ★ローカル状態の即時書き換えは廃止(B方式: 承認制を保つため、bento_delivery 側の pending_changes に従う)
+  // 旧: ここで item.status = 'pending_cancel' に書き換えていた
+  // 新: 送信成功後に loadUsageData を再呼び出し、サーバから pending_changes を取得して反映
 
   // === API 送信 ===
   if (USE_API && cancellations.length > 0) {
@@ -2169,14 +2238,18 @@ function submitCancelMode() {
       client_timestamp: new Date().toISOString(),
       cancellations: cancellations
     };
-    apiPost(apiPayload, function(){}, function(err){
+    apiPost(apiPayload, function(){
+      // ★送信成功後、サーバから最新の承認済データ + pending_changes を再フェッチ
+      reloadUsageDataAfterSubmit();
+    }, function(err){
       console.error('dateCancel API error:', err);
+      reloadUsageDataAfterSubmit();
     });
   }
 
   var n = keys.length;
   closeOpModal();
-  // モード解除
+  // モード解除(ローカルの選択カートをクリア)
   clearCancelMode();
   document.body.classList.remove('cancel-mode-active');
   removeCancelModeBar();
@@ -2744,16 +2817,21 @@ function loadUsageData(callback) {
       if (data && data.status === 'ok' && data.enrolled && data.months) {
         // bento_delivery のレスポンスを LIFF 内部形式に変換
         var converted = convertScheduleApiToUsageData(data.months);
+        // ★pending_changes を保持(承認待ちのオーバーレイ表示用)
+        pendingChanges = Array.isArray(data.pending_changes) ? data.pending_changes : [];
         callback(converted);
       } else {
         // 未紐付け or データなし → モックデータ(空のカレンダー)
+        pendingChanges = [];
         callback(generateMockUsage());
       }
     }, function(err) {
       console.error('getSchedule error:', err);
+      pendingChanges = [];
       callback(generateMockUsage());  // フォールバック
     });
   } else {
+    pendingChanges = [];
     setTimeout(function(){ callback(generateMockUsage()); }, 200);
   }
 }
@@ -2976,9 +3054,88 @@ function generateMockUsage() {
 }
 
 
-/* ----------------------------------------
-   締切ロジック
-   ---------------------------------------- */
+// ★pending_changes 関連ヘルパー(承認待ちオーバーレイ表示用)
+
+// 指定日付に紐づく pending_changes をすべて返す(複数日にまたがる申請も含む)
+function getPendingForDate(dateStr) {
+  if (!Array.isArray(pendingChanges) || pendingChanges.length === 0) return [];
+  return pendingChanges.filter(function(pc) {
+    if (!pc || !Array.isArray(pc.affected_dates)) return false;
+    return pc.affected_dates.indexOf(dateStr) !== -1;
+  });
+}
+
+// 日付に紐づかない pending(profile_change 等)を返す
+function getPendingProfileChanges() {
+  if (!Array.isArray(pendingChanges) || pendingChanges.length === 0) return [];
+  return pendingChanges.filter(function(pc) {
+    return pc && pc.type === 'profile_change';
+  });
+}
+
+// type → 日本語短縮ラベル(セル内バッジ用)
+function pendingShortLabel(type) {
+  if (type === 'quantity_change') return '申請中:数量変更';
+  if (type === 'date_cancel')     return '申請中:取消';
+  if (type === 'cancel')          return '申請中:利用終了';
+  if (type === 'profile_change')  return '申請中:プロフィール変更';
+  return '申請中';
+}
+
+// type → モーダル/一覧表示用のフルラベル
+function pendingFullLabel(type) {
+  if (type === 'quantity_change') return '数量変更の申請';
+  if (type === 'date_cancel')     return '日付キャンセルの申請';
+  if (type === 'cancel')          return '利用終了の申請';
+  if (type === 'profile_change')  return 'プロフィール変更の申請';
+  return '変更の申請';
+}
+
+// ISO8601 → "M月D日 HH:MM 受付"
+function formatPendingReceivedAt(iso) {
+  if (!iso) return '';
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return (d.getMonth()+1) + '月' + d.getDate() + '日 ' +
+           pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' 受付';
+  } catch(e) { return ''; }
+}
+
+// 単一の pending の詳細をモーダルで表示
+function showPendingDetailModal(pending) {
+  if (!pending) return;
+  var label = pendingFullLabel(pending.type);
+  var summary = pending.summary || '(詳細なし)';
+  var time = formatPendingReceivedAt(pending.received_at);
+  showModal('🟡', label,
+    summary + (time ? '\n\n' + time : '') +
+    '\n\n店舗にて確認後、反映されます。');
+}
+
+// インデックス番号から pending を引いてモーダル表示(onclick から呼ぶ用、エスケープ事故防止)
+function showPendingByIndex(idx) {
+  if (!Array.isArray(pendingChanges)) return;
+  var pc = pendingChanges[idx];
+  if (!pc) return;
+  showPendingDetailModal(pc);
+}
+
+// 全 pending を一覧表示するモーダル
+function showAllPendingModal() {
+  if (!Array.isArray(pendingChanges) || pendingChanges.length === 0) {
+    showModal('ℹ️', '承認待ちはありません', '現在、申請中の変更はありません。');
+    return;
+  }
+  var lines = pendingChanges.map(function(pc, idx) {
+    var time = formatPendingReceivedAt(pc.received_at);
+    return (idx+1) + '. 【' + pendingFullLabel(pc.type) + '】\n' +
+           '   ' + (pc.summary || '') + (time ? '\n   ' + time : '');
+  });
+  showModal('🟡', '承認待ちの変更 (' + pendingChanges.length + '件)', lines.join('\n\n'));
+}
+
+
 // 配達対象週の前週水曜17時が締切
 // 操作可能な週(月〜金)を返す。締切超過なら次の週、未到来なら直近の週。
 function getEditableWeek() {
@@ -3441,6 +3598,30 @@ function renderUsageCalendar(monthData) {
 
   var html = '';
   html += '<div class="usage-cal-wrap">';
+
+  // ★承認待ちサマリーバナー(承認待ちが1件以上ある場合のみ表示)
+  var allPending = Array.isArray(pendingChanges) ? pendingChanges : [];
+  if (allPending.length > 0) {
+    html += '<div class="pending-summary-bar" onclick="showAllPendingModal()">';
+    html += '<span class="icon">🟡</span>';
+    html += '<span>' + allPending.length + '件の変更が店舗の承認待ちです</span>';
+    html += '<span class="arrow">›</span>';
+    html += '</div>';
+  }
+
+  // ★プロフィール変更申請中のバナー(affected_dates が空のため日付バッジでは見えないので別表示)
+  var profilePending = getPendingProfileChanges();
+  if (profilePending.length > 0) {
+    profilePending.forEach(function(pc) {
+      // pendingChanges 配列内のインデックスを取得して onclick に渡す
+      var pcIdx = pendingChanges.indexOf(pc);
+      html += '<div class="pending-profile-banner" onclick="showPendingByIndex(' + pcIdx + ')">';
+      html += '<span>📝</span>';
+      html += '<span>プロフィール変更を申請中: ' + escapeHtml(pc.summary || '') + '</span>';
+      html += '</div>';
+    });
+  }
+
   html += '<div class="usage-cal-deadline-notice">⏰ 水曜日17時が翌週の注文締切です</div>';
   html += '<div class="usage-cal-days-row">';
   html += '<span>月</span><span>火</span><span class="wed">水</span><span>木</span><span>金</span>';
@@ -3482,6 +3663,10 @@ function renderUsageCalendar(monthData) {
     if (isToday) cellClass += ' today';
     if (dayData && isEditable) cellClass += ' editable';
     if (!dayData) cellClass += ' no-delivery';
+
+    // ★この日付に紐づく pending_changes を取得
+    var cellPending = getPendingForDate(dateStr);
+    if (cellPending.length > 0) cellClass += ' has-pending';
 
     html += '<div class="' + cellClass + '">';
 
@@ -3542,6 +3727,23 @@ function renderUsageCalendar(monthData) {
         html += '<span class="chip-qty">×' + displayQty + '</span>';
         html += '</div>';
       });
+    }
+
+    // ★pending バッジ(承認待ちの変更がこの日付に紐づくとき)
+    if (cellPending.length > 0) {
+      // 複数 pending がある場合は最初の1件をバッジに表示(タップで先頭の詳細)
+      // 2件以上は「申請中(Nつ)」に縮める
+      var firstPending = cellPending[0];
+      var firstIdx = pendingChanges.indexOf(firstPending);
+      var badgeLabel;
+      if (cellPending.length === 1) {
+        badgeLabel = pendingShortLabel(firstPending.type);
+      } else {
+        badgeLabel = '申請中(' + cellPending.length + '件)';
+      }
+      html += '<div class="pending-badge type-' + (firstPending.type || '') + '" ' +
+              'onclick="event.stopPropagation();showPendingByIndex(' + firstIdx + ')">' +
+              escapeHtml(badgeLabel) + '</div>';
     }
 
     html += '</div>';
@@ -4544,41 +4746,8 @@ function renderEndServiceConfirmStep() {
 }
 
 function submitEndService() {
-  var stopDt = new Date(modalState.esDate + 'T00:00:00');
-  // 最終利用日より後の active/pending_add を pending_cancel に
-  // (pending_change も巻き込み:変更申請中もキャンセル扱いに)
-  var affectedDates = [];
-  Object.keys(usageData || {}).forEach(function(monthKey) {
-    if (!usageData[monthKey].hasData) return;
-    usageData[monthKey].days.forEach(function(day) {
-      var ddt = new Date(day.date + 'T00:00:00');
-      if (ddt <= stopDt) return; // 最終日以前は維持
-      // pending_add は削除、active/pending_change は pending_cancel に
-      var keep = [];
-      day.items.forEach(function(item) {
-        if (item.status === 'pending_add') {
-          // 削除(keepに入れない)
-          affectedDates.push(day.date);
-        } else if (item.status === 'active' || item.status === 'pending_change') {
-          item.status = 'pending_cancel';
-          delete item.pendingChange;
-          keep.push(item);
-          affectedDates.push(day.date);
-        } else {
-          keep.push(item);
-        }
-      });
-      day.items = keep;
-    });
-  });
-  // 空になったdayを削除
-  Object.keys(usageData || {}).forEach(function(monthKey) {
-    if (!usageData[monthKey].hasData) return;
-    usageData[monthKey].days = usageData[monthKey].days.filter(function(day){ return day.items.length > 0; });
-  });
-
-  // ごはんは前述の自動連動で必要なら処理(ただし削除済みの日も含めて)
-  applyGohanAutoCancel();
+  // ★ローカル状態の即時書き換えは廃止(B方式: 承認制を保つため、bento_delivery 側の pending_changes に従う)
+  // 旧: ここで pending_cancel に書き換え + applyGohanAutoCancel() していた
 
   // === API 送信 ===
   if (USE_API) {
@@ -4590,15 +4759,18 @@ function submitEndService() {
       last_delivery_date: modalState.esDate || '',
       reason: modalState.esReason || ''
     };
-    apiPost(apiPayload, function(){}, function(err){
+    apiPost(apiPayload, function(){
+      reloadUsageDataAfterSubmit();
+    }, function(err){
       console.error('cancel(endService) API error:', err);
+      reloadUsageDataAfterSubmit();
     });
   }
 
   closeOpModal();
   renderUsageContent();
-  showModal('✅', 'ご利用ありがとうございました',
-    '再度ご注文がございましたら、ご注文ページからご連絡をお願いいたします。');
+  showModal('✅', 'ご利用終了を承りました',
+    '店舗にて確認後、最終配達日以降のご予定をキャンセルいたします。\n再度ご注文がございましたら、ご注文ページからご連絡をお願いいたします。');
 }
 
 // 数量変更ビュー
@@ -5511,15 +5683,21 @@ function finalizeCustomerInfoSave(nm, ad, ph, pm, cardLast4) {
       after:  afterSnapshot,
       fields_changed: fieldsChanged
     };
-    apiPost(apiPayload, function(){}, function(err){
+    apiPost(apiPayload, function(){
+      // ★送信成功後、getSchedule を再フェッチして pending_changes(profile_change)を反映
+      // → カレンダー上部に「プロフィール変更を申請中」バナーが出る
+      reloadUsageDataAfterSubmit();
+    }, function(err){
       console.error('profileEdit API error:', err);
+      reloadUsageDataAfterSubmit();
     });
   }
 
   closeOpModal();
   renderCustomerInfoCard();
-  showModal('✅', isRegister ? 'ご登録ありがとうございます' : '更新しました',
-    isRegister ? 'もう一つの台所から、\nあなたを想う食事を\nお届けさせていただきます。' : 'お客様情報を更新しました。');
+  showModal('✅', isRegister ? 'ご登録ありがとうございます' : '更新を承りました',
+    isRegister ? 'もう一つの台所から、\nあなたを想う食事を\nお届けさせていただきます。'
+               : 'お客様情報の変更を申請しました。\n店舗にて確認後、反映いたします。');
 }
 
 // HTMLエスケープ
