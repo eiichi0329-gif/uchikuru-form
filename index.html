@@ -1080,14 +1080,8 @@ body.cancel-mode-active {
   <div id="menuWrap" style="display:none;">
     <p class="menu-title">ご用件をお選びください</p>
     <div class="menu-grid">
-      <button class="menu-btn primary" onclick="loadAndShow('newOrder')">
-        <span class="icon">🍱</span><span>新規ご注文</span><span class="arrow">›</span>
-      </button>
-      <button class="menu-btn" onclick="loadAndShow('usage')">
+      <button class="menu-btn primary" onclick="loadAndShow('usage')">
         <span class="icon">👤</span><span>マイページ</span><span class="arrow">›</span>
-      </button>
-      <button class="menu-btn" onclick="loadAndShow('change')">
-        <span class="icon">📝</span><span>注文内容の変更</span><span class="arrow">›</span>
       </button>
       <button class="menu-btn" onclick="window.open('https://uchikuru-form-yddu.vercel.app/menu.html','_blank')">
         <span class="icon">🍽</span><span>献立紹介</span><span class="arrow">›</span>
@@ -4733,7 +4727,7 @@ function renderEndServicePickStep() {
   html += '<b style="color:#c0392b;">ご注意</b><br>';
   html += '選んだ週の<b>最終利用日が変更</b>されます。翌週以降のご注文はすべてキャンセル扱いとなります。<br>';
   html += '締切が過ぎた週は選択できません。<br>';
-  html += '操作完了後、再度のご注文は新規ご注文ページからお願いいたします。';
+  html += '操作完了後、再度のご注文はマイページの「新規注文」からお願いいたします。';
   html += '</div>';
 
   if (weeks.length === 0) {
@@ -4868,12 +4862,12 @@ function renderEndServiceConfirmStep() {
   if (isFullStop) {
     html += '・最終配達日の翌日以降のご注文はすべてキャンセル扱いとなります<br>';
     html += '・お支払いは月末締めにて請求いたします<br>';
-    html += '・再開時は新規ご注文ページよりお手続きください';
+    html += '・再開時はマイページの「新規注文」よりお手続きください';
   } else {
     html += '・最終配達日の翌日以降、選択したお弁当のみキャンセル扱いとなります<br>';
     html += '・選択していないお弁当はそのまま配達を継続します<br>';
     html += '・お支払いは月末締めにて請求いたします<br>';
-    html += '・再開時は新規ご注文ページよりお手続きください';
+    html += '・再開時はマイページの「新規注文」よりお手続きください';
   }
   html += '</div>';
 
@@ -5860,12 +5854,12 @@ function finalizeCustomerInfoSave(nm, ad, ph, pm, cardLast4) {
   closeOpModal();
   renderCustomerInfoCard();
   if (isRegister) {
-    // 新規登録 → 完了モーダル → OK で「新規ご注文」画面に自動遷移
-    // (新規登録だけだと顧客管理システムにデータが残らないため、注文まで進めてもらう)
+    // 新規登録 → 完了モーダル → OK で「マイページ」に自動遷移
+    // (マイページ内の「新規注文」ボタンから初回注文へ進む導線)
     showModalWithAction('✅', 'ご登録ありがとうございます',
-      'もう一つの台所から、\nあなたを想う食事を\nお届けさせていただきます。\n\n続いてご注文へお進みください。',
+      'もう一つの台所から、\nあなたを想う食事を\nお届けさせていただきます。\n\nマイページに移動します。\n「新規注文」ボタンから初回ご注文をお願いいたします。',
       function() {
-        loadAndShow('newOrder');
+        loadAndShow('usage');
       });
   } else {
     showModal('✅', '更新を承りました',
