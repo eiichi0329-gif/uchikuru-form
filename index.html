@@ -1047,6 +1047,54 @@ body.cancel-mode-active {
   border-radius: 8px; padding:16px 40px; font-size:18px; font-weight:700;
   cursor:pointer; width:100%;
 }
+
+/* ===== ETAカード(お届け予定時間) ===== */
+.eta-card {
+  background: linear-gradient(135deg, #f0f8f3 0%, #d8edd8 100%);
+  border: 2px solid #4a8c5e;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(74, 140, 94, 0.12);
+}
+.eta-card-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+.eta-card-icon { font-size: 22px; }
+.eta-card-title {
+  font-size: 15px; font-weight: bold; color: #2d6b3f;
+  letter-spacing: 0.05em;
+}
+.eta-card-window {
+  font-size: 28px; font-weight: 800; color: #2d6b3f;
+  text-align: center; padding: 8px 0;
+  letter-spacing: -0.3px;
+}
+.eta-card-sub {
+  font-size: 14px; color: #4a8c5e; text-align: center;
+  margin-top: 4px;
+}
+.eta-card.calculating {
+  background: #f5f5f5; border-color: #ccc;
+}
+.eta-card.calculating .eta-card-title,
+.eta-card.calculating .eta-card-window { color: #888; }
+.eta-card.calculating .eta-card-window { font-size: 18px; font-weight: bold; padding: 12px 0; }
+.eta-card.delivered {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-color: #4caf50;
+}
+.eta-card.delivered .eta-card-window {
+  color: #2e7d32; font-size: 22px;
+}
+.eta-card.pending-departure {
+  background: #fff8f0; border-color: #F08300;
+}
+.eta-card.pending-departure .eta-card-title,
+.eta-card.pending-departure .eta-card-window { color: #C26900; }
+.eta-card.pending-departure .eta-card-window { font-size: 18px; font-weight: bold; padding: 12px 0; }
+
 </style>
 </head>
 <body>
@@ -1670,6 +1718,14 @@ var BRAND_LOGO_URI = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 /* ========== マイページ用ステート ========== */
 var billingData = null;
 var usageData = null;
+
+/* ===== ETAカード state ===== */
+var etaData = null;          // 直近の ETA API レスポンス
+var etaPollingTimer = null;  // 5分polling のタイマーID
+var etaRetryCount = 0;       // 計算中レスポンス時のリトライカウンタ
+var etaPollingIntervalMs = 5 * 60 * 1000;  // 5分
+var etaRetryDelayMs = 5000;                 // 5秒
+var etaMaxRetry = 3;
 
 // ★pending_changes(bento_delivery 側で承認待ちの変更)を保持
 // 形: [{id, type, received_at, summary, affected_dates: ["YYYY-MM-DD",...]}]
@@ -2618,6 +2674,12 @@ function onFormShown(type) {
         renderUsageContent();
       });
     });
+
+    // ★ETA: 初回ロード + 5分polling 開始
+    loadEtaData(function() {
+      renderUsageContent();
+    });
+    startEtaPolling();
   }
 }
 
@@ -2669,6 +2731,7 @@ function hideAll(){
   document.getElementById('statusMsg').style.display='none';
   document.getElementById('completeWrap').classList.remove('active');
   document.querySelectorAll('.form-wrap').forEach(function(f){f.classList.remove('active');});
+  stopEtaPolling();  // ★ETA polling を停止
 }
 
 /* ========== 顧客情報 ========== */
@@ -2842,6 +2905,116 @@ function loadUsageData(callback) {
     pendingChanges = [];
     setTimeout(function(){ callback(generateMockUsage()); }, 200);
   }
+}
+
+/* ============================================================
+   ETA API 呼び出し(GAS 経由で bento_delivery を中継)
+   ============================================================ */
+function loadEtaData(callback) {
+  if (!USE_API || !userId) {
+    etaData = null;
+    if (callback) callback(null);
+    return;
+  }
+  apiGet('getEta', { userId: userId }, function(data) {
+    etaData = data || null;
+    // 計算中レスポンスの場合、retry_after 秒後にリトライ(最大3回)
+    if (data && data.eta_window === null && data.fallback_message === '計算中です'
+        && data.has_delivery === true && etaRetryCount < etaMaxRetry) {
+      etaRetryCount++;
+      var delay = (data.retry_after ? data.retry_after * 1000 : etaRetryDelayMs);
+      setTimeout(function() {
+        loadEtaData(callback);
+      }, delay);
+      return;
+    }
+    // 確定 or 最大リトライ到達 → リトライカウンタリセット
+    etaRetryCount = 0;
+    if (callback) callback(data);
+  }, function(err) {
+    console.error('getEta error:', err);
+    etaData = null;
+    etaRetryCount = 0;
+    if (callback) callback(null);
+  });
+}
+
+function startEtaPolling() {
+  stopEtaPolling();
+  etaPollingTimer = setInterval(function() {
+    loadEtaData(function() {
+      // 取得完了 → カードを再描画(現在マイページ表示中の場合のみ)
+      if (document.getElementById('form-usage') &&
+          document.getElementById('form-usage').classList.contains('active')) {
+        renderUsageContent();
+      }
+    });
+  }, etaPollingIntervalMs);
+}
+
+function stopEtaPolling() {
+  if (etaPollingTimer) {
+    clearInterval(etaPollingTimer);
+    etaPollingTimer = null;
+  }
+}
+
+function renderEtaCard() {
+  // 配達なし or 未紐付け or データなし → 非表示
+  if (!etaData) return '';
+  if (etaData.has_delivery === false) return '';   // 本日配達なし or 未紐付け
+  if (!etaData.ok) return '';
+
+  // 配達済み
+  if (etaData.delivered === true) {
+    return '<div class="eta-card delivered">' +
+             '<div class="eta-card-header">' +
+               '<span class="eta-card-icon">✅</span>' +
+               '<span class="eta-card-title">本日のお弁当</span>' +
+             '</div>' +
+             '<div class="eta-card-window">配達済 (' + escapeHtml(etaData.delivered_at || '') + ' 着)</div>' +
+           '</div>';
+  }
+
+  // 計算中
+  if (etaData.eta_window === null && etaData.fallback_message === '計算中です') {
+    return '<div class="eta-card calculating">' +
+             '<div class="eta-card-header">' +
+               '<span class="eta-card-icon">🕒</span>' +
+               '<span class="eta-card-title">お弁当のお届け予定時間</span>' +
+             '</div>' +
+             '<div class="eta-card-window">お届け時間を計算中...</div>' +
+           '</div>';
+  }
+
+  // 出発時刻未設定
+  if (etaData.eta_window === null && etaData.reason === 'departure_not_set') {
+    return '<div class="eta-card pending-departure">' +
+             '<div class="eta-card-header">' +
+               '<span class="eta-card-icon">🕒</span>' +
+               '<span class="eta-card-title">お弁当のお届け予定時間</span>' +
+             '</div>' +
+             '<div class="eta-card-window">お届け時間はまもなく確定します</div>' +
+           '</div>';
+  }
+
+  // ETA 確定
+  if (etaData.eta_window && etaData.eta_window.label) {
+    var subText = '';
+    if (typeof etaData.delivery_order === 'number') {
+      subText = '本日 ' + etaData.delivery_order + ' 番目のお届けです';
+    }
+    return '<div class="eta-card">' +
+             '<div class="eta-card-header">' +
+               '<span class="eta-card-icon">🕒</span>' +
+               '<span class="eta-card-title">お弁当のお届け予定時間</span>' +
+             '</div>' +
+             '<div class="eta-card-window">' + escapeHtml(etaData.eta_window.label) + '</div>' +
+             (subText ? '<div class="eta-card-sub">' + escapeHtml(subText) + '</div>' : '') +
+           '</div>';
+  }
+
+  return '';
 }
 
 // bento_delivery /schedule のレスポンスを LIFF 内部の usageData 形式に変換
@@ -3247,6 +3420,9 @@ function renderUsageContent() {
   html += '<div id="usage-calendar-anchor">';
   html += renderUsageCalendar(d);
   html += '</div>';
+
+  // ★ETAカード(カレンダーと利用状況の間に挿入)
+  html += renderEtaCard();
 
   // === ご利用状況(種類別食数+合計金額) ===
   var byType = {};
