@@ -1,20 +1,31 @@
 <!DOCTYPE html>
 <html lang="ja">
 <!--
-  うちくる LIFF マイページ - test_index_mypage_v4(完成版)
+  うちくる LIFF マイページ - test_index_mypage_v5(完成版)
   ============================================================
-  v3 からの変更点(要件書 2026-05-12 に基づく):
-    (A) 新規注文フォーム冒頭に「ご利用状況」(usage_status)ラジオボタン追加
-        - 選択肢: 初めて利用 / 現在利用中 / 過去に利用(必須)
+  v4 → v5 の変更点:
+    ・利用状況選択を独立ステップ化(no-step-usage-select)
+      → 新規注文ボタン押下時に最初に表示される
+    ・「現在利用中」選択時のみ「注文有無の確認」ステップ追加(no-step-confirm-order)
+      → 「はい、続ける」→ 注文入力へ
+      → 「いいえ、登録のみ」→ submitRegisterOnly() で送信
+    ・新規関数: submitUsageSelect / noShowUsageSelectStep
+                noShowConfirmOrderStep / onCoBackToCustomerStep
+                onCoYesContinueToOrder / onCoNoSubmitRegisterOnly
+                submitRegisterOnly
+    ・既存関数の修正: initNewOrderPage / noShowCustomerStep / noShowOrderStep
+                     finalizeNoCustomerInfo / submitNoOrder
+    ・noState に step='usageSelect'|'customer'|'confirmOrder'|'order' と
+      requestOnlyLink:boolean を追加
+    ・「登録のみ」ペイロードに request_only_link: true を含めて
+      GAS 経由で /api/line/customer/register-only に転送
+
+  v3 → v4 の変更点(要件書 2026-05-12 に基づく):
+    (A) 新規注文フォームに「ご利用状況」(usage_status)ラジオボタン追加(必須)
     (B) 注文送信ペイロードに usage_status を含める + 完了モーダル文言分岐
     (D) 既存顧客マッチング・紐付けUI/コードを撤去
-        - openExistingCustomerCheck 等の7関数を削除
-        - customerMatch/customerLink ラッパーを削除
-        - ウェルカム画面の「現在ご利用中の方」ボタンを撤去
     (F) マイページ未紐付け時の3分岐(登録済み/申請中/完全新規)
-        - localStorage の申請中レコードで「店舗で確認中」画面を表示
-        - 「紐付け状況を確認」ボタンで手動再取得可能
-  v2 → v3 の変更点: ETA表示機能追加(loadEtaData/renderEtaCard 等)
+  v2 → v3 の変更点: ETA表示機能追加
 ============================================================
 -->
 <head>
@@ -1247,6 +1258,39 @@ body.cancel-mode-active {
   <div id="form-newOrder" class="form-wrap">
     <div class="form-title">🍱 新規ご注文</div>
 
+    <!-- ★v5: ステップ0: ご利用状況選択(独立ページ・最初に表示) -->
+    <div id="no-step-usage-select" style="display:none;">
+      <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius: 7px;padding:14px 16px;margin-bottom:18px;font-size:14px;color:#444;line-height:1.7;">
+        ご注文の前に、お客様の<b>ご利用状況</b>をお選びください。<br>
+        現在ご利用中・過去にご利用の方は、店舗にて過去のご利用情報との紐付けを行います。
+      </div>
+      <div class="sec-label">ご利用状況<span class="req">*</span></div>
+      <div class="usage-status-grid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
+        <label class="usage-status-row" data-value="first_time" style="display:flex;align-items:center;gap:12px;padding:16px;background:white;border:2px solid #ddd;border-radius:8px;cursor:pointer;">
+          <input type="radio" name="us_usage_status" value="first_time" onchange="onUsUsageStatusChange(this.value)" style="width:22px;height:22px;flex-shrink:0;accent-color:#F08300;">
+          <div style="flex:1;">
+            <div style="font-size:17px;font-weight:bold;color:#333;">初めて利用します</div>
+            <div style="font-size:13px;color:#888;margin-top:4px;">新規のお客様としてご登録いたします</div>
+          </div>
+        </label>
+        <label class="usage-status-row" data-value="active" style="display:flex;align-items:center;gap:12px;padding:16px;background:white;border:2px solid #ddd;border-radius:8px;cursor:pointer;">
+          <input type="radio" name="us_usage_status" value="active" onchange="onUsUsageStatusChange(this.value)" style="width:22px;height:22px;flex-shrink:0;accent-color:#F08300;">
+          <div style="flex:1;">
+            <div style="font-size:17px;font-weight:bold;color:#333;">現在利用中です</div>
+            <div style="font-size:13px;color:#888;margin-top:4px;">店舗で確認後、マイページがご利用可能になります</div>
+          </div>
+        </label>
+        <label class="usage-status-row" data-value="past" style="display:flex;align-items:center;gap:12px;padding:16px;background:white;border:2px solid #ddd;border-radius:8px;cursor:pointer;">
+          <input type="radio" name="us_usage_status" value="past" onchange="onUsUsageStatusChange(this.value)" style="width:22px;height:22px;flex-shrink:0;accent-color:#F08300;">
+          <div style="flex:1;">
+            <div style="font-size:17px;font-weight:bold;color:#333;">過去に利用したことがあります</div>
+            <div style="font-size:13px;color:#888;margin-top:4px;">店舗で確認後、マイページがご利用可能になります</div>
+          </div>
+        </label>
+      </div>
+      <button class="btn-submit" onclick="submitUsageSelect()">次へ進む</button>
+    </div>
+
     <!-- ステップ1: 顧客情報登録(未登録時のみ表示) -->
     <div id="no-step-customer" style="display:none;">
       <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius: 7px;padding:14px 16px;margin-bottom:18px;font-size:14px;color:#444;line-height:1.7;">
@@ -1283,6 +1327,46 @@ body.cancel-mode-active {
       <button class="btn-submit" onclick="submitNoCustomerInfo()">登録して注文へ進む</button>
     </div>
 
+    <!-- ★v5: ステップ1.5: 注文有無の確認(usage_status=active の場合のみ表示) -->
+    <div id="no-step-confirm-order" style="display:none;">
+      <!-- 顧客情報サマリー -->
+      <div class="cust-info-card" id="co-cust-summary" style="margin-bottom:14px;">
+        <div class="cust-greet-row">
+          <div>
+            <div class="cust-greet-name" id="co-cust-summary-name">お客様</div>
+          </div>
+          <button class="cust-edit-btn" onclick="onCoBackToCustomerStep()">✏️ 変更</button>
+        </div>
+        <div class="cust-info-rows">
+          <div class="cust-info-row">
+            <span class="cust-info-lbl">ご住所</span>
+            <span class="cust-info-val" id="co-cust-summary-address">―</span>
+          </div>
+          <div class="cust-info-row">
+            <span class="cust-info-lbl">電話番号</span>
+            <span class="cust-info-val" id="co-cust-summary-phone">―</span>
+          </div>
+          <div class="cust-info-row">
+            <span class="cust-info-lbl">お支払い</span>
+            <span class="cust-info-val" id="co-cust-summary-payment">―</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#fffdf8;border:1px solid #f0d8b8;border-radius:7px;padding:16px;margin-bottom:18px;font-size:15px;color:#333;line-height:1.8;">
+        お客様情報を承りました。<br>
+        続けて<b>ご注文</b>もされますか?
+      </div>
+
+      <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#666;line-height:1.7;">
+        ご注文をしない場合は、お客様情報のみ店舗にお伝えします。<br>
+        紐付け確認後、改めてLINEでご注文いただけるようになります。
+      </div>
+
+      <button class="btn-submit" onclick="onCoYesContinueToOrder()" style="margin-bottom:10px;">はい、ご注文を続ける</button>
+      <button class="btn-submit" onclick="onCoNoSubmitRegisterOnly()" style="background:white;color:#F08300;border:2px solid #F08300;">いいえ、登録のみで完了</button>
+    </div>
+
     <!-- ステップ2: 注文入力(顧客情報があれば直接ここから) -->
     <div id="no-step-order" style="display:none;">
       <!-- 顧客情報サマリー(ステップ2で表示) -->
@@ -1307,36 +1391,6 @@ body.cancel-mode-active {
             <span class="cust-info-val" id="no-cust-summary-payment">―</span>
           </div>
         </div>
-      </div>
-
-      <!-- ★v6: ご利用状況(usage_status)- 要件書 5.1 / 自己申告必須 -->
-      <div class="sec-label">ご利用状況<span class="req">*</span></div>
-      <div style="background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:11px 14px;margin-bottom:10px;font-size:13px;color:#555;line-height:1.7;">
-        ご注文者様の現在のご利用状況をお選びください。<br>
-        <b>現在ご利用中</b>または<b>過去にご利用</b>を選ばれた場合、店舗にて過去のご利用情報との紐付けを行います。
-      </div>
-      <div class="usage-status-grid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
-        <label class="usage-status-row" data-value="first_time" style="display:flex;align-items:center;gap:12px;padding:14px;background:white;border:2px solid #ddd;border-radius:7px;cursor:pointer;">
-          <input type="radio" name="usage_status" value="first_time" onchange="onNoUsageStatusChange(this.value)" style="width:20px;height:20px;flex-shrink:0;accent-color:#F08300;">
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:bold;color:#333;">初めて利用します</div>
-            <div style="font-size:12px;color:#888;margin-top:3px;">新規のお客様としてご登録いたします</div>
-          </div>
-        </label>
-        <label class="usage-status-row" data-value="active" style="display:flex;align-items:center;gap:12px;padding:14px;background:white;border:2px solid #ddd;border-radius:7px;cursor:pointer;">
-          <input type="radio" name="usage_status" value="active" onchange="onNoUsageStatusChange(this.value)" style="width:20px;height:20px;flex-shrink:0;accent-color:#F08300;">
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:bold;color:#333;">現在利用中です</div>
-            <div style="font-size:12px;color:#888;margin-top:3px;">店舗で確認後、マイページがご利用可能になります</div>
-          </div>
-        </label>
-        <label class="usage-status-row" data-value="past" style="display:flex;align-items:center;gap:12px;padding:14px;background:white;border:2px solid #ddd;border-radius:7px;cursor:pointer;">
-          <input type="radio" name="usage_status" value="past" onchange="onNoUsageStatusChange(this.value)" style="width:20px;height:20px;flex-shrink:0;accent-color:#F08300;">
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:bold;color:#333;">過去に利用したことがあります</div>
-            <div style="font-size:12px;color:#888;margin-top:3px;">店舗で確認後、マイページがご利用可能になります</div>
-          </div>
-        </label>
       </div>
 
       <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius: 7px;padding:14px 16px;margin-bottom:14px;font-size:14px;color:#444;line-height:1.7;">
@@ -4202,7 +4256,7 @@ function findItem(dateStr, itemId) {
    新規注文ページ(顧客情報登録 → 注文入力 の2ステップ)
    ============================================================ */
 var noState = {
-  step: 'customer',         // 'customer' | 'order'
+  step: 'usageSelect',      // ★v5: 'usageSelect' | 'customer' | 'confirmOrder' | 'order'
   payment: '',
   cardLast4: '',
   // 注文入力用
@@ -4213,13 +4267,15 @@ var noState = {
   specifyMonth: null,
   startDate: '',            // 配達開始日(毎週パターン時)
   startMonth: null,         // 配達開始日カレンダー表示中の年月 {y, m}
-  usageStatus: ''           // ★v6: 自己申告ステータス 'first_time' | 'active' | 'past'
+  usageStatus: '',          // 'first_time' | 'active' | 'past'
+  requestOnlyLink: false    // ★v5: 「登録のみ」フラグ(usage_status=active 時に true 可能)
 };
 
-// ★v6: usage_status ラジオ変更ハンドラ(選択行のハイライト)
-function onNoUsageStatusChange(value) {
+// ★v5: 利用状況選択ステップでのラジオ変更ハンドラ
+function onUsUsageStatusChange(value) {
   noState.usageStatus = value;
-  var rows = document.querySelectorAll('.usage-status-row');
+  noState.requestOnlyLink = false; // 選び直したらフラグもリセット
+  var rows = document.querySelectorAll('#no-step-usage-select .usage-status-row');
   for (var i = 0; i < rows.length; i++) {
     var v = rows[i].getAttribute('data-value');
     if (v === value) {
@@ -4232,15 +4288,14 @@ function onNoUsageStatusChange(value) {
   }
 }
 
-function initNewOrderPage() {
-  // 顧客情報の有無を確認
-  var cd = window._customerData || {};
-  var nm = (cd.name || '').trim();
-  var ad = (cd.address || '').trim();
-  var ph = (cd.phone || '').trim();
-  var pm = (cd.payment || '').trim();
-  var isComplete = nm && ad && ph && pm;
+// ★v5: 旧 onNoUsageStatusChange は v4 で no-step-order 内に置いていた名残
+// v5 では no-step-usage-select 側の onUsUsageStatusChange に統一済み(後方互換のため空関数で残す)
+function onNoUsageStatusChange(value) {
+  // v5: 統合済み(no-op)
+  onUsUsageStatusChange(value);
+}
 
+function initNewOrderPage() {
   // 注文入力部分を初期化
   noState.types = {};
   BENTO_LIST.forEach(function(name){ noState.types[name] = 0; });
@@ -4251,29 +4306,66 @@ function initNewOrderPage() {
   noState.specifyMonth = { y: ew.monday.getFullYear(), m: ew.monday.getMonth() + 1 };
   noState.startDate = '';
   noState.startMonth = { y: ew.monday.getFullYear(), m: ew.monday.getMonth() + 1 };
-  noState.usageStatus = '';  // ★v6: リセット
+  noState.usageStatus = '';
+  noState.requestOnlyLink = false;
 
-  // ★v6: ラジオボタンの選択状態もリセット
-  var radios = document.querySelectorAll('input[name="usage_status"]');
+  // ★v5: 利用状況ラジオの選択状態をリセット
+  var radios = document.querySelectorAll('input[name="us_usage_status"]');
   for (var i = 0; i < radios.length; i++) radios[i].checked = false;
-  var rows = document.querySelectorAll('.usage-status-row');
+  var rows = document.querySelectorAll('#no-step-usage-select .usage-status-row');
   for (var j = 0; j < rows.length; j++) {
     rows[j].style.borderColor = '#ddd';
     rows[j].style.background = 'white';
   }
 
+  // ★v5: 必ず利用状況選択ステップから開始
+  noShowUsageSelectStep();
+}
+
+// ★v5: 利用状況選択ステップを表示
+function noShowUsageSelectStep() {
+  noState.step = 'usageSelect';
+  document.getElementById('no-step-usage-select').style.display = 'block';
+  document.getElementById('no-step-customer').style.display = 'none';
+  document.getElementById('no-step-confirm-order').style.display = 'none';
+  document.getElementById('no-step-order').style.display = 'none';
+  // スクロール最上部へ
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0, 0); }
+}
+
+// ★v5: 「次へ進む」ボタン押下時
+function submitUsageSelect() {
+  if (!noState.usageStatus) {
+    showModal('🙏', 'ご利用状況をお選びください',
+      '初めて利用 / 現在利用中 / 過去に利用 のいずれかをお選びください。');
+    return;
+  }
+  // 顧客情報が既に揃っている場合は customer ステップをスキップ
+  var cd = window._customerData || {};
+  var nm = (cd.name || '').trim();
+  var ad = (cd.address || '').trim();
+  var ph = (cd.phone || '').trim();
+  var pm = (cd.payment || '').trim();
+  var isComplete = nm && ad && ph && pm;
+
   if (isComplete) {
-    // 顧客情報あり → 注文入力ステップへ直接
-    noShowOrderStep();
+    // 顧客情報あり → usage_status='active' なら確認ステップへ、それ以外は注文入力へ
+    if (noState.usageStatus === 'active') {
+      noShowConfirmOrderStep();
+    } else {
+      noShowOrderStep();
+    }
   } else {
-    // 未登録 → 顧客情報登録ステップ
+    // 顧客情報なし → 顧客情報入力ステップへ
     noShowCustomerStep();
   }
 }
 
 function noShowCustomerStep() {
   noState.step = 'customer';
+  document.getElementById('no-step-usage-select').style.display = 'none';
   document.getElementById('no-step-customer').style.display = 'block';
+  document.getElementById('no-step-confirm-order').style.display = 'none';
   document.getElementById('no-step-order').style.display = 'none';
 
   var cd = window._customerData || {};
@@ -4285,6 +4377,9 @@ function noShowCustomerStep() {
   noState.cardLast4 = cd.cardLast4 || '';
   // 支払いがクレカなら入力欄を表示してStripe初期化
   onNoCustPaymentChange(noState.payment);
+
+  // スクロール最上部へ
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0, 0); }
 }
 
 function onNoCustPaymentChange(value) {
@@ -4351,13 +4446,19 @@ function finalizeNoCustomerInfo(nm, ad, ph, pm, cardLast4) {
     absentAction: prev.absentAction || '',
     referral:     prev.referral || ''
   };
-  // TODO: 本番ではAPI送信
-  noShowOrderStep();
+  // ★v5: usage_status='active' なら確認ステップへ、それ以外は注文ステップへ
+  if (noState.usageStatus === 'active') {
+    noShowConfirmOrderStep();
+  } else {
+    noShowOrderStep();
+  }
 }
 
 function noShowOrderStep() {
   noState.step = 'order';
+  document.getElementById('no-step-usage-select').style.display = 'none';
   document.getElementById('no-step-customer').style.display = 'none';
+  document.getElementById('no-step-confirm-order').style.display = 'none';
   document.getElementById('no-step-order').style.display = 'block';
 
   // 顧客情報サマリー
@@ -4395,6 +4496,49 @@ function noShowOrderStep() {
 
   // 注文入力のレンダリング
   renderNoOrderStep();
+
+  // スクロール最上部へ
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0, 0); }
+}
+
+// ★v5: 注文有無確認ステップを表示(usage_status=active 時のみ通る)
+function noShowConfirmOrderStep() {
+  noState.step = 'confirmOrder';
+  document.getElementById('no-step-usage-select').style.display = 'none';
+  document.getElementById('no-step-customer').style.display = 'none';
+  document.getElementById('no-step-confirm-order').style.display = 'block';
+  document.getElementById('no-step-order').style.display = 'none';
+
+  // 顧客情報サマリー
+  var cd = window._customerData || {};
+  document.getElementById('co-cust-summary-name').textContent = (cd.name || '') + '様';
+  document.getElementById('co-cust-summary-address').textContent = cd.address || '―';
+  document.getElementById('co-cust-summary-phone').textContent = cd.phone || '―';
+  var paymentLabel = cd.payment || '―';
+  if (cd.payment === 'クレジットカード' && cd.cardLast4) {
+    paymentLabel += ' (****' + cd.cardLast4 + ')';
+  }
+  document.getElementById('co-cust-summary-payment').textContent = paymentLabel;
+
+  // スクロール最上部へ
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0, 0); }
+}
+
+// ★v5: 確認ステップ「変更」ボタン → 顧客情報入力に戻る
+function onCoBackToCustomerStep() {
+  noShowCustomerStep();
+}
+
+// ★v5: 確認ステップ「はい、ご注文を続ける」
+function onCoYesContinueToOrder() {
+  noState.requestOnlyLink = false;
+  noShowOrderStep();
+}
+
+// ★v5: 確認ステップ「いいえ、登録のみで完了」
+function onCoNoSubmitRegisterOnly() {
+  noState.requestOnlyLink = true;
+  submitRegisterOnly();
 }
 
 function onNoBackToCustomerStep() {
@@ -4681,15 +4825,12 @@ function clearNoStartDate() {
 
 // 注文確定
 function submitNoOrder() {
-  // ★v6: usage_status 必須チェック(要件書 5.1)
+  // ★v5: usage_status は利用状況選択ステップで取得済みのはず
+  //      万一未設定の場合は利用状況選択ステップに戻す(セーフティ)
   if (!noState.usageStatus) {
     showModal('🙏', 'ご利用状況をお選びください',
-      'フォーム冒頭の「ご利用状況」から、現在の状況をお選びください。\n\n・初めて利用します\n・現在利用中です\n・過去に利用したことがあります');
-    // ラジオボタンエリアまでスクロール
-    var radio = document.querySelector('input[name="usage_status"]');
-    if (radio && radio.scrollIntoView) {
-      try { radio.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
-    }
+      'はじめにご利用状況をお選びいただきます。');
+    noShowUsageSelectStep();
     return;
   }
 
@@ -4893,6 +5034,75 @@ function submitNoOrder() {
 
   // 完了モーダル → タップでマイページ(usage)に遷移
   showModalWithAction('✅', completeTitle, completeMsg,
+    function() {
+      // マイページに遷移
+      loadAndShow('usage');
+    });
+}
+
+// ★v5: 「登録のみ」送信(usage_status=active で注文なしのケース)
+// → bento_delivery の /api/line/customer/register-only を新エンドポイントとして呼ぶ
+function submitRegisterOnly() {
+  var cd = window._customerData || {};
+  // 安全チェック
+  if (!cd.name || !cd.address || !cd.phone) {
+    showModal('🙏', '顧客情報をご入力ください', 'お名前・ご住所・電話番号をご確認ください。');
+    noShowCustomerStep();
+    return;
+  }
+
+  // 支払い方法ラベル → 1/2/3 へ
+  var pmMap = { '現金': 1, '口座振替': 2, 'クレジットカード': 3 };
+  var paymentMethod = pmMap[cd.payment] || cd.payment;
+
+  if (USE_API) {
+    var apiPayload = {
+      type: 'newOrder',                 // GAS側の handleFormSubmit に流す
+      line_user_id: userId,
+      client_request_id: genRequestId('reg'),
+      client_timestamp: new Date().toISOString(),
+      usage_status: 'active',           // ★必ず active(その他はこの導線に来ない)
+      request_only_link: true,          // ★★★これがあったら GAS は /register-only を呼ぶ
+      customer: {
+        name:               cd.name        || '',
+        address:            cd.address     || '',
+        phone:              cd.phone       || '',
+        store:              cd.store       || '',
+        payment_method:     paymentMethod,
+        card_last4:         cd.cardLast4   || '',
+        emergency_contacts: cd.emergency   || '',
+        delivery_note:      cd.deliveryNote || '',
+        absence_handling:   cd.absentAction || '',
+        referral:           cd.referral    || ''
+      },
+      order: {
+        items:            [],   // 空(登録のみ)
+        schedule_pattern: '',
+        schedule_days:    [],
+        specify_dates:    [],
+        start_date:       '',
+        note:             ''
+      }
+    };
+    apiPost(apiPayload, function(){}, function(err){
+      console.error('registerOnly API error:', err);
+    });
+
+    // localStorage に申請中レコードを記録(マイページの「店舗で確認中」表示用)
+    try {
+      localStorage.setItem('uchikuru_pending_order', JSON.stringify({
+        client_request_id: apiPayload.client_request_id,
+        usage_status: 'active',
+        request_only_link: true,
+        submitted_at: apiPayload.client_timestamp,
+        line_user_id: userId
+      }));
+    } catch(e) { /* localStorage不可環境では無視 */ }
+  }
+
+  // 完了モーダル(登録のみ専用文言)
+  showModalWithAction('✅', 'お客様情報を承りました',
+    '現在ご利用中のお客様としてお客様情報を登録しました。\n\n店舗にて過去のご利用情報との紐付けを行います。\n紐付け完了時にLINEでお知らせします。',
     function() {
       // マイページに遷移
       loadAndShow('usage');
