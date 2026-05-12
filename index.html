@@ -1,5 +1,22 @@
 <!DOCTYPE html>
 <html lang="ja">
+<!--
+  うちくる LIFF マイページ - test_index_mypage_v4(完成版)
+  ============================================================
+  v3 からの変更点(要件書 2026-05-12 に基づく):
+    (A) 新規注文フォーム冒頭に「ご利用状況」(usage_status)ラジオボタン追加
+        - 選択肢: 初めて利用 / 現在利用中 / 過去に利用(必須)
+    (B) 注文送信ペイロードに usage_status を含める + 完了モーダル文言分岐
+    (D) 既存顧客マッチング・紐付けUI/コードを撤去
+        - openExistingCustomerCheck 等の7関数を削除
+        - customerMatch/customerLink ラッパーを削除
+        - ウェルカム画面の「現在ご利用中の方」ボタンを撤去
+    (F) マイページ未紐付け時の3分岐(登録済み/申請中/完全新規)
+        - localStorage の申請中レコードで「店舗で確認中」画面を表示
+        - 「紐付け状況を確認」ボタンで手動再取得可能
+  v2 → v3 の変更点: ETA表示機能追加(loadEtaData/renderEtaCard 等)
+============================================================
+-->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
@@ -1183,12 +1200,12 @@ body.cancel-mode-active {
         <div class="welcome-desc">
           すでにご利用中の方も、これからの方も、<br>こちらからお手続きいただけます。
         </div>
-        <button class="welcome-cta-btn" style="background:#F08300;color:white;margin-bottom:10px;" onclick="openCustomerRegisterModal()">
-          初めての方(新規登録)
+        <button class="welcome-cta-btn" style="background:#F08300;color:white;" onclick="loadAndShow('newOrder')">
+          ご注文・お申込みへ進む
         </button>
-        <button class="welcome-cta-btn" style="background:white;color:#F08300;border:2px solid #F08300;" onclick="openExistingCustomerCheck()">
-          現在ご利用中の方
-        </button>
+        <div style="font-size:13px;color:#666;margin-top:14px;line-height:1.7;text-align:left;background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:10px 12px;">
+          現在ご利用中の方・過去にご利用いただいた方は、注文フォーム内で<b>ご利用状況</b>をご選択ください。<br>店舗にて過去のご利用情報との紐付け後、マイページがご利用いただけます。
+        </div>
       </div>
     </div>
 
@@ -1290,6 +1307,36 @@ body.cancel-mode-active {
             <span class="cust-info-val" id="no-cust-summary-payment">―</span>
           </div>
         </div>
+      </div>
+
+      <!-- ★v6: ご利用状況(usage_status)- 要件書 5.1 / 自己申告必須 -->
+      <div class="sec-label">ご利用状況<span class="req">*</span></div>
+      <div style="background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:11px 14px;margin-bottom:10px;font-size:13px;color:#555;line-height:1.7;">
+        ご注文者様の現在のご利用状況をお選びください。<br>
+        <b>現在ご利用中</b>または<b>過去にご利用</b>を選ばれた場合、店舗にて過去のご利用情報との紐付けを行います。
+      </div>
+      <div class="usage-status-grid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+        <label class="usage-status-row" data-value="first_time" style="display:flex;align-items:center;gap:12px;padding:14px;background:white;border:2px solid #ddd;border-radius:7px;cursor:pointer;">
+          <input type="radio" name="usage_status" value="first_time" onchange="onNoUsageStatusChange(this.value)" style="width:20px;height:20px;flex-shrink:0;accent-color:#F08300;">
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:bold;color:#333;">初めて利用します</div>
+            <div style="font-size:12px;color:#888;margin-top:3px;">新規のお客様としてご登録いたします</div>
+          </div>
+        </label>
+        <label class="usage-status-row" data-value="active" style="display:flex;align-items:center;gap:12px;padding:14px;background:white;border:2px solid #ddd;border-radius:7px;cursor:pointer;">
+          <input type="radio" name="usage_status" value="active" onchange="onNoUsageStatusChange(this.value)" style="width:20px;height:20px;flex-shrink:0;accent-color:#F08300;">
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:bold;color:#333;">現在利用中です</div>
+            <div style="font-size:12px;color:#888;margin-top:3px;">店舗で確認後、マイページがご利用可能になります</div>
+          </div>
+        </label>
+        <label class="usage-status-row" data-value="past" style="display:flex;align-items:center;gap:12px;padding:14px;background:white;border:2px solid #ddd;border-radius:7px;cursor:pointer;">
+          <input type="radio" name="usage_status" value="past" onchange="onNoUsageStatusChange(this.value)" style="width:20px;height:20px;flex-shrink:0;accent-color:#F08300;">
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:bold;color:#333;">過去に利用したことがあります</div>
+            <div style="font-size:12px;color:#888;margin-top:3px;">店舗で確認後、マイページがご利用可能になります</div>
+          </div>
+        </label>
       </div>
 
       <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius: 7px;padding:14px 16px;margin-bottom:14px;font-size:14px;color:#444;line-height:1.7;">
@@ -1662,33 +1709,9 @@ function genRequestId(prefix) {
   return (prefix || 'req') + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
 }
 
-// === v5: 既存顧客マッチング(/match) ===
-// phone と name から既存顧客の候補を返す
-// onSuccess(data): data.matched, data.auto_linkable, data.match_token, data.candidates[]
-function customerMatch(phone, name, onSuccess, onError) {
-  if (!USE_API) {
-    if (onError) onError({status:'error', message:'USE_API=false'});
-    return;
-  }
-  apiGet('customerMatch', {
-    userId: userId,
-    phone:  phone || '',
-    name:   name || ''
-  }, onSuccess, onError);
-}
-
-// === v5: 既存顧客紐付け確定(/link) ===
-function customerLink(customerId, matchToken, onSuccess, onError) {
-  if (!USE_API) {
-    if (onError) onError({status:'error', message:'USE_API=false'});
-    return;
-  }
-  apiGet('customerLink', {
-    userId:       userId,
-    customer_id:  customerId,
-    match_token:  matchToken
-  }, onSuccess, onError);
-}
+// === v6: 顧客マッチング・紐付け関数(customerMatch/customerLink)を撤去 ===
+// 紐付けは bento_delivery CMS (/cms/line-orders) で店舗スタッフが目視で実行する運用に変更
+// 撤去日: 2026-05-12 / 要件書 4.2 / 5.3 に基づく
 
 var isSameOrder = false;
 var isSameOrderNew = false;
@@ -2711,18 +2734,147 @@ function renderCustomerInfoCard() {
       paymentLabel += ' (****' + cd.cardLast4 + ')';
     }
     document.getElementById('cust-info-payment').textContent = paymentLabel;
-  } else {
-    // 未登録 → ウェルカム画面表示 + 登録モーダルを自動オープン
-    welcomeEl.style.display = 'block';
-    mainEl.style.display = 'none';
-    // ブランドロゴをセット
-    var logoImg = document.getElementById('welcome-logo-img');
-    if (logoImg && typeof BRAND_LOGO_URI !== 'undefined') {
-      logoImg.src = BRAND_LOGO_URI;
-    }
-    // ※ モーダル自動オープンは廃止
-    // ユーザーがウェルカム画面の「現在ご利用中の方」または「初めての方」を選択する
+    return;
   }
+
+  // ★v6: 未登録時の2分岐(申請中 / 完全新規)
+  // localStorage に申請中レコードがあれば「店舗で確認中」表示に切り替え
+  welcomeEl.style.display = 'block';
+  mainEl.style.display = 'none';
+
+  var pendingOrder = readPendingOrderFromStorage();
+  if (pendingOrder) {
+    renderPendingApprovalWelcome(pendingOrder);
+  } else {
+    renderInitialWelcome();
+  }
+}
+
+// ★v6: localStorage から申請中レコードを取得(有効期限14日)
+function readPendingOrderFromStorage() {
+  try {
+    var raw = localStorage.getItem('uchikuru_pending_order');
+    if (!raw) return null;
+    var data = JSON.parse(raw);
+    if (!data || !data.submitted_at) return null;
+    // userId が現在と一致しなければ無視(別アカウントの残骸)
+    if (data.line_user_id && userId && data.line_user_id !== userId) return null;
+    // 14日以上経過していたら破棄
+    var submittedAt = new Date(data.submitted_at);
+    var now = new Date();
+    var elapsedDays = (now - submittedAt) / (1000 * 60 * 60 * 24);
+    if (elapsedDays > 14) {
+      localStorage.removeItem('uchikuru_pending_order');
+      return null;
+    }
+    return data;
+  } catch(e) {
+    return null;
+  }
+}
+
+// ★v6: 申請中表示(店舗で確認中)
+function renderPendingApprovalWelcome(pendingOrder) {
+  var welcomeEl = document.getElementById('usage-welcome');
+  if (!welcomeEl) return;
+  var usLabel = '';
+  if (pendingOrder.usage_status === 'active') usLabel = '現在ご利用中';
+  else if (pendingOrder.usage_status === 'past') usLabel = '過去にご利用';
+  else if (pendingOrder.usage_status === 'first_time') usLabel = '初めてご利用';
+
+  // 申告に応じて文言を分岐(初めて=単純に確認中、その他=過去情報との紐付け確認中)
+  var introMsg, mainMsg;
+  if (pendingOrder.usage_status === 'first_time') {
+    introMsg = 'ご注文ありがとうございます';
+    mainMsg = '店舗にてご注文内容を確認中です。<br>登録完了次第、マイページがご利用いただけます。';
+  } else {
+    introMsg = 'ご注文ありがとうございます';
+    mainMsg = '店舗にて<b>過去のご利用情報との紐付け</b>を確認中です。<br>紐付け完了次第、マイページがご利用いただけます。';
+  }
+
+  welcomeEl.innerHTML =
+    '<div class="welcome-card" style="border-color:#F08300;background:linear-gradient(135deg, #fff8f3 0%, #ffeedc 100%);">' +
+      '<div class="welcome-icon">' +
+        '<img id="welcome-logo-img" src="' + (typeof BRAND_LOGO_URI !== "undefined" ? BRAND_LOGO_URI : "") + '" alt="うちくる" style="width:88px;height:88px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply;">' +
+      '</div>' +
+      '<div class="welcome-title" style="color:#C26900;">' + introMsg + '</div>' +
+      '<div class="welcome-subtitle">' + mainMsg + '</div>' +
+      '<div class="welcome-desc" style="background:#fffdf8;border-color:#F0C088;">' +
+        (usLabel ? '<b>ご申告内容:</b>' + usLabel + '<br>' : '') +
+        '<b>受付日時:</b>' + formatPendingSubmittedAt(pendingOrder.submitted_at) +
+      '</div>' +
+      '<div style="background:#fff5ee;border:1px solid #F08300;border-radius:7px;padding:12px 14px;font-size:14px;color:#444;line-height:1.7;margin-bottom:14px;text-align:left;">' +
+        '紐付け完了時に、こちらのLINEにお知らせメッセージが届きます。<br>' +
+        'お急ぎの場合は、ご注文時にお選びの店舗までお電話ください。' +
+      '</div>' +
+      '<button class="welcome-cta-btn" style="background:white;color:#F08300;border:2px solid #F08300;" onclick="checkLinkStatusManually()">' +
+        '紐付け状況を確認' +
+      '</button>' +
+    '</div>';
+}
+
+// ★v6: 完全新規(申請中レコードなし)の表示
+function renderInitialWelcome() {
+  var welcomeEl = document.getElementById('usage-welcome');
+  if (!welcomeEl) return;
+  welcomeEl.innerHTML =
+    '<div class="welcome-card">' +
+      '<div class="welcome-icon">' +
+        '<img id="welcome-logo-img" src="' + (typeof BRAND_LOGO_URI !== "undefined" ? BRAND_LOGO_URI : "") + '" alt="うちくる" style="width:96px;height:96px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply;">' +
+      '</div>' +
+      '<div class="welcome-title">ようこそ</div>' +
+      '<div class="welcome-subtitle">うちくる夕食宅配サービスをご利用いただきありがとうございます</div>' +
+      '<div class="welcome-desc">' +
+        'すでにご利用中の方も、これからの方も、<br>こちらからお手続きいただけます。' +
+      '</div>' +
+      '<button class="welcome-cta-btn" style="background:#F08300;color:white;" onclick="loadAndShow(\'newOrder\')">' +
+        'ご注文・お申込みへ進む' +
+      '</button>' +
+      '<div style="font-size:13px;color:#666;margin-top:14px;line-height:1.7;text-align:left;background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:10px 12px;">' +
+        '現在ご利用中の方・過去にご利用いただいた方は、注文フォーム内で<b>ご利用状況</b>をご選択ください。<br>店舗にて過去のご利用情報との紐付け後、マイページがご利用いただけます。' +
+      '</div>' +
+    '</div>';
+}
+
+// ★v6: ISO日時 → "M月D日 HH:MM" 表示
+function formatPendingSubmittedAt(iso) {
+  if (!iso) return '';
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return (d.getMonth()+1) + '月' + d.getDate() + '日 ' +
+           ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+  } catch(e) { return ''; }
+}
+
+// ★v6: 「紐付け状況を確認」ボタン押下時、顧客情報を再取得して画面更新
+function checkLinkStatusManually() {
+  document.getElementById('statusMsg').textContent = 'お客様情報を確認中...';
+  document.getElementById('statusMsg').style.display = 'block';
+  loadCustomerInfoThen('usage', function(){
+    document.getElementById('statusMsg').style.display = 'none';
+    renderCustomerInfoCard();
+    // 紐付け済になったら申請中レコードを破棄
+    var cd = window._customerData || {};
+    if (cd.name && cd.address && cd.phone) {
+      try { localStorage.removeItem('uchikuru_pending_order'); } catch(e){}
+      // 紐付け完了 → usageDataなどを再読込してマイページ全体を更新
+      billingData = null;
+      usageData = null;
+      var loadBilling = function(next) { loadBillingData(function(b){ billingData = b; next(); }); };
+      var loadUsage   = function(next) { loadUsageData(function(u){ usageData = u; next(); }); };
+      loadUsage(function(){
+        loadBilling(function(){
+          renderMonthTabs('usage');
+          renderUsageContent();
+        });
+      });
+    } else {
+      // まだ紐付いていない → 案内
+      showModal('🙏', 'まだ確認中です',
+        '店舗での確認・紐付けが完了していないようです。\nしばらくお待ちいただくか、店舗までお電話ください。');
+    }
+  });
 }
 
 function showMenu(){hideAll();document.getElementById('menuWrap').style.display='block';}
@@ -4060,8 +4212,25 @@ var noState = {
   specifyDates: [],
   specifyMonth: null,
   startDate: '',            // 配達開始日(毎週パターン時)
-  startMonth: null          // 配達開始日カレンダー表示中の年月 {y, m}
+  startMonth: null,         // 配達開始日カレンダー表示中の年月 {y, m}
+  usageStatus: ''           // ★v6: 自己申告ステータス 'first_time' | 'active' | 'past'
 };
+
+// ★v6: usage_status ラジオ変更ハンドラ(選択行のハイライト)
+function onNoUsageStatusChange(value) {
+  noState.usageStatus = value;
+  var rows = document.querySelectorAll('.usage-status-row');
+  for (var i = 0; i < rows.length; i++) {
+    var v = rows[i].getAttribute('data-value');
+    if (v === value) {
+      rows[i].style.borderColor = '#F08300';
+      rows[i].style.background = '#fff5ee';
+    } else {
+      rows[i].style.borderColor = '#ddd';
+      rows[i].style.background = 'white';
+    }
+  }
+}
 
 function initNewOrderPage() {
   // 顧客情報の有無を確認
@@ -4082,6 +4251,16 @@ function initNewOrderPage() {
   noState.specifyMonth = { y: ew.monday.getFullYear(), m: ew.monday.getMonth() + 1 };
   noState.startDate = '';
   noState.startMonth = { y: ew.monday.getFullYear(), m: ew.monday.getMonth() + 1 };
+  noState.usageStatus = '';  // ★v6: リセット
+
+  // ★v6: ラジオボタンの選択状態もリセット
+  var radios = document.querySelectorAll('input[name="usage_status"]');
+  for (var i = 0; i < radios.length; i++) radios[i].checked = false;
+  var rows = document.querySelectorAll('.usage-status-row');
+  for (var j = 0; j < rows.length; j++) {
+    rows[j].style.borderColor = '#ddd';
+    rows[j].style.background = 'white';
+  }
 
   if (isComplete) {
     // 顧客情報あり → 注文入力ステップへ直接
@@ -4502,6 +4681,18 @@ function clearNoStartDate() {
 
 // 注文確定
 function submitNoOrder() {
+  // ★v6: usage_status 必須チェック(要件書 5.1)
+  if (!noState.usageStatus) {
+    showModal('🙏', 'ご利用状況をお選びください',
+      'フォーム冒頭の「ご利用状況」から、現在の状況をお選びください。\n\n・初めて利用します\n・現在利用中です\n・過去に利用したことがあります');
+    // ラジオボタンエリアまでスクロール
+    var radio = document.querySelector('input[name="usage_status"]');
+    if (radio && radio.scrollIntoView) {
+      try { radio.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
+    }
+    return;
+  }
+
   var selectedTypes = [];
   Object.keys(noState.types).forEach(function(k){
     if (noState.types[k] > 0) selectedTypes.push({name: k, qty: noState.types[k]});
@@ -4644,6 +4835,7 @@ function submitNoOrder() {
       line_user_id: userId,
       client_request_id: genRequestId('ord'),
       client_timestamp: new Date().toISOString(),
+      usage_status: noState.usageStatus,  // ★v6: 自己申告ステータス(first_time/active/past)
       customer: {
         name:               cd.name        || '',
         address:            cd.address     || '',
@@ -4670,11 +4862,37 @@ function submitNoOrder() {
     apiPost(apiPayload, function(){}, function(err){
       console.error('newOrder API error:', err);
     });
+
+    // ★v6: 申請中レコードを localStorage に記録(マイページ未紐付け時の判定用)
+    try {
+      localStorage.setItem('uchikuru_pending_order', JSON.stringify({
+        client_request_id: apiPayload.client_request_id,
+        usage_status: noState.usageStatus,
+        submitted_at: apiPayload.client_timestamp,
+        line_user_id: userId
+      }));
+    } catch(e) { /* localStorage不可環境では無視 */ }
+  }
+
+  // ★v6: 完了モーダルを申告内容で分岐
+  var us = noState.usageStatus;
+  var completeTitle, completeMsg;
+  if (us === 'first_time') {
+    completeTitle = 'ご注文ありがとうございました';
+    completeMsg = 'ご注文を承りました。\n\n店舗にて内容を確認のうえ、ご連絡させていただきます。\nマイページのカレンダーからご注文内容をご確認いただけます。';
+  } else if (us === 'active') {
+    completeTitle = 'ご注文を承りました';
+    completeMsg = '現在ご利用中のお客様としてご注文を受け付けました。\n\n店舗にて過去のご利用情報との紐付けを行ったうえで、内容を反映いたします。\n紐付け完了時にLINEでお知らせします。';
+  } else if (us === 'past') {
+    completeTitle = 'ご注文を承りました';
+    completeMsg = '過去にご利用いただいたお客様としてご注文を受け付けました。\n\n店舗にて過去のご利用情報との紐付けを行ったうえで、内容を反映いたします。\n紐付け完了時にLINEでお知らせします。';
+  } else {
+    completeTitle = 'ご注文ありがとうございました';
+    completeMsg = 'ご注文を承りました。\nマイページのカレンダーからご注文内容をご確認いただけます。';
   }
 
   // 完了モーダル → タップでマイページ(usage)に遷移
-  showModalWithAction('✅', 'ご注文ありがとうございました',
-    'ご注文を承りました。\nマイページのカレンダーからご注文内容をご確認いただけます。',
+  showModalWithAction('✅', completeTitle, completeMsg,
     function() {
       // マイページに遷移
       loadAndShow('usage');
@@ -5593,208 +5811,15 @@ function initStripeElements() {
 
 /* ----- 種類・数量を変える(週選択 → 種類グループ選択 → 新種類・数量) ----- */
 /* ============================================================
-   v5: 既存顧客チェック・マッチング・紐付けフロー
+   ★v6: 既存顧客チェック・マッチング・紐付けフローを撤去
+        (店舗側人手紐付け運用に移行)
+        撤去日: 2026-05-12 / 要件書 5.3 に基づく
+        旧関数: openExistingCustomerCheck / renderExistingCheckView
+              submitExistingCheck / renderExistingMatchResultView
+              selectExistingCandidate / renderExistingConfirmView
+              confirmExistingLink
    ============================================================ */
 
-// 「現在ご利用中の方」をタップ → 電話番号入力モーダル表示
-function openExistingCustomerCheck() {
-  if (!USE_API) {
-    // テストモードでは直接 register に進む
-    openCustomerRegisterModal();
-    return;
-  }
-  modalState.view = 'existingCheck';
-  modalState.ecPhone = '';
-  modalState.ecName = '';
-  modalState.ecCandidates = [];
-  modalState.ecMatchToken = '';
-  renderExistingCheckView();
-}
-
-function renderExistingCheckView() {
-  var html = '';
-  html += '<div style="text-align:center;margin-bottom:8px;"><img src="' + BRAND_LOGO_URI + '" alt="うちくる" style="width:64px;height:64px;object-fit:contain;display:inline-block;mix-blend-mode:multiply;"></div>';
-  html += '<div class="op-modal-title">ご本人確認</div>';
-  html += '<div class="op-modal-subtitle">ご利用中のお電話番号をお教えください</div>';
-
-  html += '<div class="op-modal-field">';
-  html += '<label>電話番号<span style="color:#e74c3c;margin-left:3px;">*</span></label>';
-  html += '<input type="tel" id="ec-phone" value="' + escapeHtml(modalState.ecPhone || '') + '" placeholder="例:090-1234-5678" oninput="modalState.ecPhone=this.value">';
-  html += '</div>';
-
-  html += '<div class="op-modal-field">';
-  html += '<label>お名前(任意)</label>';
-  html += '<input type="text" id="ec-name" value="' + escapeHtml(modalState.ecName || '') + '" placeholder="例:田中太郎" oninput="modalState.ecName=this.value">';
-  html += '<div style="font-size:12px;color:#888;margin-top:4px;">お名前を入力すると、より正確に検索できます</div>';
-  html += '</div>';
-
-  html += '<button class="op-modal-confirm" onclick="submitExistingCheck()">検索する</button>';
-  html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="closeOpModal();">‹ 戻る</button>';
-
-  document.getElementById('op-modal-content').innerHTML = html;
-  openOpModal(false);
-}
-
-// 検索ボタン → /match 呼出
-function submitExistingCheck() {
-  var phone = (modalState.ecPhone || '').trim();
-  var name  = (modalState.ecName || '').trim();
-  if (!phone && !name) {
-    showModal('🙏', 'ご入力をお願いします', '電話番号またはお名前を入力してください。');
-    return;
-  }
-  // 検索中表示
-  document.getElementById('op-modal-content').innerHTML =
-    '<div style="text-align:center;padding:30px;">' +
-    '<div style="font-size:48px;margin-bottom:16px;">🔍</div>' +
-    '<div style="font-size:16px;color:#666;">検索中です。少々お待ちください...</div>' +
-    '</div>';
-
-  customerMatch(phone, name, function(data) {
-    if (!data || data.status !== 'ok') {
-      showModal('🙏', 'エラー', '通信エラーが発生しました。\nもう一度お試しください。');
-      closeOpModal();
-      return;
-    }
-    if (!data.matched || !data.candidates || data.candidates.length === 0) {
-      // マッチなし → 新規登録を促す
-      showModalWithAction('🙏', 'ご登録が見つかりませんでした',
-        'お電話番号で検索しましたが、ご登録が見つかりませんでした。\n\n' +
-        '新規登録としてお手続きください。',
-        function() {
-          openCustomerRegisterModal();
-        });
-      return;
-    }
-    // 候補あり → 候補表示画面へ
-    modalState.ecCandidates = data.candidates;
-    modalState.ecMatchToken = data.match_token || '';
-    modalState.ecAutoLinkable = !!data.auto_linkable;
-    renderExistingMatchResultView();
-  }, function(err) {
-    console.error('customerMatch error:', err);
-    showModal('🙏', 'エラー',
-      '通信エラーが発生しました。\nしばらく待ってからもう一度お試しください。');
-    closeOpModal();
-  });
-}
-
-// 候補表示画面
-function renderExistingMatchResultView() {
-  var cs = modalState.ecCandidates || [];
-  var html = '';
-  html += '<div style="text-align:center;margin-bottom:8px;"><img src="' + BRAND_LOGO_URI + '" alt="うちくる" style="width:64px;height:64px;object-fit:contain;display:inline-block;mix-blend-mode:multiply;"></div>';
-  html += '<div class="op-modal-title">ご登録が見つかりました</div>';
-
-  if (cs.length === 1 && modalState.ecAutoLinkable) {
-    html += '<div class="op-modal-subtitle">ご本人の情報をご確認ください</div>';
-  } else {
-    html += '<div class="op-modal-subtitle">該当する方をお選びください</div>';
-  }
-
-  html += '<div style="margin:16px 0;">';
-  cs.forEach(function(c, idx) {
-    html += '<div style="border:1.5px solid #e0d8d0;border-radius:7px;padding:14px;margin-bottom:10px;background:#fff;cursor:pointer;" onclick="selectExistingCandidate(' + idx + ')">';
-    html += '<div style="font-size:18px;font-weight:bold;color:#3a2a1a;margin-bottom:6px;">' + escapeHtml(c.name_masked || '') + ' 様</div>';
-    html += '<div style="font-size:14px;color:#666;line-height:1.7;">';
-    if (c.address_masked) html += '🏠 ' + escapeHtml(c.address_masked) + '<br>';
-    if (c.phone_last4)    html += '📞 ****-****-' + escapeHtml(c.phone_last4) + '<br>';
-    if (c.store)          html += '🏪 ' + escapeHtml(c.store);
-    html += '</div>';
-    html += '</div>';
-  });
-  html += '</div>';
-
-  html += '<button class="op-modal-cancel" onclick="renderExistingCheckView();">‹ 検索条件を変える</button>';
-
-  document.getElementById('op-modal-content').innerHTML = html;
-  openOpModal(false);
-}
-
-// 候補をタップ → 確認画面
-function selectExistingCandidate(idx) {
-  var c = modalState.ecCandidates[idx];
-  if (!c) return;
-  modalState.ecSelectedCandidate = c;
-  renderExistingConfirmView();
-}
-
-function renderExistingConfirmView() {
-  var c = modalState.ecSelectedCandidate;
-  if (!c) return;
-  var html = '';
-  html += '<div style="text-align:center;margin-bottom:8px;"><img src="' + BRAND_LOGO_URI + '" alt="うちくる" style="width:64px;height:64px;object-fit:contain;display:inline-block;mix-blend-mode:multiply;"></div>';
-  html += '<div class="op-modal-title">ご本人確認</div>';
-  html += '<div class="op-modal-subtitle">こちらのご登録でお間違いありませんか?</div>';
-
-  html += '<div style="border:2px solid #F08300;border-radius:8px;padding:16px;margin:16px 0;background:#fff8f0;">';
-  html += '<div style="font-size:19px;font-weight:bold;color:#3a2a1a;margin-bottom:10px;">' + escapeHtml(c.name_masked || '') + ' 様</div>';
-  html += '<div style="font-size:15px;color:#444;line-height:1.9;">';
-  if (c.address_masked) html += '🏠 ' + escapeHtml(c.address_masked) + '<br>';
-  if (c.phone_last4)    html += '📞 ****-****-' + escapeHtml(c.phone_last4) + '<br>';
-  if (c.store)          html += '🏪 ' + escapeHtml(c.store);
-  html += '</div>';
-  html += '</div>';
-
-  html += '<button class="op-modal-confirm" onclick="confirmExistingLink()">この登録で続ける</button>';
-  html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="renderExistingMatchResultView();">‹ 別の登録を選ぶ</button>';
-
-  document.getElementById('op-modal-content').innerHTML = html;
-  openOpModal(false);
-}
-
-// 紐付け確定
-function confirmExistingLink() {
-  var c = modalState.ecSelectedCandidate;
-  if (!c || !modalState.ecMatchToken) return;
-
-  // 紐付け中表示
-  document.getElementById('op-modal-content').innerHTML =
-    '<div style="text-align:center;padding:30px;">' +
-    '<div style="font-size:48px;margin-bottom:16px;">🔗</div>' +
-    '<div style="font-size:16px;color:#666;">登録中です。少々お待ちください...</div>' +
-    '</div>';
-
-  customerLink(c.customer_id, modalState.ecMatchToken, function(data) {
-    if (!data || data.status !== 'ok' || !data.linked) {
-      var msg = '登録中にエラーが発生しました。';
-      if (data && data.message) msg += '\n' + data.message;
-      showModal('🙏', 'エラー', msg);
-      closeOpModal();
-      return;
-    }
-    // 紐付け成功 → 顧客情報を反映
-    var customer = data.customer || {};
-    var nameParts = String(customer.name || '').split(/[\s 　]+/).filter(function(s){return s;});
-    window._customerData = {
-      name:        customer.name || '',
-      address:     customer.address || '',
-      phone:       customer.phone || '',
-      store:       customer.store || '',
-      payment:     '',  // payment_method の文字列変換は後続のステップで
-      cardLast4:   '',
-      emergency:   '',
-      deliveryNote:'',
-      absentAction:'',
-      referral:    ''
-    };
-    closeOpModal();
-    showModalWithAction('✅', '紐付けが完了しました',
-      customer.name + ' 様、ありがとうございます。\n\n' +
-      'お客様情報をマイページに反映いたしました。',
-      function() {
-        // マイページを再読込して実データを表示
-        billingData = null;
-        usageData = null;
-        loadAndShow('usage');
-      });
-  }, function(err) {
-    console.error('customerLink error:', err);
-    showModal('🙏', 'エラー',
-      '通信エラーが発生しました。\nしばらく待ってからもう一度お試しください。');
-    closeOpModal();
-  });
-}
 
 /* ============================================================
    顧客情報登録・編集モーダル
