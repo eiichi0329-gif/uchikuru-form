@@ -19,6 +19,9 @@
       requestOnlyLink:boolean を追加
     ・「登録のみ」ペイロードに request_only_link: true を含めて
       GAS 経由で /api/line/customer/register-only に転送
+    ・★テスト用リセット機能: URL末尾に ?reset=1 を付けて開くと
+      localStorage の uchikuru_pending_order をクリアする
+      「店舗で確認中」画面から「ようこそ」画面に戻したい時に使用
 
   v3 → v4 の変更点(要件書 2026-05-12 に基づく):
     (A) 新規注文フォームに「ご利用状況」(usage_status)ラジオボタン追加(必須)
@@ -1662,6 +1665,77 @@ body.cancel-mode-active {
 <script>
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbxQZ6mvNIJe18wPPlspwlEq-doTlS85lScH1K_fh35RV13jDxILl7ivCkXoOUPi5Tu3Cw/exec';
 var userId = '';
+
+/* ============================================================
+   ★v5: テスト用リセット機能 (URLパラメータ ?reset=1)
+   ============================================================
+   LIFF URL の末尾に ?reset=1 を付けて開くと、
+   ブラウザの localStorage に保存された「申請中レコード」をクリアする。
+   主に「店舗で確認中」画面から「ようこそ」画面に戻したい
+   開発・テスト時に使用。
+
+   例:
+     https://liff.line.me/2009932062-S6WFaYdg?reset=1
+
+   実行後は URL から reset パラメータが除去されるため、
+   リロード時に再実行されることはない。
+   ============================================================ */
+(function() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('reset') === '1') {
+      var removedKeys = [];
+      try {
+        if (localStorage.getItem('uchikuru_pending_order')) {
+          localStorage.removeItem('uchikuru_pending_order');
+          removedKeys.push('uchikuru_pending_order');
+        }
+      } catch(e) { /* localStorage 不可環境 */ }
+
+      console.log('[reset=1] cleared localStorage keys:', removedKeys);
+
+      // URLから reset パラメータを削除
+      if (window.history && window.history.replaceState) {
+        params.delete('reset');
+        var qs = params.toString();
+        var newUrl = window.location.pathname +
+                     (qs ? '?' + qs : '') +
+                     (window.location.hash || '');
+        try { window.history.replaceState({}, '', newUrl); } catch(e) {}
+      }
+
+      // 画面読み込み完了後にトースト表示
+      var showResetToast = function() {
+        var toast = document.createElement('div');
+        toast.id = 'reset-toast';
+        toast.textContent = removedKeys.length > 0
+          ? '✓ テストデータをリセットしました'
+          : '✓ クリア対象なし(既に未紐付け状態)';
+        toast.style.cssText =
+          'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);' +
+          'background:rgba(50,50,50,0.92);color:white;padding:12px 22px;' +
+          'border-radius:24px;font-size:14px;font-weight:bold;' +
+          'box-shadow:0 4px 12px rgba(0,0,0,0.25);z-index:99999;' +
+          'opacity:0;transition:opacity 0.3s;';
+        document.body.appendChild(toast);
+        setTimeout(function(){ toast.style.opacity = '1'; }, 20);
+        setTimeout(function(){
+          toast.style.opacity = '0';
+          setTimeout(function(){
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+          }, 400);
+        }, 2200);
+      };
+      if (document.body) {
+        showResetToast();
+      } else {
+        document.addEventListener('DOMContentLoaded', showResetToast);
+      }
+    }
+  } catch(e) {
+    console.warn('[reset=1] handler error:', e);
+  }
+})();
 
 /* ============================================================
    API連携設定
