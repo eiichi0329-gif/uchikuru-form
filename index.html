@@ -3,6 +3,16 @@
 <!--
   うちくる LIFF マイページ - test_index_mypage_v5(完成版)
   ============================================================
+  追加改修 (2026-05-15):
+    ・renderEtaCard に「代配影響時(substitute_status='affected')」の分岐追加
+      → ETAを出さず substitute_message を表示(薄い黄色背景 + 📢 アイコン)
+    ・.eta-card.substitute スタイル追加(複数行・全文表示・通常通知温度感)
+    ・GAS v7 はパススルー設計のため機能的変更なし(ログ強化のみ)
+
+  追加改修 (2026-05-13):
+    ・水曜の注文締切アラート機能を追加(weekly-deadline-alert)
+    ・renderWeeklyDeadlineAlert 関数 + 設定変数(WDA_*)
+
   v4 → v5 の変更点:
     ・利用状況選択を独立ステップ化(no-step-usage-select)
       → 新規注文ボタン押下時に最初に表示される
@@ -898,6 +908,51 @@ body.cancel-mode-active {
   box-shadow: 0 2px 4px rgba(230, 126, 34, 0.3);
 }
 
+/* ===== 水曜の注文締切アラート ===== */
+#weekly-deadline-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(135deg, #FFF4E0 0%, #FFE0B3 100%);
+  border: 2px solid #F08300;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(240, 131, 0, 0.18);
+  animation: wda-pulse 2.4s ease-in-out infinite;
+}
+#weekly-deadline-alert .wda-icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+#weekly-deadline-alert .wda-body {
+  flex: 1;
+}
+#weekly-deadline-alert .wda-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #C0560A;
+  margin-bottom: 6px;
+}
+#weekly-deadline-alert .wda-text {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.65;
+}
+#weekly-deadline-alert .wda-text b {
+  color: #C00000;
+}
+#weekly-deadline-alert #wda-date-range {
+  font-weight: bold;
+  color: #C0560A;
+}
+@keyframes wda-pulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(240, 131, 0, 0.18); }
+  50%       { box-shadow: 0 2px 14px rgba(240, 131, 0, 0.36); }
+}
+
 /* ===== 顧客情報カード(マイページ用) ===== */
 .cust-info-card {
   background: linear-gradient(135deg, #fff8f3 0%, #ffeedc 100%);
@@ -1126,6 +1181,24 @@ body.cancel-mode-active {
 .eta-card.pending-departure .eta-card-window { color: #C26900; }
 .eta-card.pending-departure .eta-card-window { font-size: 18px; font-weight: bold; padding: 12px 0; }
 
+/* ★v5+: 代配影響時のETA代替表示(要件書 §3.2 / 薄い黄色背景 + 注意系) */
+.eta-card.substitute {
+  background: #FFFBEB;
+  border-color: #F0B400;
+}
+.eta-card.substitute .eta-card-title {
+  color: #8A6500;
+}
+.eta-card.substitute .eta-card-message {
+  color: #4A3500;
+  font-size: 15px;
+  line-height: 1.7;
+  padding: 8px 0 4px;
+  white-space: pre-wrap;     /* APIから\n が来ても改行 */
+  word-break: keep-all;       /* 日本語の途中で変な切れ方しないように */
+  overflow-wrap: break-word;
+}
+
 </style>
 </head>
 <body>
@@ -1225,6 +1298,19 @@ body.cancel-mode-active {
 
     <!-- ★通常画面(登録済みの時に表示する全コンテンツ) -->
     <div id="usage-main" style="display:none;">
+
+      <!-- ★v5+: 水曜の注文締切アラート(水曜0:00〜17:00 のみ表示) -->
+      <div id="weekly-deadline-alert" style="display:none;">
+        <div class="wda-icon">⏰</div>
+        <div class="wda-body">
+          <div class="wda-title">翌週分のご注文締切のお知らせ</div>
+          <div class="wda-text">
+            <span id="wda-date-range">―</span>ご利用分のご注文締め切りは、本日の<b>17時</b>までとなっております。<br>
+            ご注文・変更のご連絡を<b>お忘れではないでしょうか?</b>
+          </div>
+        </div>
+      </div>
+
       <!-- 顧客情報カード(登録済み) -->
       <div class="cust-info-card" id="cust-info-card">
         <div class="cust-greet-row">
@@ -3245,6 +3331,20 @@ function renderEtaCard() {
   if (etaData.has_delivery === false) return '';   // 本日配達なし or 未紐付け
   if (!etaData.ok) return '';
 
+  // ★v5+: 代配影響中 → ETAは出さず、サーバから来た固定メッセージを表示
+  //       要件書 §3.1 に準拠。文言はハードコードせず、必ず API の substitute_message を使う
+  if (etaData.substitute_status === 'affected') {
+    var subMsg = etaData.substitute_message ||
+                 '本日配達ルートがいつもと変更になっております。今しばらくお待ちください。';
+    return '<div class="eta-card substitute">' +
+             '<div class="eta-card-header">' +
+               '<span class="eta-card-icon">📢</span>' +
+               '<span class="eta-card-title">配達ルート変更のお知らせ</span>' +
+             '</div>' +
+             '<div class="eta-card-message">' + escapeHtml(subMsg) + '</div>' +
+           '</div>';
+  }
+
   // 配達済み
   if (etaData.delivered === true) {
     return '<div class="eta-card delivered">' +
@@ -3659,9 +3759,60 @@ function formatDateRange(monday, friday) {
          (friday.getMonth()+1) + '/' + friday.getDate() + '(金)';
 }
 
+/* ============================================================
+   ★v5+: 水曜の注文締切アラート
+   ============================================================
+   - 水曜 0:00 〜 17:00 の間のみマイページ上部に表示
+   - 翌週月曜〜金曜の日付範囲を自動計算して文中に差し込み
+   - 17:00 以降は自動的に非表示(締切後はアラート意味なし)
+   - 水曜以外は常に非表示
+
+   設定値(変更が必要なら以下の3定数を編集):
+   - WDA_DEADLINE_DOW  : 締切曜日(0=日, 1=月, ..., 3=水)
+   - WDA_DEADLINE_HOUR : 締切時刻(時)
+   - WDA_DELIVERY_RANGE: 翌週の表示範囲('mon_fri' or 'mon_sat' or 'mon_sun')
+   ============================================================ */
+var WDA_DEADLINE_DOW  = 3;   // 水曜
+var WDA_DEADLINE_HOUR = 17;  // 17時
+var WDA_DELIVERY_RANGE = 'mon_fri'; // 月〜金
+
+function renderWeeklyDeadlineAlert() {
+  var alertEl = document.getElementById('weekly-deadline-alert');
+  if (!alertEl) return;
+
+  var now = new Date();
+  var dow = now.getDay();      // 0=日, 1=月, ..., 6=土
+  var hour = now.getHours();
+
+  // 水曜日でない、または締切時刻を過ぎていたら非表示
+  if (dow !== WDA_DEADLINE_DOW || hour >= WDA_DEADLINE_HOUR) {
+    alertEl.style.display = 'none';
+    return;
+  }
+
+  // 翌週の月曜と最終日(金/土/日)の日付を計算
+  // 水曜から翌週月曜まで5日後
+  var nextMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5);
+  var endOffset = 4; // mon_fri: 月+4=金
+  if (WDA_DELIVERY_RANGE === 'mon_sat') endOffset = 5;
+  else if (WDA_DELIVERY_RANGE === 'mon_sun') endOffset = 6;
+  var nextEnd = new Date(nextMon.getFullYear(), nextMon.getMonth(), nextMon.getDate() + endOffset);
+
+  var dowChars = ['日','月','火','水','木','金','土'];
+  var monStr = (nextMon.getMonth()+1) + '月' + nextMon.getDate() + '日(' + dowChars[nextMon.getDay()] + ')';
+  var endStr = (nextEnd.getMonth()+1) + '月' + nextEnd.getDate() + '日(' + dowChars[nextEnd.getDay()] + ')';
+
+  // 表示更新
+  document.getElementById('wda-date-range').textContent = monStr + '〜' + endStr;
+  alertEl.style.display = 'flex';
+}
+
 function renderUsageContent() {
   var contentEl = document.getElementById('usage-content');
   if (!contentEl || !usageData) return;
+
+  // ★v5+: 水曜の注文締切アラートを更新
+  renderWeeklyDeadlineAlert();
 
   // currentUsageMonth が未設定なら自動選択
   ensureCurrentMonth('usage');
