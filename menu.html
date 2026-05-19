@@ -131,10 +131,47 @@ function extractImgSrc(h) {
   var m = h.match(/<img[^>]+src=["']([^"']+uchikuru\.jp[^"']+)["']/);
   return m ? m[1] : '';
 }
+
+/* ===== PDF URL抽出（改良版） =====
+   投稿内に複数のPDFリンクがある場合に、正しい当月分PDFを選ぶ。
+   うちくるの投稿は通常以下のパターン：
+     1番目: [カラーメニュー表(令和8年4月仮) A献立名変更] → 古い4月のPDF（テンプレ残骸）
+     2番目: [PDFファイルはこちらをクリック！]            → 当月分の正しいPDF
+   したがって「PDFファイル」「クリック」というラベルを含むリンクを優先する。 */
 function extractPdfUrl(h) {
-  var m = h.match(/href=["'](https?:\/\/uchikuru\.jp\/wp-content\/uploads\/[^"']+\.pdf)["']/);
-  return m ? m[1] : '';
+  var re = /<a\s+[^>]*href=["'](https?:\/\/uchikuru\.jp\/wp-content\/uploads\/[^"']+\.pdf)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  var matches = [];
+  var m;
+  while ((m = re.exec(h)) !== null) {
+    var text = m[2].replace(/<[^>]+>/g, '').replace(/&[a-z]+;/gi, '').trim();
+    matches.push({ url: m[1], text: text });
+  }
+  if (matches.length === 0) return '';
+  if (matches.length === 1) return matches[0].url;
+
+  // 優先1: 「PDFファイル」かつ「クリック」を含むリンク（最も信頼できる）
+  for (var i = 0; i < matches.length; i++) {
+    if (matches[i].text.indexOf('PDFファイル') !== -1 && matches[i].text.indexOf('クリック') !== -1) {
+      return matches[i].url;
+    }
+  }
+  // 優先2: 「クリック」を含むリンク
+  for (var i = 0; i < matches.length; i++) {
+    if (matches[i].text.indexOf('クリック') !== -1) {
+      return matches[i].url;
+    }
+  }
+  // 優先3: 「仮」「カラーメニュー表」を含まないリンク（テンプレ的なものを除外）
+  for (var i = 0; i < matches.length; i++) {
+    var t = matches[i].text;
+    if (t.indexOf('仮') === -1 && t.indexOf('カラーメニュー表') === -1) {
+      return matches[i].url;
+    }
+  }
+  // フォールバック: 最後のPDFリンク（テンプレが先頭になりがちなため）
+  return matches[matches.length - 1].url;
 }
+
 function stripTags(h) {
   return h.replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n').replace(/<[^>]+>/g,'')
     .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/[ \t]+/g,' ').trim();
@@ -245,17 +282,15 @@ function buildMonthButtons(posts) {
     });
   });
 
-  // 既知のPDF URLマップ（APIキャッシュ回避のため直接指定）
-  var knownPdfs = {
-    4: { pdfUrl:'https://uchikuru.jp/wp-content/uploads/2026/03/920500fda15b93d6f422ca911c741d59.pdf' },
-    5: { pdfUrl:'https://uchikuru.jp/wp-content/uploads/2026/04/0895588be246a93e81d8ddff5ce9188f.pdf' }
-  };
+  // 手動オーバーライド用マップ（通常は不要。緊急時のみ使用）
+  // 例: knownPdfs[6] = { pdfUrl: 'https://uchikuru.jp/.../june.pdf' };
+  var knownPdfs = {};
 
   function findMonth(target){
     // 当年優先
     var found=allMonths.filter(function(m){return m.monthNum===target&&m.postYear===thisYear;});
     if(found.length){
-      // knownPdfsが設定されていれば常に上書き（APIのキャッシュより優先）
+      // knownPdfsが設定されていれば上書き
       if(knownPdfs[target]) found[0].pdfUrl=knownPdfs[target].pdfUrl;
       return found[0];
     }
