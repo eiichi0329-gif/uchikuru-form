@@ -1414,6 +1414,50 @@ body.cancel-mode-active {
   50%       { box-shadow: 0 0 0 9px rgba(76, 175, 80, 0.08); }
 }
 
+/* ★v8: お届け開始前カード(配達日前に開始日+目安時間を案内) */
+#pre-start-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 2px solid #F08300;
+}
+.psc-block { padding: 6px 0; }
+.psc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.psc-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.psc-label { font-size: 12px; color: #999; font-weight: bold; }
+.psc-start-date {
+  font-size: 19px;
+  font-weight: bold;
+  color: #C26900;
+  padding-left: 28px;
+  line-height: 1.4;
+}
+.psc-divider {
+  border: none;
+  border-top: 1px dashed #f0e0cc;
+  margin: 12px 0;
+}
+.psc-time {
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+  padding-left: 28px;
+  line-height: 1.4;
+}
+.psc-note {
+  font-size: 11px;
+  color: #999;
+  padding-left: 28px;
+  margin-top: 3px;
+}
+
 /* ★v5+: 今日のお弁当カード(進捗カードの下に距離を置いて配置) */
 #daily-menu-card {
   background: white;
@@ -1596,6 +1640,9 @@ body.cancel-mode-active {
           <button class="wda-ack-btn" onclick="dismissWda()">確認しました ✓</button>
         </div>
       </div>
+
+      <!-- ★v8: お届け開始前カード(配達日前に開始日+目安時間を表示) -->
+      <div id="pre-start-card" style="display:none;"></div>
 
       <!-- ★v5+: 配達進捗3段階カード(③お届け状況・献立モードで表示) -->
       <div id="delivery-progress-card" style="display:none;"></div>
@@ -4293,6 +4340,83 @@ function formatLocalDateYMD(d) {
      - 代配影響中(substitute_status=affected) かつ 本人(role=as_target)
    ※同ルート他顧客(role=same_route)時は通常通り表示する
    ============================================================ */
+// ★v8: お届け開始前カード(配達日前に「開始日 + いつもの目安時間」を案内)
+//   表示条件:viewMode=delivery かつ has_delivery===false かつ first_delivery_date あり
+function renderPreStartCard() {
+  var cardEl = document.getElementById('pre-start-card');
+  if (!cardEl) return;
+
+  // ③お届け状況・献立モードのみ
+  if (viewMode !== 'delivery') {
+    cardEl.style.display = 'none';
+    return;
+  }
+
+  // 本日配達あり / 未紐付け / 将来予定なし → このカードは出さない
+  if (!etaData || !etaData.ok || etaData.has_delivery !== false || !etaData.first_delivery_date) {
+    cardEl.style.display = 'none';
+    return;
+  }
+
+  // お届け開始日を「6月8日(月)」形式に整形
+  var startLabel = formatStartDate(etaData.first_delivery_date);
+  if (!startLabel) {
+    cardEl.style.display = 'none';
+    return;
+  }
+
+  // 予定お届け時間(いつもの目安)。usual_eta_window.label から時間部分だけ抽出
+  var timeLabel = '';
+  if (etaData.usual_eta_window && etaData.usual_eta_window.label) {
+    timeLabel = etaData.usual_eta_window.label
+      .replace(/[にも]?お届け予定$/, '')
+      .replace(/にお届け$/, '')
+      .replace(/頃にお届け.*$/, '頃')
+      .trim();
+  }
+
+  var html =
+    '<div class="psc-block">' +
+      '<div class="psc-head">' +
+        '<span class="psc-icon">📅</span>' +
+        '<span class="psc-label">お届け開始日</span>' +
+      '</div>' +
+      '<div class="psc-start-date">' + escapeHtml(startLabel) + ' から</div>' +
+    '</div>';
+
+  if (timeLabel) {
+    html +=
+      '<hr class="psc-divider">' +
+      '<div class="psc-block">' +
+        '<div class="psc-head">' +
+          '<span class="psc-icon">🕐</span>' +
+          '<span class="psc-label">予定お届け時間</span>' +
+        '</div>' +
+        '<div class="psc-time">' + escapeHtml(timeLabel) + '</div>' +
+        '<div class="psc-note">※いつもの目安の時間帯です。当日に正確な時間をお知らせします。</div>' +
+      '</div>';
+  }
+
+  cardEl.innerHTML = html;
+  cardEl.style.display = 'block';
+}
+
+// ★v8: 日付文字列(YYYY-MM-DD)を「6月8日(月)」形式に整形
+function formatStartDate(dateStr) {
+  if (!dateStr) return '';
+  var parts = String(dateStr).split('-');
+  if (parts.length !== 3) return '';
+  var y = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10);
+  var d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return '';
+  var dowJa = ['日','月','火','水','木','金','土'];
+  var dt = new Date(y, m - 1, d);
+  var label = m + '月' + d + '日';
+  if (!isNaN(dt.getTime())) label += '(' + dowJa[dt.getDay()] + ')';
+  return label;
+}
+
 function renderDeliveryProgressCard() {
   var cardEl = document.getElementById('delivery-progress-card');
   if (!cardEl) return;
@@ -4474,8 +4598,9 @@ function renderDailyMenuCard() {
     cardEl.style.display = 'none';
     return;
   }
-  // 本日配達がない人には今日の献立も非表示(混乱防止)
-  if (etaData && etaData.has_delivery === false) {
+  // ★v8: 本日配達なしでも、将来の配達予定がある人(first_delivery_date あり=配達開始前)には
+  //   「参考」として今日の献立を表示する。未紐付け等(将来予定なし)は従来通り非表示。
+  if (etaData && etaData.has_delivery === false && !etaData.first_delivery_date) {
     cardEl.style.display = 'none';
     return;
   }
@@ -4511,17 +4636,24 @@ function renderDailyMenuCard() {
                 'onerror="this.style.display=\'none\';">';
   }
 
+  // ★v8: 配達開始前(本日配達なし・将来予定あり)は「参考の献立」と明示する
+  var isPreStart = !!(etaData && etaData.has_delivery === false && etaData.first_delivery_date);
+  var menuTitle = isPreStart ? '本日の献立(参考)' : '今日のお弁当';
+  var noteText = isPreStart
+    ? '※本日提供中の献立です。お届け開始までは参考としてご覧ください'
+    : '※ご利用タイプによって品数が異なります';
+
   cardEl.innerHTML =
     '<div class="dmc-header">' +
       '<div class="dmc-icon">🍱</div>' +
-      '<div class="dmc-title">今日のお弁当</div>' +
+      '<div class="dmc-title">' + menuTitle + '</div>' +
       (dateLabel ? '<div class="dmc-date">' + escapeHtml(dateLabel) + '</div>' : '') +
     '</div>' +
     imageHtml +
     '<div class="dmc-main">' + escapeHtml(main) + '</div>' +
     (subsHtml ? '<ul class="dmc-subs">' + subsHtml + '</ul>' : '') +
     '<div class="dmc-note">' +
-      '※ご利用タイプによって品数が異なります' +
+      noteText +
     '</div>';
 
   cardEl.style.display = 'block';
@@ -4550,6 +4682,9 @@ function renderUsageContent() {
 
   // ★v7: 表示モードに応じてセクションを振り分け
   applyViewMode();
+
+  // ★v8: お届け開始前カード(配達日前に開始日+目安時間を案内)
+  renderPreStartCard();
 
   // ★v5+: 配達進捗3段階カードを更新(③お届け状況・献立モードでのみ表示)
   renderDeliveryProgressCard();
