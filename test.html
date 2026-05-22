@@ -90,22 +90,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>うちくるサービス</title>
-<script>
-  // ★v7: デモモード(?demo=true)では LIFF SDK を読み込まない
-  //   LIFF SDK は外部ブラウザで読み込まれると自動でLINE認証を発動し
-  //   400 Bad Request になるため、デモ確認時はSDK自体を読み込まない
-  (function(){
-    try {
-      var isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
-      if (!isDemo) {
-        document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
-      }
-    } catch(e) {
-      document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
-    }
-  })();
-</script>
+<title>うちくるサービス(デモ確認版)</title>
+<!-- ★test_demo.html: LIFF SDK を一切読み込まない(LINE認証を完全回避)
+     このファイルは表示確認専用。?mode=usage / ?mode=delivery / ?mode=order で画面切替 -->
 <script src="https://js.stripe.com/v3/"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3119,6 +3106,24 @@ window.onload = function() {
   buildDayGrids();
   initAllCalendars();
 
+  var params=new URLSearchParams(window.location.search);
+
+  // ★test_demo.html: 常にデモモード固定(?demo=true 不要)
+  //   ?mode= だけで画面を切り替える(usage / delivery / order)
+  var type = 'usage';
+  var modeParam = params.get('mode') || 'usage';
+  if(modeParam === 'order')         { type = 'newOrder'; }
+  else if(modeParam === 'delivery') { type = 'usage'; viewMode = 'delivery'; }
+  else                              { type = 'usage'; viewMode = 'usage'; }
+
+  isDemoMode = true;
+  USE_API = false;
+  setupDemoData();
+  loadAndShow(type);
+  return;  // ↓の通常フロー(LIFF認証等)は一切実行しない
+};
+
+window.onloadDISABLED = function() {
   var params=new URLSearchParams(window.location.search);
   if(params.get('uid')) userId=params.get('uid');
 
