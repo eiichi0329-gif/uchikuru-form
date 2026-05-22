@@ -90,9 +90,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>うちくるサービス(デモ確認版)</title>
-<!-- ★test_demo.html: LIFF SDK を一切読み込まない(LINE認証を完全回避)
-     このファイルは表示確認専用。?mode=usage / ?mode=delivery / ?mode=order で画面切替 -->
+<title>うちくるサービス</title>
+<script>
+  // ★v7: デモモード(?demo=true)では LIFF SDK を読み込まない
+  //   LIFF SDK は外部ブラウザで読み込まれると自動でLINE認証を発動し
+  //   400 Bad Request になるため、デモ確認時はSDK自体を読み込まない
+  (function(){
+    try {
+      var isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
+      if (!isDemo) {
+        document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
+      }
+    } catch(e) {
+      document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
+    }
+  })();
+</script>
 <script src="https://js.stripe.com/v3/"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3031,14 +3044,9 @@ function setupDemoData() {
     substitute_role: 'none'
   };
 
-  // テスト今日の献立
-  dailyMenuData = {
-    ok: true,
-    date: '2026-05-20',
-    dow: '水',
-    main: '鶏肉の照り焼き 香味だれ',
-    subs: ['だし巻き玉子', 'ほうれん草のお浸し', '切り干し大根の煮物', 'かぼちゃの甘煮', '香の物']
-  };
+  // ★v8: 今日の献立はdemoモードでもInstagramから実データを取得(テスト確認のため)
+  //  dailyMenuData を null のままにし、loadDailyMenu がInstagram WebAppを叩く
+  dailyMenuData = null;
   // 利用状況(usageData)は generateMockUsage が demo 分岐で生成
 }
 
@@ -3106,24 +3114,6 @@ window.onload = function() {
   buildDayGrids();
   initAllCalendars();
 
-  var params=new URLSearchParams(window.location.search);
-
-  // ★test_demo.html: 常にデモモード固定(?demo=true 不要)
-  //   ?mode= だけで画面を切り替える(usage / delivery / order)
-  var type = 'usage';
-  var modeParam = params.get('mode') || 'usage';
-  if(modeParam === 'order')         { type = 'newOrder'; }
-  else if(modeParam === 'delivery') { type = 'usage'; viewMode = 'delivery'; }
-  else                              { type = 'usage'; viewMode = 'usage'; }
-
-  isDemoMode = true;
-  USE_API = false;
-  setupDemoData();
-  loadAndShow(type);
-  return;  // ↓の通常フロー(LIFF認証等)は一切実行しない
-};
-
-window.onloadDISABLED = function() {
   var params=new URLSearchParams(window.location.search);
   if(params.get('uid')) userId=params.get('uid');
 
@@ -4442,11 +4432,7 @@ var dailyMenuData = null;
 var dailyMenuLoading = false;
 
 function loadDailyMenu(callback) {
-  // ★v7: デモモードなら setupDemoData でセット済みの dailyMenuData をそのまま使う
-  if (isDemoMode) {
-    if (callback) callback(dailyMenuData);
-    return;
-  }
+  // ★v8: demoモードでもInstagramから実献立を取得(旧デモ分岐を削除)
   if (dailyMenuLoading) return;
   dailyMenuLoading = true;
 
@@ -4460,11 +4446,11 @@ function loadDailyMenu(callback) {
     if (callback) callback(dailyMenuData);
   };
 
+  // ★v8: 献立はInstagram WebAppから取得(本番GASとは別エンドポイント)
+  var IG_MENU_URL = 'https://script.google.com/macros/s/AKfycbxR2G-zKplRX1nQHmE5sOTQjQ1g75HY5sGvpS6N-2ZV_R7SOCOuhyDmbq9hisDP_C25Tw/exec';
   var script = document.createElement('script');
   script.id = cbName + '_script';
-  script.src = GAS_URL + (GAS_URL.indexOf('?') >= 0 ? '&' : '?') +
-               'action=getDailyMenu&callback=' + cbName +
-               '&_=' + Date.now();
+  script.src = IG_MENU_URL + '?callback=' + cbName + '&_=' + Date.now();
   script.onerror = function() {
     dailyMenuLoading = false;
     dailyMenuData = { ok: false, error: 'jsonp_failed' };
@@ -4516,16 +4502,25 @@ function renderDailyMenuCard() {
     if (subs[i]) subsHtml += '<li>' + escapeHtml(subs[i]) + '</li>';
   }
 
+  // ★v8: Instagram の料理写真(あれば表示)
+  var imageUrl = dailyMenuData.imageUrl || '';
+  var imageHtml = '';
+  if (imageUrl) {
+    imageHtml = '<img src="' + escapeHtml(imageUrl) + '" alt="今日のお弁当" ' +
+                'style="width:100%;border-radius:12px;margin:10px 0 4px;display:block;" loading="lazy" ' +
+                'onerror="this.style.display=\'none\';">';
+  }
+
   cardEl.innerHTML =
     '<div class="dmc-header">' +
       '<div class="dmc-icon">🍱</div>' +
       '<div class="dmc-title">今日のお弁当</div>' +
       (dateLabel ? '<div class="dmc-date">' + escapeHtml(dateLabel) + '</div>' : '') +
     '</div>' +
+    imageHtml +
     '<div class="dmc-main">' + escapeHtml(main) + '</div>' +
     (subsHtml ? '<ul class="dmc-subs">' + subsHtml + '</ul>' : '') +
     '<div class="dmc-note">' +
-      '📷 お弁当の写真は到着次第表示します<br>' +
       '※ご利用タイプによって品数が異なります' +
     '</div>';
 
