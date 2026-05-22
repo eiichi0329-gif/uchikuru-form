@@ -91,7 +91,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>うちくるサービス</title>
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+  // ★v7: デモモード(?demo=true)では LIFF SDK を読み込まない
+  //   LIFF SDK は外部ブラウザで読み込まれると自動でLINE認証を発動し
+  //   400 Bad Request になるため、デモ確認時はSDK自体を読み込まない
+  (function(){
+    try {
+      var isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
+      if (!isDemo) {
+        document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
+      }
+    } catch(e) {
+      document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
+    }
+  })();
+</script>
 <script src="https://js.stripe.com/v3/"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
