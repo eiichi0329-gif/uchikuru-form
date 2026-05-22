@@ -1,34 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <!--
-  うちくる LIFF マイページ - test_index_mypage_v7(3画面分割・タブなし)
+  うちくる LIFF マイページ - test_index_mypage_v5(完成版)
   ============================================================
-  v6 → v7 改修 (2026-05-17):
-    【マイページを3画面に分割(タブUIなし、リッチメニューの ?mode= で振り分け)】
-    ・?mode=order    → ①新規注文(既存フローのまま、変更なし)
-    ・?mode=usage    → ②利用状況(顧客情報 + 水曜アラート + カレンダー + 変更ボタン + 利用金額)
-    ・?mode=delivery → ③お届け状況・献立(配達進捗カード + 今日の献立)
-    ・?mode=mypage   → 後方互換(②利用状況にフォールバック)
-    ・viewMode 変数で usage/delivery を制御、該当モード以外のセクションは非表示
-    ・今日の献立カードを③に復活(v6でmenu.htmlに移したが、③でも表示)
-    ・水曜アラートは②に表示
-
-  v5 → v6 改修 (2026-05-16 夜):
-    【マイページのデザイン刷新】
-    ・順序変更:顧客情報 → 水曜アラート → 配達進捗 → カレンダー → 利用状況
-    ・顧客情報を「名前のみコンパクト版」に簡素化(住所/電話/支払はモーダル側)
-    ・水曜アラートに「確認しました」ボタン追加
-      → localStorage に当日日付記録、翌週水曜まで非表示
-    ・配達進捗カードの時間表示を 26pt に大きく
-      → in_transit 状態で ETA を中央大きく表示
-    ・「今日のお弁当」カードをマイページから削除
-      → ③献立画面(menu.html v3)に移動
-    ・下部ETAカード削除(配達進捗カードに時間情報を統合)
-    【LIFF 3画面分割対応】
-    ・URLクエリ ?mode=order で起動時に新規注文フォームへ直行
-    ・URLクエリ ?mode=mypage は既存挙動(マイページ表示)
-    ・LIFF ID は1つのまま、URLクエリで画面を切り替え
-
   追加改修 (2026-05-16 後半):
     ・「今日のお弁当」カードを追加(daily-menu-card)
       連動: GAS v8 の handleGetDailyMenu / cacheMonthlyMenu
@@ -91,21 +65,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>うちくるサービス</title>
-<script>
-  // ★v7: デモモード(?demo=true)では LIFF SDK を読み込まない
-  //   LIFF SDK は外部ブラウザで読み込まれると自動でLINE認証を発動し
-  //   400 Bad Request になるため、デモ確認時はSDK自体を読み込まない
-  (function(){
-    try {
-      var isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
-      if (!isDemo) {
-        document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
-      }
-    } catch(e) {
-      document.write('<scr' + 'ipt src="https://static.line-scdn.net/liff/edge/2/sdk.js"></scr' + 'ipt>');
-    }
-  })();
-</script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://js.stripe.com/v3/"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -969,9 +929,10 @@ body.cancel-mode-active {
 }
 
 /* ===== 水曜の注文締切アラート ===== */
-/* ★v6: 水曜の注文締切アラート(縦配置に変更、確認ボタン付き) */
 #weekly-deadline-alert {
-  display: block; /* ★v6: flex から block に変更(ヘッダー + ボタン行の縦並び) */
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   background: linear-gradient(135deg, #FFF4E0 0%, #FFE0B3 100%);
   border: 2px solid #F08300;
   border-radius: 10px;
@@ -979,23 +940,6 @@ body.cancel-mode-active {
   margin-bottom: 14px;
   box-shadow: 0 2px 8px rgba(240, 131, 0, 0.18);
   animation: wda-pulse 2.4s ease-in-out infinite;
-  transition: opacity 0.3s, transform 0.3s, max-height 0.3s, padding 0.3s, margin 0.3s;
-}
-#weekly-deadline-alert.dismissed {
-  opacity: 0;
-  transform: translateY(-10px);
-  max-height: 0;
-  padding: 0 16px;
-  margin: 0;
-  overflow: hidden;
-  border: none;
-  animation: none;
-}
-.wda-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 10px;
 }
 #weekly-deadline-alert .wda-icon {
   font-size: 28px;
@@ -1028,52 +972,12 @@ body.cancel-mode-active {
   0%, 100% { box-shadow: 0 2px 8px rgba(240, 131, 0, 0.18); }
   50%       { box-shadow: 0 2px 14px rgba(240, 131, 0, 0.36); }
 }
-/* ★v6: 水曜アラート「確認しました」ボタン */
-.wda-ack-row {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 8px;
-  border-top: 1px dashed rgba(192, 86, 10, 0.3);
-}
-.wda-ack-btn {
-  font-size: 13px;
-  font-weight: bold;
-  color: white;
-  background: #F08300;
-  border: none;
-  padding: 8px 18px;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(192, 86, 10, 0.25);
-}
-.wda-ack-btn:active {
-  transform: scale(0.97);
-  background: #C26900;
-}
 
 /* ===== 顧客情報カード(マイページ用) ===== */
 .cust-info-card {
   background: linear-gradient(135deg, #fff8f3 0%, #ffeedc 100%);
   border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;
   border: 1.5px solid #F08300;
-}
-/* ★v6: 名前のみコンパクト版(1行レイアウト) */
-.cust-info-card.cust-info-card-compact {
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.cust-info-card.cust-info-card-compact .cust-greet-block { flex: 1; min-width: 0; }
-.cust-greet-hello-compact { font-size: 11px; color: #888; }
-.cust-info-card.cust-info-card-compact .cust-greet-name {
-  font-size: 17px; font-weight: bold; color: #333; margin-top: 2px;
-}
-.cust-info-card.cust-info-card-compact .cust-edit-btn {
-  font-size: 11px; color: #F08300;
-  border: 1px solid #F08300; padding: 5px 12px; border-radius: 5px;
-  background: white; cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
 .cust-info-card.unregistered {
   background: #fff5f5;
@@ -1389,22 +1293,6 @@ body.cancel-mode-active {
 .dpc-sub b { color: #2e7d32; }
 .dpc-greet { font-size: 13px; color: #8B4513; font-weight: 500; }
 .dpc-time-done { font-size: 11px; color: #999; margin-top: 6px; }
-/* ★v6: 配達中時の時間を大きく強調表示 */
-.dpc-title-row {
-  display: flex; align-items: center; justify-content: center;
-  gap: 6px; margin-bottom: 6px;
-}
-.dpc-title-row .ico { font-size: 22px; line-height: 1; }
-.dpc-eta-big {
-  font-size: 26px;
-  font-weight: bold;
-  color: #2e7d32;
-  letter-spacing: 1px;
-  margin: 4px 0 2px;
-  line-height: 1.2;
-}
-.dpc-eta-big.preparing-color { color: #C26900; }
-.dpc-eta-label { font-size: 11px; color: #666; }
 @keyframes dpc-pulse-orange {
   0%, 100% { box-shadow: 0 0 0 5px rgba(240, 131, 0, 0.20); }
   50%       { box-shadow: 0 0 0 9px rgba(240, 131, 0, 0.08); }
@@ -1571,38 +1459,50 @@ body.cancel-mode-active {
     <!-- ★通常画面(登録済みの時に表示する全コンテンツ) -->
     <div id="usage-main" style="display:none;">
 
-      <!-- ★v6+: 顧客情報カード(名前のみコンパクト版、最上段) -->
-      <div class="cust-info-card cust-info-card-compact" id="cust-info-card">
-        <div class="cust-greet-block">
-          <div class="cust-greet-hello-compact">こんにちは</div>
-          <div class="cust-greet-name" id="cust-greet-name">お客様</div>
-        </div>
-        <button class="cust-edit-btn" onclick="openCustomerEditModal()">✏️ 編集</button>
-      </div>
-
-      <!-- ★v6+: 水曜の注文締切アラート(確認ボタン付き) -->
-      <div id="weekly-deadline-alert" style="display:none;">
-        <div class="wda-header">
-          <div class="wda-icon">⏰</div>
-          <div class="wda-body">
-            <div class="wda-title">翌週分のご注文締切のお知らせ</div>
-            <div class="wda-text">
-              <span id="wda-date-range">―</span>ご利用分のご注文締め切りは、本日の<b>17時</b>までとなっております。<br>
-              ご注文・変更のご連絡を<b>お忘れではないでしょうか?</b>
-            </div>
-          </div>
-        </div>
-        <div class="wda-ack-row">
-          <button class="wda-ack-btn" onclick="dismissWda()">確認しました ✓</button>
-        </div>
-      </div>
-
-      <!-- ★v5+: 配達進捗3段階カード(③お届け状況・献立モードで表示) -->
+      <!-- ★v5+: 配達進捗3段階カード(マイページ最上段、要件書 §3.6 準拠) -->
+      <!-- JSで innerHTML を全更新するので空のコンテナだけ用意 -->
       <div id="delivery-progress-card" style="display:none;"></div>
 
-      <!-- ★v7: 今日の献立カード(③お届け状況・献立モードで表示) -->
-      <!--      v6でmenu.htmlに移したが、③でも配達状況とセットで表示する -->
+      <!-- ★v5+: 今日のお弁当カード(進捗カードの下、距離感を保つ) -->
       <div id="daily-menu-card" style="display:none;"></div>
+
+      <!-- ★v5+: 水曜の注文締切アラート(水曜0:00〜17:00 のみ表示) -->
+      <div id="weekly-deadline-alert" style="display:none;">
+        <div class="wda-icon">⏰</div>
+        <div class="wda-body">
+          <div class="wda-title">翌週分のご注文締切のお知らせ</div>
+          <div class="wda-text">
+            <span id="wda-date-range">―</span>ご利用分のご注文締め切りは、本日の<b>17時</b>までとなっております。<br>
+            ご注文・変更のご連絡を<b>お忘れではないでしょうか?</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- 顧客情報カード(登録済み) -->
+      <div class="cust-info-card" id="cust-info-card">
+        <div class="cust-greet-row">
+          <div>
+            <div class="cust-greet-name" id="cust-greet-name">お客様</div>
+          </div>
+          <button class="cust-edit-btn" onclick="openCustomerEditModal()">✏️ 編集</button>
+        </div>
+        <div class="cust-info-rows">
+          <div class="cust-info-row" id="cust-info-address-row">
+            <span class="cust-info-lbl">ご住所</span>
+            <span class="cust-info-val" id="cust-info-address">―</span>
+          </div>
+          <div class="cust-info-row" id="cust-info-phone-row">
+            <span class="cust-info-lbl">電話番号</span>
+            <span class="cust-info-val" id="cust-info-phone">―</span>
+          </div>
+          <div class="cust-info-row" id="cust-info-payment-row" style="display:none;">
+            <!-- お支払い方法はカード上では非表示。編集モーダルでは引き続き表示・編集可能。 -->
+            <!-- 将来 bento_delivery 側に payment_method 取得APIが実装されたらこのstyleを外す -->
+            <span class="cust-info-lbl">お支払い</span>
+            <span class="cust-info-val" id="cust-info-payment">―</span>
+          </div>
+        </div>
+      </div>
 
       <div id="usage-content">
         <div class="mypage-loading">読み込み中...</div>
@@ -2222,14 +2122,6 @@ var BRAND_LOGO_URI = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAU
 /* ========== マイページ用ステート ========== */
 var billingData = null;
 var usageData = null;
-
-/* ★v7: マイページ表示モード('usage'=②利用状況 / 'delivery'=③お届け状況・献立)
-   リッチメニューの ?mode= で切り替わる。タブUIはなく、表示セクションを振り分ける */
-var viewMode = 'usage';
-
-/* ★v7: デモモード(?demo=true で起動するとテストデータで表示確認できる)
-   LIFF認証・API呼び出しをスキップし、サンプルデータを注入する */
-var isDemoMode = false;
 
 /* ===== ETAカード state ===== */
 var etaData = null;          // 直近の ETA API レスポンス
@@ -3020,41 +2912,6 @@ function showModalWithAction(icon, title, msg, action) {
 }
 
 // ★マイページ拡張: 既存顧客自動振り分け
-// ★v7: デモモード用のテストデータをセットアップ
-//       顧客情報・利用状況・配達進捗・今日の献立をサンプル値で注入
-function setupDemoData() {
-  userId = 'demo_user';
-
-  // テスト顧客情報
-  window._customerData = {
-    name: '田中 瑛一',
-    address: '下関市入江町8-11',
-    phone: '090-1335-0076',
-    payment: '現金',
-    store: '下関店'
-  };
-
-  // テスト配達進捗(配達中)
-  etaData = {
-    ok: true,
-    has_delivery: true,
-    delivery_status: 'in_transit',
-    eta_window: { label: '11:20〜13:20頃にお届け予定' },
-    substitute_status: 'none',
-    substitute_role: 'none'
-  };
-
-  // テスト今日の献立
-  dailyMenuData = {
-    ok: true,
-    date: '2026-05-20',
-    dow: '水',
-    main: '鶏肉の照り焼き 香味だれ',
-    subs: ['だし巻き玉子', 'ほうれん草のお浸し', '切り干し大根の煮物', 'かぼちゃの甘煮', '香の物']
-  };
-  // 利用状況(usageData)は generateMockUsage が demo 分岐で生成
-}
-
 // userId が顧客データに既に登録済み(name/address/phone のいずれかあり)なら type='usage' で起動、
 // それ以外(完全新規 or 通信失敗)は元のまま showMenu() に流す。
 function checkExistingCustomerThenLoad(currentType) {
@@ -3094,26 +2951,6 @@ function checkExistingCustomerThenLoad(currentType) {
     });
 }
 
-// ★v7(デバッグ用): デモモードで未捕捉エラーが起きたら画面に表示する
-//   原因特定後に削除可能
-window.onerror = function(msg, url, line, col, error) {
-  try {
-    if (typeof isDemoMode !== 'undefined' && isDemoMode) {
-      var el = document.getElementById('usage-content');
-      if (el) {
-        el.innerHTML = '<div style="padding:16px;margin:10px;background:#fff5f5;' +
-          'border:1px solid #f5c6cb;border-radius:8px;color:#a00;font-size:11px;' +
-          'word-break:break-all;line-height:1.6;">' +
-          '<b>デバッグ:描画エラー</b><br>' +
-          'msg: ' + msg + '<br>line: ' + line + ':' + col +
-          (error && error.stack ? '<br>stack: ' + String(error.stack).substring(0, 300) : '') +
-          '</div>';
-      }
-    }
-  } catch(e) {}
-  return false;
-};
-
 window.onload = function() {
   buildBentoGrids();
   buildDayGrids();
@@ -3125,29 +2962,6 @@ window.onload = function() {
   // URLから直接typeを取得
   var type=params.get('type')||'';
 
-  // ★v6: LIFF 3画面分割対応 - ?mode= を ?type= にマッピング
-  //       リッチメニュー側で ?mode=order, ?mode=usage, ?mode=delivery を使う設計
-  //       既存の type= パラメータが優先される(後方互換)
-  // ★v7: usage / delivery を追加(②利用状況 / ③お届け状況・献立)
-  if(!type){
-    var modeParam = params.get('mode') || '';
-    if(modeParam === 'order')         type = 'newOrder';
-    else if(modeParam === 'usage')   { type = 'usage'; viewMode = 'usage'; }
-    else if(modeParam === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
-    else if(modeParam === 'mypage')  { type = 'usage'; viewMode = 'usage'; } // 後方互換
-  }
-
-  // ★v7: デモモード検出(?demo=true)
-  //       LIFF認証・API呼び出しをスキップし、テストデータを注入して表示確認
-  if (params.get('demo') === 'true') {
-    isDemoMode = true;
-    USE_API = false;  // API呼び出しを無効化
-    if (!type) { type = 'usage'; }  // mode未指定なら利用状況
-    setupDemoData();
-    loadAndShow(type);
-    return;  // ↓のLIFF認証フローはスキップ
-  }
-
   // LIFFはquery paramsをliff.stateに変換する場合があるので先読み
   if(!type){
     var liffStateRaw=params.get('liff.state')||'';
@@ -3155,15 +2969,6 @@ window.onload = function() {
       try{
         var sp=new URLSearchParams(liffStateRaw.replace(/^\?/,''));
         type=sp.get('type')||'';
-        // ★v6: liff.state 内の ?mode= もマッピング
-        // ★v7: usage / delivery を追加
-        if(!type){
-          var modeFromState = sp.get('mode') || '';
-          if(modeFromState === 'order')         type = 'newOrder';
-          else if(modeFromState === 'usage')   { type = 'usage'; viewMode = 'usage'; }
-          else if(modeFromState === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
-          else if(modeFromState === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
-        }
       }catch(e){}
     }
   }
@@ -3192,24 +2997,6 @@ window.onload = function() {
               var lsp=new URLSearchParams(String(ls).replace(/^\?/,'').replace(/^\//,''));
               var t=lsp.get('type')||'';
               if(t){type=t;}
-              // ★v6: liff.state 内の ?mode= もマッピング
-              // ★v7: usage / delivery を追加
-              if(!type){
-                var m=lsp.get('mode')||'';
-                if(m === 'order')         type = 'newOrder';
-                else if(m === 'usage')   { type = 'usage'; viewMode = 'usage'; }
-                else if(m === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
-                else if(m === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
-              }
-              // ★v7: liff.state 内の ?demo=true も読む(LIFF経由のデモ起動)
-              if(lsp.get('demo') === 'true'){
-                isDemoMode = true;
-                USE_API = false;
-                if(!type){ type = 'usage'; }
-                setupDemoData();
-                loadAndShow(type);
-                return;  // demo はここで起動完了、getProfile に進まない
-              }
             }
           }catch(e){}
         }
@@ -3320,30 +3107,14 @@ function renderCustomerInfoCard() {
   if (isComplete) {
     welcomeEl.style.display = 'none';
     mainEl.style.display = 'block';
-    // ★v7: コンパクト版で削除した要素もあるため、存在チェックしてから代入
-    var greetEl = document.getElementById('cust-greet-name');
-    if (greetEl) greetEl.textContent = nm + '様';
-    var addrEl = document.getElementById('cust-info-address');
-    if (addrEl) addrEl.textContent = ad;
-    var phoneEl = document.getElementById('cust-info-phone');
-    if (phoneEl) phoneEl.textContent = ph;
-    var payEl = document.getElementById('cust-info-payment');
-    if (payEl) {
-      var paymentLabel = pm;
-      if (pm === 'クレジットカード' && cd.cardLast4) {
-        paymentLabel += ' (****' + cd.cardLast4 + ')';
-      }
-      payEl.textContent = paymentLabel;
+    document.getElementById('cust-greet-name').textContent = nm + '様';
+    document.getElementById('cust-info-address').textContent = ad;
+    document.getElementById('cust-info-phone').textContent = ph;
+    var paymentLabel = pm;
+    if (pm === 'クレジットカード' && cd.cardLast4) {
+      paymentLabel += ' (****' + cd.cardLast4 + ')';
     }
-    return;
-  }
-
-  // ★v7: デモモードでは未登録判定をスキップ(必ず登録済みとして扱う)
-  if (isDemoMode) {
-    welcomeEl.style.display = 'none';
-    mainEl.style.display = 'block';
-    var gEl = document.getElementById('cust-greet-name');
-    if (gEl) gEl.textContent = (nm || 'お客様') + '様';
+    document.getElementById('cust-info-payment').textContent = paymentLabel;
     return;
   }
 
@@ -3499,9 +3270,6 @@ function hideAll(){
 /* ========== 顧客情報 ========== */
 function loadCustomerInfoThen(type, callback) {
   if(!userId){ if(callback) callback(); return; }
-
-  // ★v7: デモモードは API を叩かず、setupDemoData でセットした顧客情報をそのまま使う
-  if (isDemoMode) { if(callback) callback(); return; }
 
   fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
     .then(function(r){ return r.json(); })
@@ -3676,11 +3444,6 @@ function loadUsageData(callback) {
    ETA API 呼び出し(GAS 経由で bento_delivery を中継)
    ============================================================ */
 function loadEtaData(callback) {
-  // ★v7: デモモードなら setupDemoData でセット済みの etaData をそのまま使う
-  if (isDemoMode) {
-    if (callback) callback(etaData);
-    return;
-  }
   if (!USE_API || !userId) {
     etaData = null;
     if (callback) callback(null);
@@ -4008,47 +3771,12 @@ function generateMockBilling() {
 }
 
 function generateMockUsage() {
-  // ★v7: デモモードなら実データ入りのテスト利用状況を返す
-  if (isDemoMode) {
-    return generateDemoUsage();
-  }
   // テスト用:利用状況なし(全月空)
   // 月タブとカレンダー枠だけ表示するため、各月 hasData:true / days:[] を返す
   var months = getMonthRange();
   var data = {};
   months.forEach(function(m) {
     data[m.key] = { hasData: true, days: [] };
-  });
-  return data;
-}
-
-/* ★v7: デモモード用の利用状況データを生成
-   各月の平日に「うちくるおかず1食 + ごはん1食」を入れたサンプル
-   ※本日(20日)より前=お届け済み、以降=ご予定 として見えるように status を分ける */
-function generateDemoUsage() {
-  var months = getMonthRange();
-  var data = {};
-  var today = new Date();
-  months.forEach(function(m) {
-    var parts = m.key.split('-');
-    var year = parseInt(parts[0], 10);
-    var month = parseInt(parts[1], 10);
-    var daysInMonth = new Date(year, month, 0).getDate();
-    var days = [];
-    for (var dd = 1; dd <= daysInMonth; dd++) {
-      var date = new Date(year, month - 1, dd);
-      var dow = date.getDay();
-      if (dow === 0 || dow === 6) continue; // 平日のみ
-      var dateStr = m.key + '-' + ('0' + dd).slice(-2);
-      days.push({
-        date: dateStr,
-        items: [
-          { name: 'うちくるおかず', qty: 1, status: 'confirmed' },
-          { name: 'ごはん', qty: 1, status: 'confirmed' }
-        ]
-      });
-    }
-    data[m.key] = { hasData: true, days: days };
   });
   return data;
 }
@@ -4219,12 +3947,6 @@ function renderWeeklyDeadlineAlert() {
   var alertEl = document.getElementById('weekly-deadline-alert');
   if (!alertEl) return;
 
-  // ★v7: 水曜アラートは②利用状況モードのみ表示
-  if (viewMode !== 'usage') {
-    alertEl.style.display = 'none';
-    return;
-  }
-
   var now = new Date();
   var dow = now.getDay();      // 0=日, 1=月, ..., 6=土
   var hour = now.getHours();
@@ -4234,17 +3956,6 @@ function renderWeeklyDeadlineAlert() {
     alertEl.style.display = 'none';
     return;
   }
-
-  // ★v6: 当日中にユーザーが「確認しました」を押していたら非表示
-  //       翌週の水曜(=次回 dow===3 になった日)で localStorage の日付と一致しなくなるので自然に再表示される
-  try {
-    var todayStr = formatLocalDateYMD(now);
-    var dismissed = localStorage.getItem('uchikuru_wda_dismissed');
-    if (dismissed === todayStr) {
-      alertEl.style.display = 'none';
-      return;
-    }
-  } catch(e) { /* localStorage 使用不可な環境ではスキップして通常表示 */ }
 
   // 翌週の月曜と最終日(金/土/日)の日付を計算
   // 水曜から翌週月曜まで5日後
@@ -4260,32 +3971,7 @@ function renderWeeklyDeadlineAlert() {
 
   // 表示更新
   document.getElementById('wda-date-range').textContent = monStr + '〜' + endStr;
-  // ★v6: CSS を flex→block に変更したので、display 値も block で OK
-  alertEl.style.display = 'block';
-  alertEl.classList.remove('dismissed'); // 念のため再表示時はクリア
-}
-
-/* ★v6: 水曜アラート「確認しました」ボタンのハンドラ
-   - localStorage に当日の日付(YYYY-MM-DD)を記録
-   - アニメーションで消去
-   - 翌週水曜になれば renderWeeklyDeadlineAlert が再表示する */
-function dismissWda() {
-  var alertEl = document.getElementById('weekly-deadline-alert');
-  if (!alertEl) return;
-  try {
-    var todayStr = formatLocalDateYMD(new Date());
-    localStorage.setItem('uchikuru_wda_dismissed', todayStr);
-  } catch(e) { /* 失敗してもアニメーションは進める */ }
-  alertEl.classList.add('dismissed');
-  setTimeout(function(){ alertEl.style.display = 'none'; }, 350);
-}
-
-/* ★v6: ローカルタイムの YYYY-MM-DD を返すユーティリティ */
-function formatLocalDateYMD(d) {
-  var y = d.getFullYear();
-  var m = ('0' + (d.getMonth() + 1)).slice(-2);
-  var dd = ('0' + d.getDate()).slice(-2);
-  return y + '-' + m + '-' + dd;
+  alertEl.style.display = 'flex';
 }
 
 /* ============================================================
@@ -4301,12 +3987,6 @@ function formatLocalDateYMD(d) {
 function renderDeliveryProgressCard() {
   var cardEl = document.getElementById('delivery-progress-card');
   if (!cardEl) return;
-
-  // ★v7: 配達進捗カードは③お届け状況・献立モードのみ表示
-  if (viewMode !== 'delivery') {
-    cardEl.style.display = 'none';
-    return;
-  }
 
   // 非表示判定
   if (!etaData || !etaData.ok || etaData.has_delivery === false) {
@@ -4355,35 +4035,15 @@ function renderDeliveryProgressCard() {
     line1 = 'done-orange';       line2 = 'done-orange';
   }
 
-  // ★v6: メッセージ部のHTML組み立て(時間表示を中央大きく)
+  // メッセージ部のHTML組み立て
   var msgHtml = '';
   if (status === 'preparing') {
-    // 準備中:アイコン + タイトル のみ(出発予定時刻は表示しない=田中要望)
-    msgHtml =
-      '<div class="dpc-title-row">' +
-        '<span class="ico">🍱</span>' +
-        '<span class="dpc-title preparing">お食事を準備中です</span>' +
-      '</div>';
+    msgHtml = '<div class="dpc-title preparing">🍱 お食事を準備中です</div>';
   } else if (status === 'in_transit') {
-    // 配達中:時間を 26pt 大きく中央表示
     var etaLabel = (etaData.eta_window && etaData.eta_window.label) ? etaData.eta_window.label : '';
-    msgHtml =
-      '<div class="dpc-title-row">' +
-        '<span class="ico">🚚</span>' +
-        '<span class="dpc-title transit">配達中です</span>' +
-      '</div>';
+    msgHtml = '<div class="dpc-title transit">🚚 配達中です</div>';
     if (etaLabel) {
-      // eta_window.label が「11:20〜13:20頃にお届け予定」の場合、
-      // 「にお届け予定」「お届け予定」などの末尾を取り除いて時間部分だけ抽出
-      var etaTimeOnly = etaLabel
-        .replace(/[にも]?お届け予定$/, '')
-        .replace(/にお届け$/, '')
-        .replace(/お届け予定時間.*$/, '')
-        .replace(/頃にお届け.*$/, '頃')
-        .trim();
-      msgHtml +=
-        '<div class="dpc-eta-big">' + escapeHtml(etaTimeOnly) + '</div>' +
-        '<div class="dpc-eta-label">にお届け予定</div>';
+      msgHtml += '<div class="dpc-sub">お届け予定:<b>' + escapeHtml(etaLabel) + '</b></div>';
     }
   } else { // delivered
     var doneTimeStr = '';
@@ -4437,11 +4097,6 @@ var dailyMenuData = null;
 var dailyMenuLoading = false;
 
 function loadDailyMenu(callback) {
-  // ★v7: デモモードなら setupDemoData でセット済みの dailyMenuData をそのまま使う
-  if (isDemoMode) {
-    if (callback) callback(dailyMenuData);
-    return;
-  }
   if (dailyMenuLoading) return;
   dailyMenuLoading = true;
 
@@ -4471,12 +4126,6 @@ function loadDailyMenu(callback) {
 function renderDailyMenuCard() {
   var cardEl = document.getElementById('daily-menu-card');
   if (!cardEl) return;
-
-  // ★v7: 今日の献立カードは③お届け状況・献立モードのみ表示
-  if (viewMode !== 'delivery') {
-    cardEl.style.display = 'none';
-    return;
-  }
 
   // データ取得失敗 or 当日分なし → 非表示
   if (!dailyMenuData || !dailyMenuData.ok) {
@@ -4527,51 +4176,23 @@ function renderDailyMenuCard() {
   cardEl.style.display = 'block';
 }
 
-/* ★v7: 表示モード(usage/delivery)に応じてセクションの表示を振り分ける
-   - ②利用状況(usage):顧客情報・水曜アラート・カレンダー・操作ボタン・利用金額
-   - ③お届け状況・献立(delivery):配達進捗カード・今日の献立 */
-function applyViewMode() {
-  var isUsage = (viewMode === 'usage');
-
-  // 顧客情報カード:②利用状況のみ表示
-  var custCard = document.getElementById('cust-info-card');
-  if (custCard) custCard.style.display = isUsage ? '' : 'none';
-
-  // usage-content(カレンダー・操作ボタン・利用金額):②利用状況のみ表示
-  var usageContentEl = document.getElementById('usage-content');
-  if (usageContentEl) usageContentEl.style.display = isUsage ? '' : 'none';
-
-  // 配達進捗カード・今日の献立・水曜アラートは各 render 関数内で viewMode を見て制御
-}
-
 function renderUsageContent() {
   var contentEl = document.getElementById('usage-content');
   if (!contentEl || !usageData) return;
 
-  // ★v7: 表示モードに応じてセクションを振り分け
-  applyViewMode();
-
-  // ★v5+: 配達進捗3段階カードを更新(③お届け状況・献立モードでのみ表示)
+  // ★v5+: 配達進捗3段階カードを更新(マイページ最上段)
   renderDeliveryProgressCard();
 
-  // ★v7: 今日の献立カード(③お届け状況・献立モードでのみ表示)
-  if (viewMode === 'delivery') {
-    if (dailyMenuData === null && !dailyMenuLoading) {
-      loadDailyMenu(function(){ renderDailyMenuCard(); });
-    } else {
-      renderDailyMenuCard();
-    }
+  // ★v5+: 今日のお弁当カード更新(進捗カードの下)
+  //       初回ロードのみGASから取得、以降はキャッシュ済みデータで再描画
+  if (dailyMenuData === null && !dailyMenuLoading) {
+    loadDailyMenu(function(){ renderDailyMenuCard(); });
+  } else {
+    renderDailyMenuCard();
   }
 
-  // ★v5+: 水曜の注文締切アラートを更新(②利用状況モードでのみ表示)
+  // ★v5+: 水曜の注文締切アラートを更新
   renderWeeklyDeadlineAlert();
-
-  // ★v7: ③お届け状況・献立モードでは、カレンダー・金額は描画せず終了
-  if (viewMode === 'delivery') {
-    return;
-  }
-
-  // 以下、②利用状況モードの描画(カレンダー・操作ボタン・利用金額)
 
   // currentUsageMonth が未設定なら自動選択
   ensureCurrentMonth('usage');
@@ -4611,9 +4232,8 @@ function renderUsageContent() {
   html += renderUsageCalendar(d);
   html += '</div>';
 
-  // ★v6: ETAカードは配達進捗カードに時間情報を統合したため非表示
-  //       renderEtaCard 関数は将来戻したい場合に備えてコード自体は残置
-  // html += renderEtaCard();
+  // ★ETAカード(カレンダーと利用状況の間に挿入)
+  html += renderEtaCard();
 
   // === ご利用状況(種類別食数+合計金額) ===
   var byType = {};
