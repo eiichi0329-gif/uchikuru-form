@@ -1562,6 +1562,20 @@ body.cancel-mode-active {
   border-radius: 10px;
   font-weight: normal;
 }
+.mmc-item-noimg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 26px 14px;
+  background: #eef5fb;
+  color: #2E6DA4;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+}
+.mmc-item-noimg .noimg-icon { font-size: 30px; }
 
 </style>
 </head>
@@ -4658,7 +4672,7 @@ function renderMonthlyMenuCard() {
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
     var imgHtml = it.imageUrl
       ? '<img class="mmc-item-img" src="' + escapeHtml(it.imageUrl) + '" alt="' + escapeHtml(it.label) + '" loading="lazy" onerror="this.style.display=\'none\';">'
-      : '';
+      : '<div class="mmc-item-noimg"><span class="noimg-icon">📄</span><span>タップしてPDFで献立表を見る</span></div>';
     itemsHtml +=
       '<a class="mmc-item" href="' + escapeHtml(href) + '" target="_blank" rel="noopener">' +
         imgHtml +
