@@ -1515,6 +1515,54 @@ body.cancel-mode-active {
   line-height: 1.6;
 }
 
+/* ★v8: 月間献立表カード(青系・「今日の献立」=オレンジと区別) */
+#monthly-menu-card {
+  background: white;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 2px solid #5B9BD5;
+}
+.mmc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0ebf5;
+  margin-bottom: 12px;
+}
+.mmc-icon { font-size: 22px; line-height: 1; }
+.mmc-title { font-size: 14px; font-weight: bold; color: #2E6DA4; flex: 1; }
+.mmc-item {
+  display: block;
+  text-decoration: none;
+  margin-bottom: 12px;
+  border: 1px solid #e0ebf5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mmc-item:last-child { margin-bottom: 0; }
+.mmc-item-img { width: 100%; display: block; }
+.mmc-item-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #2E6DA4;
+  background: #f5f9fd;
+}
+.mmc-item-label .badge {
+  font-size: 10px;
+  background: #5B9BD5;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: normal;
+}
+
 </style>
 </head>
 <body>
@@ -1650,6 +1698,9 @@ body.cancel-mode-active {
       <!-- ★v7: 今日の献立カード(③お届け状況・献立モードで表示) -->
       <!--      v6でmenu.htmlに移したが、③でも配達状況とセットで表示する -->
       <div id="daily-menu-card" style="display:none;"></div>
+
+      <!-- ★v8: 月間献立表カード(news サイトの当月・次月PDF/画像) -->
+      <div id="monthly-menu-card" style="display:none;"></div>
 
       <div id="usage-content">
         <div class="mypage-loading">読み込み中...</div>
@@ -4375,13 +4426,20 @@ function renderPreStartCard() {
       .trim();
   }
 
+  // ★v8: service_started フラグで文言を分岐
+  //   false/未定義(初回前=まだ一度も配達なし)→「お届け開始日 / 〇月〇日 から」
+  //   true(配達中だが本日配達なし=土日・祝日など)→「次回配達日 / 〇月〇日」
+  var isStarted = (etaData.service_started === true);
+  var psLabel = isStarted ? '次回配達日' : 'お届け開始日';
+  var psDateText = isStarted ? escapeHtml(startLabel) : (escapeHtml(startLabel) + ' から');
+
   var html =
     '<div class="psc-block">' +
       '<div class="psc-head">' +
         '<span class="psc-icon">📅</span>' +
-        '<span class="psc-label">お届け開始日</span>' +
+        '<span class="psc-label">' + psLabel + '</span>' +
       '</div>' +
-      '<div class="psc-start-date">' + escapeHtml(startLabel) + ' から</div>' +
+      '<div class="psc-start-date">' + psDateText + '</div>' +
     '</div>';
 
   if (timeLabel) {
@@ -4555,6 +4613,65 @@ function renderDeliveryProgressCard() {
 var dailyMenuData = null;
 var dailyMenuLoading = false;
 
+// ★v8: 月間献立表(news サイトから当月・次月のPDF/画像。GASの?type=monthlyを叩く)
+var monthlyMenuData = null;
+var monthlyMenuLoading = false;
+
+function loadMonthlyMenus(callback) {
+  if (monthlyMenuLoading) return;
+  monthlyMenuLoading = true;
+  var cbName = 'monthlyMenuCb_' + Date.now();
+  window[cbName] = function(data) {
+    monthlyMenuLoading = false;
+    try { delete window[cbName]; } catch(e) {}
+    var sc = document.getElementById(cbName + '_script');
+    if (sc && sc.parentNode) sc.parentNode.removeChild(sc);
+    monthlyMenuData = data || { ok: false, items: [] };
+    if (callback) callback(monthlyMenuData);
+  };
+  var IG_MENU_URL = 'https://script.google.com/macros/s/AKfycbxR2G-zKplRX1nQHmE5sOTQjQ1g75HY5sGvpS6N-2ZV_R7SOCOuhyDmbq9hisDP_C25Tw/exec';
+  var script = document.createElement('script');
+  script.id = cbName + '_script';
+  script.src = IG_MENU_URL + '?type=monthly&callback=' + cbName + '&_=' + Date.now();
+  script.onerror = function() {
+    monthlyMenuLoading = false;
+    monthlyMenuData = { ok: false, items: [] };
+    if (callback) callback(monthlyMenuData);
+  };
+  document.body.appendChild(script);
+}
+
+function renderMonthlyMenuCard() {
+  var cardEl = document.getElementById('monthly-menu-card');
+  if (!cardEl) return;
+  // ③お届け状況・献立モードのみ
+  if (viewMode !== 'delivery') { cardEl.style.display = 'none'; return; }
+  if (!monthlyMenuData || !monthlyMenuData.ok || !monthlyMenuData.items || monthlyMenuData.items.length === 0) {
+    cardEl.style.display = 'none';
+    return;
+  }
+  var itemsHtml = '';
+  for (var i = 0; i < monthlyMenuData.items.length; i++) {
+    var it = monthlyMenuData.items[i];
+    var href = it.pdfUrl || it.articleUrl || '';   // PDF優先、なければ記事ページ
+    if (!href) continue;
+    var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
+    var imgHtml = it.imageUrl
+      ? '<img class="mmc-item-img" src="' + escapeHtml(it.imageUrl) + '" alt="' + escapeHtml(it.label) + '" loading="lazy" onerror="this.style.display=\'none\';">'
+      : '';
+    itemsHtml +=
+      '<a class="mmc-item" href="' + escapeHtml(href) + '" target="_blank" rel="noopener">' +
+        imgHtml +
+        '<div class="mmc-item-label"><span>📄 ' + escapeHtml(it.label) + '</span>' + badge + '</div>' +
+      '</a>';
+  }
+  if (!itemsHtml) { cardEl.style.display = 'none'; return; }
+  cardEl.innerHTML =
+    '<div class="mmc-header"><div class="mmc-icon">📅</div><div class="mmc-title">月間献立表</div></div>' +
+    itemsHtml;
+  cardEl.style.display = 'block';
+}
+
 function loadDailyMenu(callback) {
   // ★v8: demoモードでもInstagramから実献立を取得(旧デモ分岐を削除)
   if (dailyMenuLoading) return;
@@ -4640,7 +4757,7 @@ function renderDailyMenuCard() {
   var isPreStart = !!(etaData && etaData.has_delivery === false && etaData.first_delivery_date);
   var menuTitle = isPreStart ? '本日の献立(参考)' : '今日のお弁当';
   var noteText = isPreStart
-    ? '※本日提供中の献立です。お届け開始までは参考としてご覧ください'
+    ? '※本日提供中の献立です(参考)。ご利用タイプによって品数が異なります'
     : '※ご利用タイプによって品数が異なります';
 
   cardEl.innerHTML =
@@ -4695,6 +4812,12 @@ function renderUsageContent() {
       loadDailyMenu(function(){ renderDailyMenuCard(); });
     } else {
       renderDailyMenuCard();
+    }
+    // ★v8: 月間献立表カード(news サイトの当月・次月PDF/画像)
+    if (monthlyMenuData === null && !monthlyMenuLoading) {
+      loadMonthlyMenus(function(){ renderMonthlyMenuCard(); });
+    } else {
+      renderMonthlyMenuCard();
     }
   }
 
