@@ -6737,7 +6737,7 @@ function initStripeElements() {
   try {
     if (!stripeInstance) {
       // ★本番では実際の公開可能キーに置き換える
-      stripeInstance = Stripe('pk_test_YOUR_PUBLISHABLE_KEY_HERE');
+      stripeInstance = Stripe('pk_live_51TPd8YK9if8nMZ6wFISOjKdXQQdPAcxdBIjedDWKIghctyurO0fKdYsaUvQACiOoK5xA5ZbCgsw6gd0IkPutsUOA00cRfGfJ0D');
       stripeElements = stripeInstance.elements();
     }
     var elNumber = document.getElementById('stripe-card-number');
