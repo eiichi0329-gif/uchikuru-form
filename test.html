@@ -3757,6 +3757,14 @@ function loadBillingData(callback) {
           Object.keys(data.months).forEach(function(k) {
             if (!mock[k]) return;
             var mb = data.months[k] || {};
+            // ★bentoが請求データを返した月は、配達スケジュール(getSchedule)に
+            //   その月の明細が無くても「利用金額」を表示する(請求はbentoが正)
+            var hasBentoBilling = (mb.amount_total != null && mb.amount_total > 0) ||
+                                  (mb.payment_status && mb.payment_status !== 'unpaid');
+            if (hasBentoBilling && !mock[k].hasData) {
+              mock[k] = { hasData: true, total: 0, paid: 0, unpaid: 0,
+                          details: (mock[k] && mock[k].details) || [] };
+            }
             if (mb.amount_total     != null) mock[k].total  = mb.amount_total;
             if (mb.amount_charged   != null) mock[k].paid   = mb.amount_charged;
             if (mb.amount_uncharged != null) mock[k].unpaid = mb.amount_uncharged;
@@ -7922,21 +7930,24 @@ function renderBillingContent() {
   html += '<div class="summary-card">';
   html += '<div class="sc-title">ご請求サマリー' + pay.badge + '</div>';
   if (pay.notice) html += pay.notice;
-  html += '<div class="sc-row"><span>集金済み</span><span class="sc-amount paid">' + d.paid.toLocaleString() + '円</span></div>';
-  html += '<div class="sc-row"><span>未集金</span><span class="sc-amount unpaid">' + d.unpaid.toLocaleString() + '円</span></div>';
-  html += '<div class="sc-row total"><span>合計</span><span class="sc-amount">' + d.total.toLocaleString() + '円</span></div>';
+  html += '<div class="sc-row"><span>集金済み</span><span class="sc-amount paid">' + (d.paid||0).toLocaleString() + '円</span></div>';
+  html += '<div class="sc-row"><span>未集金</span><span class="sc-amount unpaid">' + (d.unpaid||0).toLocaleString() + '円</span></div>';
+  html += '<div class="sc-row total"><span>合計</span><span class="sc-amount">' + (d.total||0).toLocaleString() + '円</span></div>';
   html += '</div>';
 
-  html += '<div class="sec-label">日別の内訳</div>';
-  html += '<div class="detail-list">';
-  d.details.forEach(function(item) {
-    html += '<div class="dl-row">';
-    html += '<span class="dl-date">' + item.date + '</span>';
-    html += '<span class="dl-content">' + item.content + '</span>';
-    html += '<span class="dl-amount">' + item.amount.toLocaleString() + '円</span>';
+  var details = d.details || [];
+  if (details.length > 0) {
+    html += '<div class="sec-label">日別の内訳</div>';
+    html += '<div class="detail-list">';
+    details.forEach(function(item) {
+      html += '<div class="dl-row">';
+      html += '<span class="dl-date">' + item.date + '</span>';
+      html += '<span class="dl-content">' + item.content + '</span>';
+      html += '<span class="dl-amount">' + item.amount.toLocaleString() + '円</span>';
+      html += '</div>';
+    });
     html += '</div>';
-  });
-  html += '</div>';
+  }
 
   contentEl.innerHTML = html;
 }
