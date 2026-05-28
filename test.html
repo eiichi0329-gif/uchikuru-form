@@ -4675,6 +4675,10 @@ function renderDeliveryProgressCard() {
       msgHtml +=
         '<div class="dpc-eta-big">' + escapeHtml(etaTimeOnly) + '</div>' +
         '<div class="dpc-eta-label">にお届け予定</div>';
+    } else if (etaData.fallback_message) {
+      // eta_window がまだ無い(計算中)場合は fallback_message を表示
+      msgHtml +=
+        '<div class="dpc-eta-label">' + escapeHtml(etaData.fallback_message) + '</div>';
     }
   } else { // delivered
     var doneTimeStr = '';
