@@ -1344,6 +1344,15 @@ body.cancel-mode-active {
   border-color: #F08300;
   background: linear-gradient(135deg, #FFF8F0 0%, #ffefd5 100%);
 }
+/* ★代配/ルート手動変更時のお知らせ表示(薄い黄色・注意系) */
+#delivery-progress-card.dpc-notice {
+  background: #FFFBEB;
+  border-color: #F0B400;
+}
+.dpc-notice-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.dpc-notice-icon { font-size: 22px; }
+.dpc-notice-title { font-size: 15px; font-weight: bold; color: #8A6500; letter-spacing: 0.05em; }
+.dpc-notice-text { color: #4A3500; font-size: 15px; line-height: 1.7; }
 .dpc-steps {
   display: flex;
   align-items: flex-start;
@@ -4580,9 +4589,19 @@ function renderDeliveryProgressCard() {
     cardEl.style.display = 'none';
     return;
   }
-  // ★代配/ルート手動変更時は具体的な時間を出さない → 進捗カード非表示(ETAカードのメッセージのみ表示)
+  // ★代配/ルート手動変更時 → 具体的な時間は出さず、このカードに変更メッセージを表示
+  //   (お届け状況画面ではETAカードが無効化されているため、進捗カードに出す)
   if (etaData.delivery_time_changed === true) {
-    cardEl.style.display = 'none';
+    var dtcMsg = etaData.delivery_time_changed_message ||
+                 '本日配達時間が通常と変更になっております。現在配達中ですのでしばらくお待ちください。';
+    cardEl.className = 'dpc-notice';
+    cardEl.innerHTML =
+      '<div class="dpc-notice-title-row">' +
+        '<span class="dpc-notice-icon">🚚</span>' +
+        '<span class="dpc-notice-title">配達時間変更のお知らせ</span>' +
+      '</div>' +
+      '<div class="dpc-notice-text">' + escapeHtml(dtcMsg) + '</div>';
+    cardEl.style.display = 'block';
     return;
   }
   // 代配対象本人は進捗カード非表示(代配メッセージのみ表示)
@@ -5026,11 +5045,18 @@ function renderUsageContent() {
     });
     html += '</div>';
 
-    // 合計金額
+    // ★支払いステータス: getBilling の payment_status を「ご利用代金」に表示
+    //   billingData は usage モードでも読み込み済み。当月キーで参照。
+    var payBillMonth = (billingData && currentUsageMonth) ? billingData[currentUsageMonth] : null;
+    var payInfo = buildPaymentStatus(payBillMonth);
+
+    // 合計金額(bentoの実値があれば優先、無ければスケジュールからの計算値)
+    var displayAmount = (payBillMonth && payBillMonth.total != null) ? payBillMonth.total : totalAmount;
     html += '<div class="usage-total">';
-    html += '<span class="usage-total-label">ご利用代金 <span class="usage-total-tax">(税込)</span></span>';
-    html += '<span class="usage-total-amount">¥' + totalAmount.toLocaleString() + '</span>';
+    html += '<span class="usage-total-label">ご利用代金 <span class="usage-total-tax">(税込)</span>' + payInfo.badge + '</span>';
+    html += '<span class="usage-total-amount">¥' + displayAmount.toLocaleString() + '</span>';
     html += '</div>';
+    if (payInfo.notice) html += payInfo.notice;
   }
 
   // ★承認待ち変更がある場合の注記(集計値は承認済データのみで、申請中変更は反映されない仕様のため)
@@ -7893,7 +7919,7 @@ function buildPaymentStatus(d) {
   } else if (status === 'charged') {
     out.badge = '<span class="pay-badge done">決済済み</span>';
   } else if (status === 'debit_scheduled') {
-    var ml = formatDebitStartLabel(d.debit_start_month || currentBillingMonth);
+    var ml = formatDebitStartLabel(d.debit_start_month || currentBillingMonth || currentUsageMonth);
     out.notice = '<div class="pay-notice info">📅 ' + escapeHtml(ml) + 'から引き落とし予定です</div>';
   } else if (status === 'debit_failed') {
     out.notice = '<div class="pay-notice failed">お引き落としができませんでしたので、お手数ですがご集金をお願いします。</div>';
