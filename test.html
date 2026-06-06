@@ -982,6 +982,31 @@ body.cancel-mode-active {
   box-shadow: 0 2px 4px rgba(230, 126, 34, 0.3);
 }
 
+/* ===== ★Phase 2: 意図ベース変更メニュー(form-change) ===== */
+.cm-item {
+  display: block; width: 100%;
+  padding: 16px 18px; margin-bottom: 10px;
+  background: #fff; border: 2px solid #F08300; border-radius: 10px;
+  text-align: left; cursor: pointer;
+  font-family: inherit; font-size: inherit; color: inherit;
+}
+.cm-item:active { background: #FFF4E5; }
+.cm-row { display: flex; align-items: center; gap: 14px; }
+.cm-icon { font-size: 30px; line-height: 1; flex-shrink: 0; }
+.cm-body { flex: 1; min-width: 0; }
+.cm-title { font-size: 16px; font-weight: bold; color: #222; margin-bottom: 4px; line-height: 1.4; }
+.cm-desc  { font-size: 12.5px; color: #777; line-height: 1.5; }
+.cm-arrow { font-size: 24px; color: #F08300; flex-shrink: 0; }
+.cm-item.cm-warn-color { border-color: #d9534f; }
+.cm-item.cm-warn-color .cm-arrow { color: #d9534f; }
+.cm-section-title { font-size: 15px; font-weight: bold; color: #444; margin: 18px 0 12px; }
+.cm-back {
+  display: inline-block; padding: 8px 16px; margin-bottom: 14px;
+  background: #fff; color: #666; border: 1px solid #ccc; border-radius: 6px;
+  font-size: 13px; cursor: pointer;
+}
+.cm-back:active { background: #f5f5f5; }
+
 /* ===== 水曜の注文締切アラート ===== */
 /* ★v6: 水曜の注文締切アラート(縦配置に変更、確認ボタン付き) */
 #weekly-deadline-alert {
@@ -1686,13 +1711,10 @@ body.cancel-mode-active {
         <div class="welcome-title">ようこそ</div>
         <div class="welcome-subtitle">うちくる夕食宅配サービスをご利用いただきありがとうございます</div>
         <div class="welcome-desc">
-          すでにご利用中の方も、これからの方も、<br>こちらからお手続きいただけます。
+          すでにご利用中の方も、これからの方も、<br>LINEのリッチメニューよりお手続きいただけます。
         </div>
-        <button class="welcome-cta-btn" style="background:#F08300;color:white;" onclick="loadAndShow('newOrder')">
-          ご注文・お申込みへ進む
-        </button>
         <div style="font-size:13px;color:#666;margin-top:14px;line-height:1.7;text-align:left;background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:10px 12px;">
-          現在ご利用中の方・過去にご利用いただいた方は、注文フォーム内で<b>ご利用状況</b>をご選択ください。<br>店舗にて過去のご利用情報との紐付け後、マイページがご利用いただけます。
+          ご利用にあたっては、リッチメニューの<b>「新規登録」</b>からお申し込みをお願いいたします。<br>登録完了後、マイページがご利用いただけるようになります。
         </div>
       </div>
     </div>
@@ -1742,6 +1764,16 @@ body.cancel-mode-active {
       <div id="usage-content">
         <div class="mypage-loading">読み込み中...</div>
       </div>
+    </div>
+  </div>
+
+  <!-- 献立アンケート(Phase 3で本実装。Phase 1はスタブ) -->
+  <div id="form-feedback" class="form-wrap">
+    <div class="form-title">📝 献立アンケート</div>
+    <div style="text-align:center;padding:40px 20px;color:#666;line-height:1.8;">
+      <div style="font-size:48px;margin-bottom:12px;">🍱</div>
+      <div style="font-size:16px;font-weight:600;color:#444;margin-bottom:8px;">献立アンケートは準備中です</div>
+      <div style="font-size:13px;color:#888;">その日の献立へのご感想・ご要望をお送りいただける機能を、現在準備しています。<br>もうしばらくお待ちください。</div>
     </div>
   </div>
 
@@ -1956,7 +1988,110 @@ body.cancel-mode-active {
 
   <!-- 注文変更 -->
   <div id="form-change" class="form-wrap">
-    <div class="form-title">📝 注文内容の変更</div>
+    <div class="form-title">📝 変更のお手続き</div>
+
+    <!-- ★Phase 2: 意図ベース・トップメニュー(6項目) -->
+    <div id="change-menu-top">
+      <button type="button" class="cm-item" onclick="cmGoOrder()">
+        <div class="cm-row">
+          <div class="cm-icon">🍱</div>
+          <div class="cm-body">
+            <div class="cm-title">注文する・増やす</div>
+            <div class="cm-desc">新しく頼む／品数や食数を増やす</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmGoTypeChange()">
+        <div class="cm-row">
+          <div class="cm-icon">🔁</div>
+          <div class="cm-body">
+            <div class="cm-title">内容を変える</div>
+            <div class="cm-desc">食数を変える／曜日・回数を変える</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmShowRestMenu()">
+        <div class="cm-row">
+          <div class="cm-icon">⏸</div>
+          <div class="cm-body">
+            <div class="cm-title">お休みする</div>
+            <div class="cm-desc">1日だけ／期間お休み／利用をやめる、から選びます</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item cm-warn-color" onclick="cmGoEndService()">
+        <div class="cm-row">
+          <div class="cm-icon">🛑</div>
+          <div class="cm-body">
+            <div class="cm-title">やめる(利用終了)</div>
+            <div class="cm-desc">今後の配達を終了する</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmGoProfileEdit()">
+        <div class="cm-row">
+          <div class="cm-icon">📝</div>
+          <div class="cm-body">
+            <div class="cm-title">登録情報の変更</div>
+            <div class="cm-desc">住所・電話・緊急連絡先・不在時の対応 など</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmGoShopTalk()">
+        <div class="cm-row">
+          <div class="cm-icon">💬</div>
+          <div class="cm-body">
+            <div class="cm-title">その他・店舗に相談</div>
+            <div class="cm-desc">上記で迷う時／特殊な依頼</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- ★Phase 2: お休み 3分岐サブメニュー -->
+    <div id="change-menu-rest" style="display:none;">
+      <button type="button" class="cm-back" onclick="cmShowTopMenu()">‹ 戻る</button>
+      <div class="cm-section-title">お休みの種類を選んでください</div>
+      <button type="button" class="cm-item" onclick="cmGoDateCancel()">
+        <div class="cm-row">
+          <div class="cm-icon">📅</div>
+          <div class="cm-body">
+            <div class="cm-title">特定の日だけお休み</div>
+            <div class="cm-desc">例：来週の月曜だけ届け不要</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmGoSuspend()">
+        <div class="cm-row">
+          <div class="cm-icon">🏖</div>
+          <div class="cm-body">
+            <div class="cm-title">しばらくお休み(また再開します)</div>
+            <div class="cm-desc">例：旅行・入院などで一定期間お休み</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item cm-warn-color" onclick="cmGoEndService()">
+        <div class="cm-row">
+          <div class="cm-icon">🛑</div>
+          <div class="cm-body">
+            <div class="cm-title">もう利用をやめる(利用終了)</div>
+            <div class="cm-desc">今後の配達を終了します</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- ★旧UI(select方式)。Phase 2導入後は非表示。既存JSとの互換性のため要素は残存 -->
+    <div id="change-legacy-content" style="display:none;">
     <div class="customer-card" id="ccard-change" style="display:none;"></div>
     <div id="fields-change">
       <div class="sec-label">お客様情報</div>
@@ -2041,6 +2176,7 @@ body.cancel-mode-active {
     <div class="sec-label">店舗への伝達事項<span style="font-size:12px;color:#aaa;font-weight:normal;"> （任意）</span></div>
     <div class="field"><textarea id="ch-note" placeholder="その他ご要望など"></textarea></div>
     <button class="btn-submit" onclick="submitForm('change')">送信する</button>
+    </div>  <!-- /#change-legacy-content -->
   </div>
 
   <!-- 利用停止 -->
@@ -2475,6 +2611,27 @@ function actionNewOrder()    { withModeCheck(function(){ loadAndShow('newOrder')
 function actionTypeChange()  { withModeCheck(function(){ showTypeChangeGuide(); }); }
 function actionCancel()      { withModeCheck(function(){ showCancelGuide(); }); }
 function actionEndService()  { withModeCheck(function(){ openEndServiceModal(); }); }
+
+// ★Phase 2: 意図ベース変更メニューのナビゲーション
+function cmShowTopMenu() {
+  var t = document.getElementById('change-menu-top');
+  var r = document.getElementById('change-menu-rest');
+  if (t) t.style.display = '';
+  if (r) r.style.display = 'none';
+}
+function cmShowRestMenu() {
+  var t = document.getElementById('change-menu-top');
+  var r = document.getElementById('change-menu-rest');
+  if (t) t.style.display = 'none';
+  if (r) r.style.display = '';
+}
+function cmGoOrder()        { actionNewOrder(); }
+function cmGoTypeChange()   { actionTypeChange(); }
+function cmGoDateCancel()   { actionCancel(); }
+function cmGoEndService()   { actionEndService(); }
+function cmGoProfileEdit()  { openCustomerEditModal(); }
+function cmGoSuspend()      { alert('「しばらくお休み」機能は次回更新(Phase 2b)で実装予定です。\n現在は「特定の日だけお休み」または「やめる(利用終了)」をご利用ください。'); }
+function cmGoShopTalk()     { alert('「店舗に相談」フリーメッセージ機能は次回更新(Phase 2b)で実装予定です。\nお急ぎの場合はお電話でお問い合わせください。'); }
 
 // === はい/いいえ確認モーダル ===
 function showConfirmModal(icon, title, msg, yesLabel, noLabel, onYes) {
@@ -3266,6 +3423,10 @@ window.onload = function() {
     else if(modeParam === 'usage')   { type = 'usage'; viewMode = 'usage'; }
     else if(modeParam === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
     else if(modeParam === 'mypage')  { type = 'usage'; viewMode = 'usage'; } // 後方互換
+    // ★v8: 新ナビゲーション(4分類)
+    else if(modeParam === 'change')  { type = 'change'; }                    // 変更(意図ベース6項目メニュー)
+    else if(modeParam === 'status')  { type = 'usage'; viewMode = 'combined'; } // 利用状況・配達状況統合
+    else if(modeParam === 'feedback'){ type = 'feedback'; }                  // 献立アンケート(Phase 3)
   }
 
   // ★v7: デモモード検出(?demo=true)
@@ -3294,6 +3455,10 @@ window.onload = function() {
           else if(modeFromState === 'usage')   { type = 'usage'; viewMode = 'usage'; }
           else if(modeFromState === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
           else if(modeFromState === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
+          // ★v8: 新ナビゲーション(4分類)
+          else if(modeFromState === 'change')  { type = 'change'; }
+          else if(modeFromState === 'status')  { type = 'usage'; viewMode = 'combined'; }
+          else if(modeFromState === 'feedback'){ type = 'feedback'; }
         }
       }catch(e){}
     }
@@ -3331,6 +3496,10 @@ window.onload = function() {
                 else if(m === 'usage')   { type = 'usage'; viewMode = 'usage'; }
                 else if(m === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
                 else if(m === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
+                // ★v8: 新ナビゲーション(4分類)
+                else if(m === 'change')  { type = 'change'; }
+                else if(m === 'status')  { type = 'usage'; viewMode = 'combined'; }
+                else if(m === 'feedback'){ type = 'feedback'; }
               }
               // ★v7: liff.state 内の ?demo=true も読む(LIFF経由のデモ起動)
               if(lsp.get('demo') === 'true'){
@@ -3379,6 +3548,11 @@ function loadAndShow(type) {
 function onFormShown(type) {
   if (type === 'newOrder') {
     initNewOrderPage();
+    return;
+  }
+  if (type === 'change') {
+    // ★Phase 2: 変更メニューに入ったら必ずトップメニューにリセット
+    cmShowTopMenu();
     return;
   }
   if (type === 'mypage') {
@@ -3566,13 +3740,10 @@ function renderInitialWelcome() {
       '<div class="welcome-title">ようこそ</div>' +
       '<div class="welcome-subtitle">うちくる夕食宅配サービスをご利用いただきありがとうございます</div>' +
       '<div class="welcome-desc">' +
-        'すでにご利用中の方も、これからの方も、<br>こちらからお手続きいただけます。' +
+        'すでにご利用中の方も、これからの方も、<br>LINEのリッチメニューよりお手続きいただけます。' +
       '</div>' +
-      '<button class="welcome-cta-btn" style="background:#F08300;color:white;" onclick="loadAndShow(\'newOrder\')">' +
-        'ご注文・お申込みへ進む' +
-      '</button>' +
       '<div style="font-size:13px;color:#666;margin-top:14px;line-height:1.7;text-align:left;background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:10px 12px;">' +
-        '現在ご利用中の方・過去にご利用いただいた方は、注文フォーム内で<b>ご利用状況</b>をご選択ください。<br>店舗にて過去のご利用情報との紐付け後、マイページがご利用いただけます。' +
+        'ご利用にあたっては、リッチメニューの<b>「新規登録」</b>からお申し込みをお願いいたします。<br>登録完了後、マイページがご利用いただけるようになります。' +
       '</div>' +
     '</div>';
 }
@@ -4412,7 +4583,7 @@ function renderWeeklyDeadlineAlert() {
   if (!alertEl) return;
 
   // ★v7: 水曜アラートは②利用状況モードのみ表示
-  if (viewMode !== 'usage') {
+  if (viewMode !== 'usage' && viewMode !== 'combined') {
     alertEl.style.display = 'none';
     return;
   }
@@ -4497,7 +4668,7 @@ function renderPreStartCard() {
   if (!cardEl) return;
 
   // ③お届け状況・献立モードのみ
-  if (viewMode !== 'delivery') {
+  if (viewMode !== 'delivery' && viewMode !== 'combined') {
     cardEl.style.display = 'none';
     return;
   }
@@ -4579,7 +4750,7 @@ function renderDeliveryProgressCard() {
   if (!cardEl) return;
 
   // ★v7: 配達進捗カードは③お届け状況・献立モードのみ表示
-  if (viewMode !== 'delivery') {
+  if (viewMode !== 'delivery' && viewMode !== 'combined') {
     cardEl.style.display = 'none';
     return;
   }
@@ -4649,12 +4820,27 @@ function renderDeliveryProgressCard() {
   // ★v6: メッセージ部のHTML組み立て(時間表示を中央大きく)
   var msgHtml = '';
   if (status === 'preparing') {
-    // 準備中:アイコン + タイトル のみ(出発予定時刻は表示しない=田中要望)
+    // 準備中: アイコン + タイトル + ETA時間(配達中と同じ要領で表示)
+    var etaLabelP = (etaData.eta_window && etaData.eta_window.label) ? etaData.eta_window.label : '';
     msgHtml =
       '<div class="dpc-title-row">' +
         '<span class="ico">🍱</span>' +
         '<span class="dpc-title preparing">お食事を準備中です</span>' +
       '</div>';
+    if (etaLabelP) {
+      var etaTimeOnlyP = etaLabelP
+        .replace(/[にも]?お届け予定$/, '')
+        .replace(/にお届け$/, '')
+        .replace(/お届け予定時間.*$/, '')
+        .replace(/頃にお届け.*$/, '頃')
+        .trim();
+      msgHtml +=
+        '<div class="dpc-eta-big preparing-color">' + escapeHtml(etaTimeOnlyP) + '</div>' +
+        '<div class="dpc-eta-label">にお届け予定</div>';
+    } else if (etaData.fallback_message) {
+      msgHtml +=
+        '<div class="dpc-eta-label">' + escapeHtml(etaData.fallback_message) + '</div>';
+    }
   } else if (status === 'in_transit') {
     // 配達中:時間を 26pt 大きく中央表示
     var etaLabel = (etaData.eta_window && etaData.eta_window.label) ? etaData.eta_window.label : '';
@@ -4763,7 +4949,7 @@ function renderMonthlyMenuCard() {
   var cardEl = document.getElementById('monthly-menu-card');
   if (!cardEl) return;
   // ③お届け状況・献立モードのみ
-  if (viewMode !== 'delivery') { cardEl.style.display = 'none'; return; }
+  if (viewMode !== 'delivery' && viewMode !== 'combined') { cardEl.style.display = 'none'; return; }
   if (!monthlyMenuData || !monthlyMenuData.ok || !monthlyMenuData.items || monthlyMenuData.items.length === 0) {
     cardEl.style.display = 'none';
     return;
@@ -4823,7 +5009,7 @@ function renderDailyMenuCard() {
   if (!cardEl) return;
 
   // ★v7: 今日の献立カードは③お届け状況・献立モードのみ表示
-  if (viewMode !== 'delivery') {
+  if (viewMode !== 'delivery' && viewMode !== 'combined') {
     cardEl.style.display = 'none';
     return;
   }
@@ -4898,7 +5084,7 @@ function renderDailyMenuCard() {
    - ②利用状況(usage):顧客情報・水曜アラート・カレンダー・操作ボタン・利用金額
    - ③お届け状況・献立(delivery):配達進捗カード・今日の献立 */
 function applyViewMode() {
-  var isUsage = (viewMode === 'usage');
+  var isUsage = (viewMode === 'usage' || viewMode === 'combined');
 
   // 顧客情報カード:②利用状況のみ表示
   var custCard = document.getElementById('cust-info-card');
@@ -4925,7 +5111,7 @@ function renderUsageContent() {
   renderDeliveryProgressCard();
 
   // ★v7: 今日の献立カード(③お届け状況・献立モードでのみ表示)
-  if (viewMode === 'delivery') {
+  if (viewMode === 'delivery' || viewMode === 'combined') {
     if (dailyMenuData === null && !dailyMenuLoading) {
       loadDailyMenu(function(){ renderDailyMenuCard(); });
     } else {
