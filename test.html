@@ -1768,9 +1768,27 @@ body.cancel-mode-active {
     <div id="daily-menu-card" style="display:none;"></div>
     <div id="monthly-menu-card" style="display:none;"></div>
 
-    <!-- ★Phase 3: アンケート入力欄予定地 -->
-    <div style="margin-top:20px;padding:14px 16px;background:#fffdf8;border:1px solid #f0d8b8;border-radius:8px;font-size:13px;color:#666;line-height:1.7;text-align:center;">
-      献立へのご感想・ご要望を送信できる入力欄を準備中です。<br>もうしばらくお待ちください。
+    <!-- ★Phase 3: アンケート入力欄 -->
+    <div id="feedback-form-area" style="margin-top:20px;">
+      <div style="font-size:15px;font-weight:bold;color:#333;margin-bottom:8px;">🍽 献立へのご感想・ご要望</div>
+      <div style="font-size:12.5px;color:#777;margin-bottom:10px;line-height:1.6;">
+        今日の献立への感想・ご要望をご自由にお書きください。<br>店舗で内容を確認させていただきます。
+      </div>
+      <textarea id="feedback-message" placeholder="例：今日の煮物の味付けがちょうど良くて美味しかったです。" rows="5"
+                style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+      <button id="feedback-submit-btn" onclick="submitMenuFeedback()"
+              style="width:100%;margin-top:12px;padding:14px;background:#F08300;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">
+        送信する
+      </button>
+    </div>
+    <div id="feedback-success" style="display:none;margin-top:20px;padding:24px 20px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">✅</div>
+      <div style="font-size:16px;font-weight:bold;color:#2E7D32;margin-bottom:6px;">送信しました</div>
+      <div style="font-size:13px;color:#555;line-height:1.6;">ご意見ありがとうございます。<br>店舗で内容を確認させていただきます。</div>
+      <button onclick="resetFeedbackForm()"
+              style="margin-top:14px;padding:10px 20px;background:#fff;color:#F08300;border:2px solid #F08300;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;">
+        もう一度送信する
+      </button>
     </div>
   </div>
 
@@ -2629,6 +2647,78 @@ function cmGoEndService()   { actionEndService(); }
 function cmGoProfileEdit()  { openCustomerEditModal(); }
 function cmGoSuspend()      { alert('「しばらくお休み」機能は次回更新(Phase 2b)で実装予定です。\n現在は「特定の日だけお休み」または「やめる(利用終了)」をご利用ください。'); }
 function cmGoShopTalk()     { alert('「店舗に相談」フリーメッセージ機能は次回更新(Phase 2b)で実装予定です。\nお急ぎの場合はお電話でお問い合わせください。'); }
+
+// ★Phase 3: 献立アンケートの送信
+function submitMenuFeedback() {
+  var msgEl = document.getElementById('feedback-message');
+  var btn   = document.getElementById('feedback-submit-btn');
+  if (!msgEl || !btn) return;
+  var msg = (msgEl.value || '').trim();
+  if (!msg) { alert('メッセージを入力してください'); return; }
+  if (!userId) { alert('ユーザー情報が取得できません。LINEから再度開き直してください。'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  // 今日の日付(JST想定。端末ローカル時刻でOK)
+  var t = new Date();
+  var todayStr = t.getFullYear() + '-' +
+                 ('0'+(t.getMonth()+1)).slice(-2) + '-' +
+                 ('0'+t.getDate()).slice(-2);
+
+  // 顧客名(loadCustomerInfoThenで読み込み済みなら入る)
+  var customerName = (window._customerData && window._customerData.name) || '';
+
+  // 今日の弁当種別(usageData にあれば抽出。無ければ空)
+  var bentoTypes = '';
+  try {
+    if (typeof usageData !== 'undefined' && usageData) {
+      var mKey = todayStr.substring(0,7);
+      var md = usageData[mKey];
+      if (md && md.days) {
+        var todayItem = null;
+        for (var i=0; i<md.days.length; i++) {
+          if (md.days[i].date === todayStr) { todayItem = md.days[i]; break; }
+        }
+        if (todayItem && todayItem.items) {
+          bentoTypes = todayItem.items.map(function(x){ return x.bento_type + (x.quantity > 1 ? '×'+x.quantity : ''); }).join(', ');
+        }
+      }
+    }
+  } catch(e) { /* 取得失敗時は空 */ }
+
+  apiGet('submitMenuFeedback', {
+    line_user_id:  userId,
+    customer_name: customerName,
+    delivery_date: todayStr,
+    bento_types:   bentoTypes,
+    message:       msg
+  }, function(data) {
+    if (data && data.ok) {
+      document.getElementById('feedback-form-area').style.display = 'none';
+      document.getElementById('feedback-success').style.display = 'block';
+    } else {
+      alert('送信に失敗しました：' + (data && data.error ? data.error : '不明なエラー'));
+      btn.disabled = false;
+      btn.textContent = '送信する';
+    }
+  }, function(err) {
+    alert('送信に失敗しました：' + (err && err.message ? err.message : '通信エラー'));
+    btn.disabled = false;
+    btn.textContent = '送信する';
+  });
+}
+
+function resetFeedbackForm() {
+  var msgEl = document.getElementById('feedback-message');
+  var btn   = document.getElementById('feedback-submit-btn');
+  if (msgEl) msgEl.value = '';
+  if (btn)   { btn.disabled = false; btn.textContent = '送信する'; }
+  var fa = document.getElementById('feedback-form-area');
+  var fs = document.getElementById('feedback-success');
+  if (fa) fa.style.display = '';
+  if (fs) fs.style.display = 'none';
+}
 
 // === はい/いいえ確認モーダル ===
 function showConfirmModal(icon, title, msg, yesLabel, noLabel, onYes) {
@@ -3526,7 +3616,7 @@ function loadAndShow(type) {
   if(!formEl){showMenu();return;}
 
   // userId がある場合は顧客情報を取得してからフォームを表示
-  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage'].indexOf(type)!==-1){
+  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback'].indexOf(type)!==-1){
     document.getElementById('statusMsg').textContent='お客様情報を確認中...';
     document.getElementById('statusMsg').style.display='block';
     loadCustomerInfoThen(type, function(){
@@ -3560,6 +3650,8 @@ function onFormShown(type) {
     if (typeof loadMonthlyMenus === 'function') {
       loadMonthlyMenus(function(){ renderMonthlyMenuCard(); });
     }
+    // ★Phase 3: フォーム状態をリセット(前回送信後の成功表示が残らないように)
+    if (typeof resetFeedbackForm === 'function') resetFeedbackForm();
     return;
   }
   if (type === 'mypage') {
@@ -4955,8 +5047,8 @@ function loadMonthlyMenus(callback) {
 function renderMonthlyMenuCard() {
   var cardEl = document.getElementById('monthly-menu-card');
   if (!cardEl) return;
-  // ③お届け状況・献立モードのみ
-  if (viewMode !== 'delivery' && viewMode !== 'combined') { cardEl.style.display = 'none'; return; }
+  // ★Phase 2: 月間献立は「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
+  if (viewMode !== 'delivery' && type !== 'feedback') { cardEl.style.display = 'none'; return; }
   if (!monthlyMenuData || !monthlyMenuData.ok || !monthlyMenuData.items || monthlyMenuData.items.length === 0) {
     cardEl.style.display = 'none';
     return;
@@ -5015,8 +5107,8 @@ function renderDailyMenuCard() {
   var cardEl = document.getElementById('daily-menu-card');
   if (!cardEl) return;
 
-  // ★v7: 今日の献立カードは③お届け状況・献立モードのみ表示
-  if (viewMode !== 'delivery' && viewMode !== 'combined') {
+  // ★Phase 2: 今日の献立カードは「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
+  if (viewMode !== 'delivery' && type !== 'feedback') {
     cardEl.style.display = 'none';
     return;
   }
