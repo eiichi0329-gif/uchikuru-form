@@ -5059,8 +5059,10 @@ function loadMonthlyMenus(callback) {
 function renderMonthlyMenuCard() {
   var cardEl = document.getElementById('monthly-menu-card');
   if (!cardEl) return;
-  // ★Phase 2: 月間献立は「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
-  if (viewMode !== 'delivery' && type !== 'feedback') { console.log('[render-monthly] hide: not in delivery/feedback (viewMode=' + viewMode + ', type=' + type + ')'); cardEl.style.display = 'none'; return; }
+  // ★Phase 2: 「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
+  var _fbEl2 = document.getElementById('form-feedback');
+  var _isFeedback2 = _fbEl2 && _fbEl2.classList.contains('active');
+  if (viewMode !== 'delivery' && !_isFeedback2) { console.log('[render-monthly] hide: not in delivery/feedback (viewMode=' + viewMode + ', feedback=' + _isFeedback2 + ')'); cardEl.style.display = 'none'; return; }
   if (!monthlyMenuData || !monthlyMenuData.ok || !monthlyMenuData.items || monthlyMenuData.items.length === 0) {
     console.log('[render-monthly] hide: data check failed. data=' + JSON.stringify(monthlyMenuData ? {ok:monthlyMenuData.ok, itemsCount:(monthlyMenuData.items||[]).length} : null));
     cardEl.style.display = 'none';
@@ -5120,8 +5122,11 @@ function renderDailyMenuCard() {
   var cardEl = document.getElementById('daily-menu-card');
   if (!cardEl) return;
 
-  // ★Phase 2: 今日の献立カードは「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
-  if (viewMode !== 'delivery' && type !== 'feedback') {
+  // ★Phase 2: 「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
+  //   form-feedback の active クラスで判定(typeグローバル変数に依存せず確実)
+  var _fbEl = document.getElementById('form-feedback');
+  var _isFeedback = _fbEl && _fbEl.classList.contains('active');
+  if (viewMode !== 'delivery' && !_isFeedback) {
     cardEl.style.display = 'none';
     return;
   }
