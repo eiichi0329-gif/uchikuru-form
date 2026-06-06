@@ -3643,14 +3643,26 @@ function onFormShown(type) {
     return;
   }
   if (type === 'feedback') {
-    // ★Phase 2: 献立アンケートページ → 献立カード(今日 + 月間)を読込・描画
-    if (typeof loadDailyMenu === 'function') {
+    // ★Phase 3: 献立アンケートページ → 献立カード(今日 + 月間)を表示
+    console.log('[feedback] onFormShown enter. dailyMenuData=' + (dailyMenuData?'loaded':'null') +
+                ' monthlyMenuData=' + (monthlyMenuData?'loaded':'null') +
+                ' dailyLoading=' + dailyMenuLoading + ' monthlyLoading=' + monthlyMenuLoading);
+
+    // 今日の献立: null/未ロード→読込+描画、既にデータあり→即描画、ロード中→そのまま(完了時に描画される想定)
+    if (dailyMenuData === null && !dailyMenuLoading) {
       loadDailyMenu(function(){ renderDailyMenuCard(); });
+    } else if (dailyMenuData) {
+      renderDailyMenuCard();
     }
-    if (typeof loadMonthlyMenus === 'function') {
+
+    // 月間献立: 同様
+    if (monthlyMenuData === null && !monthlyMenuLoading) {
       loadMonthlyMenus(function(){ renderMonthlyMenuCard(); });
+    } else if (monthlyMenuData) {
+      renderMonthlyMenuCard();
     }
-    // ★Phase 3: フォーム状態をリセット(前回送信後の成功表示が残らないように)
+
+    // ★Phase 3: フォーム状態をリセット
     if (typeof resetFeedbackForm === 'function') resetFeedbackForm();
     return;
   }
@@ -5048,8 +5060,9 @@ function renderMonthlyMenuCard() {
   var cardEl = document.getElementById('monthly-menu-card');
   if (!cardEl) return;
   // ★Phase 2: 月間献立は「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
-  if (viewMode !== 'delivery' && type !== 'feedback') { cardEl.style.display = 'none'; return; }
+  if (viewMode !== 'delivery' && type !== 'feedback') { console.log('[render-monthly] hide: not in delivery/feedback (viewMode=' + viewMode + ', type=' + type + ')'); cardEl.style.display = 'none'; return; }
   if (!monthlyMenuData || !monthlyMenuData.ok || !monthlyMenuData.items || monthlyMenuData.items.length === 0) {
+    console.log('[render-monthly] hide: data check failed. data=' + JSON.stringify(monthlyMenuData ? {ok:monthlyMenuData.ok, itemsCount:(monthlyMenuData.items||[]).length} : null));
     cardEl.style.display = 'none';
     return;
   }
