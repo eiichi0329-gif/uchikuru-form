@@ -1764,11 +1764,10 @@ body.cancel-mode-active {
   <div id="form-feedback" class="form-wrap">
     <div class="form-title">📝 献立アンケート</div>
 
-    <!-- 献立カード(form-usageから移設) -->
+    <!-- ① 今日の献立 -->
     <div id="daily-menu-card" style="display:none;"></div>
-    <div id="monthly-menu-card" style="display:none;"></div>
 
-    <!-- ★Phase 3: アンケート入力欄 -->
+    <!-- ② ご意見入力 -->
     <div id="feedback-form-area" style="margin-top:20px;">
       <div style="font-size:15px;font-weight:bold;color:#333;margin-bottom:8px;">🍽 献立へのご感想・ご要望</div>
       <div style="font-size:12.5px;color:#777;margin-bottom:10px;line-height:1.6;">
@@ -1790,6 +1789,9 @@ body.cancel-mode-active {
         もう一度送信する
       </button>
     </div>
+
+    <!-- ③ 月間献立 -->
+    <div id="monthly-menu-card" style="display:none;margin-top:20px;"></div>
   </div>
 
   <!-- 新規注文(顧客情報登録 → 注文入力 の2ステップ式) -->
@@ -3916,9 +3918,20 @@ function loadCustomerInfoThen(type, callback) {
   // ★v7: デモモードは API を叩かず、setupDemoData でセットした顧客情報をそのまま使う
   if (isDemoMode) { if(callback) callback(); return; }
 
-  fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
-    .then(function(r){ return r.json(); })
+  // ★Phase 3: sessionStorage キャッシュ(ページ間移動を高速化)
+  //   一度取得した顧客情報は同セッション中は再取得しない。
+  //   セッション終了(LIFF閉じる)で自動的に消える。
+  (function(){
+    try {
+      var __raw = sessionStorage.getItem('_uc_cust_' + userId);
+      if (__raw) return Promise.resolve(JSON.parse(__raw));
+    } catch(e) {}
+    return fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
+      .then(function(r){ return r.json(); });
+  })()
     .then(function(data){
+      // 取得結果をキャッシュに格納(以後のページ移動が高速化)
+      try { sessionStorage.setItem('_uc_cust_' + userId, JSON.stringify(data)); } catch(e) {}
 
       var EMPTY_VALS = ['未登録','(未登録)','(未登録)','未入力','(未入力)','(未入力)',
                         'なし','ー','―','-','−','未','ない','なし','none','null','undefined'];
