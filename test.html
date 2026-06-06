@@ -1754,26 +1754,23 @@ body.cancel-mode-active {
       <!-- ★v5+: 配達進捗3段階カード(③お届け状況・献立モードで表示) -->
       <div id="delivery-progress-card" style="display:none;"></div>
 
-      <!-- ★v7: 今日の献立カード(③お届け状況・献立モードで表示) -->
-      <!--      v6でmenu.htmlに移したが、③でも配達状況とセットで表示する -->
-      <div id="daily-menu-card" style="display:none;"></div>
-
-      <!-- ★v8: 月間献立表カード(news サイトの当月・次月PDF/画像) -->
-      <div id="monthly-menu-card" style="display:none;"></div>
-
       <div id="usage-content">
         <div class="mypage-loading">読み込み中...</div>
       </div>
     </div>
   </div>
 
-  <!-- 献立アンケート(Phase 3で本実装。Phase 1はスタブ) -->
+  <!-- 献立アンケート(今日の献立 + 月間献立を表示。アンケート入力欄はPhase 3で実装) -->
   <div id="form-feedback" class="form-wrap">
     <div class="form-title">📝 献立アンケート</div>
-    <div style="text-align:center;padding:40px 20px;color:#666;line-height:1.8;">
-      <div style="font-size:48px;margin-bottom:12px;">🍱</div>
-      <div style="font-size:16px;font-weight:600;color:#444;margin-bottom:8px;">献立アンケートは準備中です</div>
-      <div style="font-size:13px;color:#888;">その日の献立へのご感想・ご要望をお送りいただける機能を、現在準備しています。<br>もうしばらくお待ちください。</div>
+
+    <!-- 献立カード(form-usageから移設) -->
+    <div id="daily-menu-card" style="display:none;"></div>
+    <div id="monthly-menu-card" style="display:none;"></div>
+
+    <!-- ★Phase 3: アンケート入力欄予定地 -->
+    <div style="margin-top:20px;padding:14px 16px;background:#fffdf8;border:1px solid #f0d8b8;border-radius:8px;font-size:13px;color:#666;line-height:1.7;text-align:center;">
+      献立へのご感想・ご要望を送信できる入力欄を準備中です。<br>もうしばらくお待ちください。
     </div>
   </div>
 
@@ -3555,6 +3552,16 @@ function onFormShown(type) {
     cmShowTopMenu();
     return;
   }
+  if (type === 'feedback') {
+    // ★Phase 2: 献立アンケートページ → 献立カード(今日 + 月間)を読込・描画
+    if (typeof loadDailyMenu === 'function') {
+      loadDailyMenu(function(){ renderDailyMenuCard(); });
+    }
+    if (typeof loadMonthlyMenus === 'function') {
+      loadMonthlyMenus(function(){ renderMonthlyMenuCard(); });
+    }
+    return;
+  }
   if (type === 'mypage') {
     // greeting表示
     var cd = window._customerData || {};
@@ -5110,8 +5117,8 @@ function renderUsageContent() {
   // ★v5+: 配達進捗3段階カードを更新(③お届け状況・献立モードでのみ表示)
   renderDeliveryProgressCard();
 
-  // ★v7: 今日の献立カード(③お届け状況・献立モードでのみ表示)
-  if (viewMode === 'delivery' || viewMode === 'combined') {
+  // ★v7: 今日の献立カード(③お届け状況モードでのみ表示。Phase 2で献立アンケートページへ移動)
+  if (viewMode === 'delivery') {
     if (dailyMenuData === null && !dailyMenuLoading) {
       loadDailyMenu(function(){ renderDailyMenuCard(); });
     } else {
@@ -5146,26 +5153,10 @@ function renderUsageContent() {
 
   var html = '';
 
-  // === 操作ボタン(カレンダーより上) ===
-  var weekOptions = getEditableWeekOptions();
-  if (weekOptions.length > 0) {
-    html += '<div class="op-btn-grid">';
-    html += '<button class="op-btn-main" onclick="actionNewOrder()">新規注文</button>';
-    html += '<button class="op-btn-main" onclick="actionTypeChange()">数量の変更</button>';
-    html += '<button class="op-btn-main" onclick="actionCancel()">キャンセル</button>';
-    html += '<button class="op-btn-main" onclick="actionEndService()">配達ストップ</button>';
-    html += '</div>';
-  } else {
-    // 操作可能週がなくても新規注文はできるようにする
-    html += '<div class="op-btn-grid">';
-    html += '<button class="op-btn-main" onclick="actionNewOrder()">新規注文</button>';
-    html += '</div>';
-    html += '<div style="background:#f5f5f5;border:1px solid #ddd;border-radius: 6px;padding:11px 14px;font-size:13px;color:#888;margin-bottom:14px;text-align:center;">';
-    html += '現在、変更・キャンセル可能な配達週がありません';
-    html += '</div>';
-  }
+  // ★Phase 2: 操作ボタン(新規注文/数量変更/キャンセル/配達ストップ)は削除。
+  //           変更操作は「変更」ページ(?mode=change)の6項目メニューに統合済み。
 
-  // === 月タブ(ご利用終了ボタンの直下、カレンダーの直前) ===
+  // === 月タブ(カレンダーの直前) ===
   html += '<div class="month-tabs" id="month-tabs-usage"></div>';
 
   // === カレンダー本体(id付き:スクロール先のアンカー) ===
