@@ -4936,6 +4936,7 @@ function pendingShortLabel(type) {
   if (type === 'date_cancel')     return '申請中:取消';
   if (type === 'cancel')          return '申請中:利用終了';
   if (type === 'profile_change')  return '申請中:プロフィール変更';
+  if (type === 'schedule_change') return '申請中:内容変更';
   return '申請中';
 }
 
@@ -4945,6 +4946,7 @@ function pendingFullLabel(type) {
   if (type === 'date_cancel')     return '日付キャンセルの申請';
   if (type === 'cancel')          return '利用終了の申請';
   if (type === 'profile_change')  return 'プロフィール変更の申請';
+  if (type === 'schedule_change') return 'まとめて内容変更の申請';
   return '変更の申請';
 }
 
