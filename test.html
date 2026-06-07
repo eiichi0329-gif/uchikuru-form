@@ -6092,7 +6092,41 @@ function initNewOrderPage() {
     rows[j].style.background = 'white';
   }
 
-  // ★v5: 必ず利用状況選択ステップから開始
+  // ★Phase 2b: マイページ経由(LIFFで顧客情報が揃っている)場合は
+  //   ご利用状況選択(step-0)をスキップして「現在利用中(active)」固定で次へ進む。
+  //   理由: マイページに入れる=既登録顧客 なので利用状況を問うこと自体が不自然。
+  var cdInit = window._customerData || {};
+  if (!isDemoMode && userId &&
+      (cdInit.name    || '').trim() &&
+      (cdInit.address || '').trim() &&
+      (cdInit.phone   || '').trim()) {
+    noState.usageStatus = 'active';
+    noState.requestOnlyLink = false;
+
+    // 支払方法を billingData から補完(あれば。なければ顧客ステップで選択してもらう)
+    if (!(cdInit.payment || '').trim() && typeof billingData !== 'undefined' && billingData) {
+      var bentoPmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
+      var monthKeys = Object.keys(billingData).sort().reverse();  // 新しい月から
+      for (var mi = 0; mi < monthKeys.length; mi++) {
+        var bpm = billingData[monthKeys[mi]] && billingData[monthKeys[mi]].payment_method;
+        if (bpm && bentoPmMap[bpm]) {
+          window._customerData.payment = bentoPmMap[bpm];
+          cdInit.payment = bentoPmMap[bpm];
+          break;
+        }
+      }
+    }
+
+    // 顧客情報が完全か判定 → 完全なら確認ステップへ、不足なら顧客情報ステップへ
+    if ((cdInit.payment || '').trim()) {
+      noShowConfirmOrderStep();
+    } else {
+      noShowCustomerStep();
+    }
+    return;
+  }
+
+  // ★v5: 通常の新規登録フロー(uchikuru-form/index.html 経由)は従来通り step-0 から
   noShowUsageSelectStep();
 }
 
