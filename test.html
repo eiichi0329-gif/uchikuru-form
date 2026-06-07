@@ -2079,16 +2079,6 @@ body.cancel-mode-active {
 
     <!-- ★Phase 2: 意図ベース・トップメニュー(6項目) -->
     <div id="change-menu-top">
-      <button type="button" class="cm-item" onclick="cmGoOrder()">
-        <div class="cm-row">
-          <div class="cm-icon">🍱</div>
-          <div class="cm-body">
-            <div class="cm-title">注文する・増やす</div>
-            <div class="cm-desc">新しく頼む／品数や食数を増やす</div>
-          </div>
-          <div class="cm-arrow">›</div>
-        </div>
-      </button>
       <button type="button" class="cm-item" onclick="cmGoTypeChange()">
         <div class="cm-row">
           <div class="cm-icon">🔁</div>
@@ -2104,7 +2094,7 @@ body.cancel-mode-active {
           <div class="cm-icon">⏸</div>
           <div class="cm-body">
             <div class="cm-title">お休みする</div>
-            <div class="cm-desc">1日だけ／期間お休み／利用をやめる、から選びます</div>
+            <div class="cm-desc">1日だけ／しばらくお休み から選びます</div>
           </div>
           <div class="cm-arrow">›</div>
         </div>
@@ -2115,26 +2105,6 @@ body.cancel-mode-active {
           <div class="cm-body">
             <div class="cm-title">やめる(利用終了)</div>
             <div class="cm-desc">今後の配達を終了する</div>
-          </div>
-          <div class="cm-arrow">›</div>
-        </div>
-      </button>
-      <button type="button" class="cm-item" onclick="cmGoProfileEdit()">
-        <div class="cm-row">
-          <div class="cm-icon">📝</div>
-          <div class="cm-body">
-            <div class="cm-title">登録情報の変更</div>
-            <div class="cm-desc">住所・電話・緊急連絡先・不在時の対応 など</div>
-          </div>
-          <div class="cm-arrow">›</div>
-        </div>
-      </button>
-      <button type="button" class="cm-item" onclick="cmGoShopTalk()">
-        <div class="cm-row">
-          <div class="cm-icon">💬</div>
-          <div class="cm-body">
-            <div class="cm-title">その他・店舗に相談</div>
-            <div class="cm-desc">上記で迷う時／特殊な依頼</div>
           </div>
           <div class="cm-arrow">›</div>
         </div>
@@ -5246,10 +5216,33 @@ function renderMonthlyMenuCard() {
     return;
   }
   var itemsHtml = '';
+  // ★Phase 2b: 当月・来月以外の年月(例:昨年同月の残骸)を除外
+  //   item.label / pdfUrl / imageUrl の中から「YYYY年M月」「YYYY/MM」「YYYY-MM」を抽出して年月チェック
+  function _extractYM(text) {
+    if (!text) return null;
+    var m = String(text).match(/(\d{4})[年\-_\/]\s*(\d{1,2})/);
+    if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+    return null;
+  }
+  var _now = new Date();
+  var _curYM = _now.getFullYear() * 12 + (_now.getMonth() + 1);
+  var _nextYM = _curYM + 1;
+  console.log('[render-monthly] items=' + monthlyMenuData.items.length + ', current=' + _now.getFullYear() + '-' + (_now.getMonth()+1));
   for (var i = 0; i < monthlyMenuData.items.length; i++) {
     var it = monthlyMenuData.items[i];
     var href = it.pdfUrl || it.articleUrl || '';   // PDF優先、なければ記事ページ
     if (!href) continue;
+
+    // 年月情報が判別できる場合は当月/来月以外を除外
+    var _ym = _extractYM(it.label) || _extractYM(it.pdfUrl) || _extractYM(it.imageUrl) || _extractYM(it.articleUrl);
+    if (_ym) {
+      var _itemYM = _ym.year * 12 + _ym.month;
+      if (_itemYM !== _curYM && _itemYM !== _nextYM) {
+        console.log('[render-monthly] skip item: year/month mismatch label="' + it.label + '" detected=' + _ym.year + '-' + _ym.month);
+        continue;
+      }
+    }
+
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
     var imgHtml = it.imageUrl
       ? '<img class="mmc-item-img" src="' + escapeHtml(it.imageUrl) + '" alt="' + escapeHtml(it.label) + '" loading="lazy" onerror="this.style.display=\'none\';">'
@@ -6208,9 +6201,10 @@ function initNewOrderPage() {
     noState.usageStatus = 'active';
     noState.requestOnlyLink = false;
 
-    // 支払方法を billing から確実にロードしてから確認ステップへ
+    // 支払方法を billing から確実にロードしてから注文入力ステップへ直行
+    //   (既登録顧客なので「ご注文を続けますか?」の確認画面は不要)
     ensurePaymentMethodLoaded(function(){
-      noShowConfirmOrderStep();
+      noShowOrderStep();
     });
     return;
   }
