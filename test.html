@@ -1836,6 +1836,34 @@ body.cancel-mode-active {
     </div>
   </div>
 
+  <!-- 登録情報・お問い合わせ(Phase 2b: リッチメニュー⑤の入口) -->
+  <div id="form-settings" class="form-wrap">
+    <div class="form-title">⚙️ 登録情報・お問い合わせ</div>
+    <div class="cm-section-title" style="margin-top:8px;">ご用件をお選びください</div>
+
+    <button type="button" class="cm-item" onclick="openCustomerEditModal()">
+      <div class="cm-row">
+        <div class="cm-icon">👤</div>
+        <div class="cm-body">
+          <div class="cm-title">登録情報の変更</div>
+          <div class="cm-desc">お名前・ご住所・電話番号・お支払い方法</div>
+        </div>
+        <div class="cm-arrow">›</div>
+      </div>
+    </button>
+
+    <button type="button" class="cm-item" onclick="loadAndShow('shoptalk')">
+      <div class="cm-row">
+        <div class="cm-icon">💬</div>
+        <div class="cm-body">
+          <div class="cm-title">店舗に相談・お問い合わせ</div>
+          <div class="cm-desc">他のメニューに当てはまらないご相談</div>
+        </div>
+        <div class="cm-arrow">›</div>
+      </div>
+    </button>
+  </div>
+
   <!-- 新規注文(顧客情報登録 → 注文入力 の2ステップ式) -->
   <div id="form-newOrder" class="form-wrap">
     <div class="form-title">🍱 新規ご注文</div>
@@ -2133,16 +2161,6 @@ body.cancel-mode-active {
           <div class="cm-body">
             <div class="cm-title">しばらくお休み(また再開します)</div>
             <div class="cm-desc">例：旅行・入院などで一定期間お休み</div>
-          </div>
-          <div class="cm-arrow">›</div>
-        </div>
-      </button>
-      <button type="button" class="cm-item cm-warn-color" onclick="cmGoEndService()">
-        <div class="cm-row">
-          <div class="cm-icon">🛑</div>
-          <div class="cm-body">
-            <div class="cm-title">もう利用をやめる(利用終了)</div>
-            <div class="cm-desc">今後の配達を終了します</div>
           </div>
           <div class="cm-arrow">›</div>
         </div>
@@ -3638,9 +3656,12 @@ window.onload = function() {
     else if(modeParam === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
     else if(modeParam === 'mypage')  { type = 'usage'; viewMode = 'usage'; } // 後方互換
     // ★v8: 新ナビゲーション(4分類)
+    // ★Phase 2b: リッチメニュー5分割に対応(newOrder/settings 追加)
     else if(modeParam === 'change')  { type = 'change'; }                    // 変更(意図ベース6項目メニュー)
     else if(modeParam === 'status')  { type = 'usage'; viewMode = 'combined'; } // 利用状況・配達状況統合
     else if(modeParam === 'feedback'){ type = 'feedback'; }                  // 献立アンケート(Phase 3)
+    else if(modeParam === 'newOrder'){ type = 'newOrder'; }                  // 新規注文(Phase 2b)
+    else if(modeParam === 'settings'){ type = 'settings'; }                  // 登録情報の変更+お問い合わせ(Phase 2b)
   }
 
   // ★v7: デモモード検出(?demo=true)
@@ -3670,9 +3691,12 @@ window.onload = function() {
           else if(modeFromState === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
           else if(modeFromState === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
           // ★v8: 新ナビゲーション(4分類)
+          // ★Phase 2b: リッチメニュー5分割
           else if(modeFromState === 'change')  { type = 'change'; }
           else if(modeFromState === 'status')  { type = 'usage'; viewMode = 'combined'; }
           else if(modeFromState === 'feedback'){ type = 'feedback'; }
+          else if(modeFromState === 'newOrder'){ type = 'newOrder'; }
+          else if(modeFromState === 'settings'){ type = 'settings'; }
         }
       }catch(e){}
     }
@@ -3711,9 +3735,12 @@ window.onload = function() {
                 else if(m === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
                 else if(m === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
                 // ★v8: 新ナビゲーション(4分類)
+                // ★Phase 2b: リッチメニュー5分割
                 else if(m === 'change')  { type = 'change'; }
                 else if(m === 'status')  { type = 'usage'; viewMode = 'combined'; }
                 else if(m === 'feedback'){ type = 'feedback'; }
+                else if(m === 'newOrder'){ type = 'newOrder'; }
+                else if(m === 'settings'){ type = 'settings'; }
               }
               // ★v7: liff.state 内の ?demo=true も読む(LIFF経由のデモ起動)
               if(lsp.get('demo') === 'true'){
@@ -3743,7 +3770,7 @@ function loadAndShow(type) {
   if(!formEl){showMenu();return;}
 
   // userId がある場合は顧客情報を取得してからフォームを表示
-  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback','shoptalk'].indexOf(type)!==-1){
+  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback','shoptalk','settings'].indexOf(type)!==-1){
     document.getElementById('statusMsg').textContent='お客様情報を確認中...';
     document.getElementById('statusMsg').style.display='block';
     loadCustomerInfoThen(type, function(){
@@ -6100,6 +6127,52 @@ function onNoUsageStatusChange(value) {
   onUsUsageStatusChange(value);
 }
 
+// ★Phase 2b: 支払方法を billing API から確実にロードして _customerData.payment にセット
+//   getCustomer は顧客データシートからしか取らないため、支払方法は bento の billing API 経由で取得する。
+//   既に _customerData.payment があれば何もせず即callback。
+//   billingData がメモリにあれば即抽出。なければ loadBillingData を実行。
+function ensurePaymentMethodLoaded(callback) {
+  if (!callback) callback = function(){};
+  // 既に payment 設定済み → そのまま
+  if (window._customerData && (window._customerData.payment || '').trim()) {
+    callback();
+    return;
+  }
+  // billingData がメモリにある → 抽出
+  if (typeof billingData !== 'undefined' && billingData) {
+    populatePaymentFromBilling();
+    callback();
+    return;
+  }
+  // billingData 未取得 → fetch
+  if (typeof loadBillingData === 'function') {
+    loadBillingData(function(data){
+      billingData = data;
+      populatePaymentFromBilling();
+      callback();
+    });
+    return;
+  }
+  // fallback
+  callback();
+}
+
+// billingData から最新月の payment_method を抽出して _customerData.payment に設定
+function populatePaymentFromBilling() {
+  if (!window._customerData) window._customerData = {};
+  if ((window._customerData.payment || '').trim()) return;
+  if (!billingData) return;
+  var bentoPmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
+  var monthKeys = Object.keys(billingData).sort().reverse();
+  for (var mi = 0; mi < monthKeys.length; mi++) {
+    var bpm = billingData[monthKeys[mi]] && billingData[monthKeys[mi]].payment_method;
+    if (bpm && bentoPmMap[bpm]) {
+      window._customerData.payment = bentoPmMap[bpm];
+      return;
+    }
+  }
+}
+
 function initNewOrderPage() {
   // 注文入力部分を初期化
   noState.types = {};
@@ -6124,8 +6197,9 @@ function initNewOrderPage() {
   }
 
   // ★Phase 2b: マイページ経由(LIFFで顧客情報が揃っている)場合は
-  //   ご利用状況選択(step-0)をスキップして「現在利用中(active)」固定で次へ進む。
-  //   理由: マイページに入れる=既登録顧客 なので利用状況を問うこと自体が不自然。
+  //   ご利用状況選択(step-0)と顧客情報ステップ(step-1)を全てスキップして「現在利用中(active)」固定で確認ステップへ。
+  //   理由: マイページに入れる=既登録顧客 なので利用状況や顧客情報の再確認は不要。
+  //   支払い方法は bento の billing API から自動取得する。
   var cdInit = window._customerData || {};
   if (!isDemoMode && userId &&
       (cdInit.name    || '').trim() &&
@@ -6134,26 +6208,10 @@ function initNewOrderPage() {
     noState.usageStatus = 'active';
     noState.requestOnlyLink = false;
 
-    // 支払方法を billingData から補完(あれば。なければ顧客ステップで選択してもらう)
-    if (!(cdInit.payment || '').trim() && typeof billingData !== 'undefined' && billingData) {
-      var bentoPmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
-      var monthKeys = Object.keys(billingData).sort().reverse();  // 新しい月から
-      for (var mi = 0; mi < monthKeys.length; mi++) {
-        var bpm = billingData[monthKeys[mi]] && billingData[monthKeys[mi]].payment_method;
-        if (bpm && bentoPmMap[bpm]) {
-          window._customerData.payment = bentoPmMap[bpm];
-          cdInit.payment = bentoPmMap[bpm];
-          break;
-        }
-      }
-    }
-
-    // 顧客情報が完全か判定 → 完全なら確認ステップへ、不足なら顧客情報ステップへ
-    if ((cdInit.payment || '').trim()) {
+    // 支払方法を billing から確実にロードしてから確認ステップへ
+    ensurePaymentMethodLoaded(function(){
       noShowConfirmOrderStep();
-    } else {
-      noShowCustomerStep();
-    }
+    });
     return;
   }
 
@@ -7886,20 +7944,23 @@ function openCustomerRegisterModal() {
   renderCustomerEditView();
 }
 function openCustomerEditModal() {
-  modalState.view = 'customerEdit';
-  modalState.ceMode = 'edit';
-  var cd = window._customerData || {};
-  modalState.ceName = cd.name || '';
-  // 既存の name を「姓 名」のスペース区切りで分割
-  // スペースがなければ全部「姓」とする(後方互換)
-  var parts = String(cd.name || '').split(/[\s 　]+/).filter(function(s){ return s; });
-  modalState.ceLastName  = parts[0] || '';
-  modalState.ceFirstName = parts.slice(1).join(' ') || '';
-  modalState.ceAddress = cd.address || '';
-  modalState.cePhone = cd.phone || '';
-  modalState.cePayment = cd.payment || '';
-  modalState.ceCardLast4 = cd.cardLast4 || '';
-  renderCustomerEditView();
+  // ★Phase 2b: 開く前に支払方法を billing API から確実にロード(getCustomerは支払いを返さないため)
+  ensurePaymentMethodLoaded(function(){
+    modalState.view = 'customerEdit';
+    modalState.ceMode = 'edit';
+    var cd = window._customerData || {};
+    modalState.ceName = cd.name || '';
+    // 既存の name を「姓 名」のスペース区切りで分割
+    // スペースがなければ全部「姓」とする(後方互換)
+    var parts = String(cd.name || '').split(/[\s 　]+/).filter(function(s){ return s; });
+    modalState.ceLastName  = parts[0] || '';
+    modalState.ceFirstName = parts.slice(1).join(' ') || '';
+    modalState.ceAddress = cd.address || '';
+    modalState.cePhone = cd.phone || '';
+    modalState.cePayment = cd.payment || '';
+    modalState.ceCardLast4 = cd.cardLast4 || '';
+    renderCustomerEditView();
+  });
 }
 function renderCustomerEditView() {
   var isRegister = (modalState.ceMode === 'register');
