@@ -1836,9 +1836,9 @@ body.cancel-mode-active {
     </div>
   </div>
 
-  <!-- まとめて内容変更(Phase 2b: 曜日・種類をまとめて差替える) -->
+  <!-- お届け種類・曜日の変更(Phase 2b: 曜日・種類をまとめて差替える) -->
   <div id="form-bulkChange" class="form-wrap">
-    <div class="form-title">🔁 まとめて内容変更</div>
+    <div class="form-title">✨ お届け種類・曜日の変更</div>
 
     <div id="bulkchange-form-area">
       <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:14px 16px;margin-bottom:18px;font-size:13.5px;color:#444;line-height:1.7;">
@@ -2100,7 +2100,7 @@ body.cancel-mode-active {
         <div class="cm-row">
           <div class="cm-icon">🔁</div>
           <div class="cm-body">
-            <div class="cm-title">個別の日を変える</div>
+            <div class="cm-title">数量の変更</div>
             <div class="cm-desc">カレンダーから特定の日の数量を変える</div>
           </div>
           <div class="cm-arrow">›</div>
@@ -2110,7 +2110,7 @@ body.cancel-mode-active {
         <div class="cm-row">
           <div class="cm-icon">✨</div>
           <div class="cm-body">
-            <div class="cm-title">まとめて内容変更</div>
+            <div class="cm-title">お届け種類・曜日の変更</div>
             <div class="cm-desc">来週からの曜日・お弁当の組合せをまとめて変える</div>
           </div>
           <div class="cm-arrow">›</div>
@@ -2120,8 +2120,8 @@ body.cancel-mode-active {
         <div class="cm-row">
           <div class="cm-icon">⏸</div>
           <div class="cm-body">
-            <div class="cm-title">お休みする</div>
-            <div class="cm-desc">1日だけ／しばらくお休み から選びます</div>
+            <div class="cm-title">お届けのキャンセル</div>
+            <div class="cm-desc">特定日のキャンセル／しばらくキャンセル から選びます</div>
           </div>
           <div class="cm-arrow">›</div>
         </div>
@@ -2130,7 +2130,7 @@ body.cancel-mode-active {
         <div class="cm-row">
           <div class="cm-icon">🛑</div>
           <div class="cm-body">
-            <div class="cm-title">やめる(利用終了)</div>
+            <div class="cm-title">利用終了</div>
             <div class="cm-desc">今後の配達を終了する</div>
           </div>
           <div class="cm-arrow">›</div>
@@ -2141,12 +2141,12 @@ body.cancel-mode-active {
     <!-- ★Phase 2: お休み 3分岐サブメニュー -->
     <div id="change-menu-rest" style="display:none;">
       <button type="button" class="cm-back" onclick="cmShowTopMenu()">‹ 戻る</button>
-      <div class="cm-section-title">お休みの種類を選んでください</div>
+      <div class="cm-section-title">キャンセルの種類を選んでください</div>
       <button type="button" class="cm-item" onclick="cmGoDateCancel()">
         <div class="cm-row">
           <div class="cm-icon">📅</div>
           <div class="cm-body">
-            <div class="cm-title">特定の日だけお休み</div>
+            <div class="cm-title">特定日のキャンセル</div>
             <div class="cm-desc">例：来週の月曜だけ届け不要</div>
           </div>
           <div class="cm-arrow">›</div>
@@ -2156,7 +2156,7 @@ body.cancel-mode-active {
         <div class="cm-row">
           <div class="cm-icon">🏖</div>
           <div class="cm-body">
-            <div class="cm-title">しばらくお休み(また再開します)</div>
+            <div class="cm-title">しばらくキャンセル(再開予定あり)</div>
             <div class="cm-desc">例：旅行・入院などで一定期間お休み</div>
           </div>
           <div class="cm-arrow">›</div>
@@ -4946,7 +4946,7 @@ function pendingFullLabel(type) {
   if (type === 'date_cancel')     return '日付キャンセルの申請';
   if (type === 'cancel')          return '利用終了の申請';
   if (type === 'profile_change')  return 'プロフィール変更の申請';
-  if (type === 'schedule_change') return 'まとめて内容変更の申請';
+  if (type === 'schedule_change') return 'お届け種類・曜日変更の申請';
   return '変更の申請';
 }
 
