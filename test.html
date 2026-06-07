@@ -1979,30 +1979,6 @@ body.cancel-mode-active {
 
     <!-- ステップ2: 注文入力(顧客情報があれば直接ここから) -->
     <div id="no-step-order" style="display:none;">
-      <!-- 顧客情報サマリー(ステップ2で表示) -->
-      <div class="cust-info-card" id="no-cust-summary" style="margin-bottom:14px;">
-        <div class="cust-greet-row">
-          <div>
-            <div class="cust-greet-name" id="no-cust-summary-name">お客様</div>
-          </div>
-          <button class="cust-edit-btn" onclick="onNoBackToCustomerStep()">✏️ 変更</button>
-        </div>
-        <div class="cust-info-rows">
-          <div class="cust-info-row">
-            <span class="cust-info-lbl">ご住所</span>
-            <span class="cust-info-val" id="no-cust-summary-address">―</span>
-          </div>
-          <div class="cust-info-row">
-            <span class="cust-info-lbl">電話番号</span>
-            <span class="cust-info-val" id="no-cust-summary-phone">―</span>
-          </div>
-          <div class="cust-info-row">
-            <span class="cust-info-lbl">お支払い</span>
-            <span class="cust-info-val" id="no-cust-summary-payment">―</span>
-          </div>
-        </div>
-      </div>
-
       <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius: 7px;padding:14px 16px;margin-bottom:14px;font-size:14px;color:#444;line-height:1.7;">
         同じ種類で<b>合計週3日以上</b>のご注文を承ります。<br>
         ※ ごはんは他のお弁当とセットでのご注文となります。
@@ -2041,17 +2017,13 @@ body.cancel-mode-active {
       <div style="font-size:13px;color:#888;margin-bottom:10px;">前回ご入力された内容が表示されています。変更がなければそのままで結構です。</div>
 
       <div class="field">
-        <label>緊急時のご連絡先<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
-        <input type="tel" id="no-emergency" placeholder="例:080-9876-5432(ご家族など)">
-      </div>
-      <div class="field">
         <label>配達時の注意事項<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
         <textarea id="no-deliveryNote" placeholder="例:インターホンを鳴らさず、玄関前に置いてください"></textarea>
       </div>
-      <div class="field">
-        <label>不在時の対応<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
-        <textarea id="no-absentAction" placeholder="例:玄関前に置いてください / 宅配ボックスに入れてください / 電話で連絡をください"></textarea>
-      </div>
+
+      <!-- ★Phase 2b: 緊急連絡先・不在時対応はUI非表示(登録情報の変更 から編集する想定)。値はhiddenで保持して既存JSとの互換性を維持 -->
+      <input type="hidden" id="no-emergency">
+      <input type="hidden" id="no-absentAction">
 
       <!-- 「何でお知りになりましたか?」は初回注文時のみ表示 -->
       <div id="no-referral-wrap" style="display:none;">
@@ -5217,10 +5189,15 @@ function renderMonthlyMenuCard() {
   }
   var itemsHtml = '';
   // ★Phase 2b: 当月・来月以外の年月(例:昨年同月の残骸)を除外
-  //   item.label / pdfUrl / imageUrl の中から「YYYY年M月」「YYYY/MM」「YYYY-MM」を抽出して年月チェック
-  function _extractYM(text) {
-    if (!text) return null;
-    var m = String(text).match(/(\d{4})[年\-_\/]\s*(\d{1,2})/);
+  //   labelからのみ「YYYY年M月」「YYYY-MM」を抽出して年月チェック。
+  //   URL は過去のアップロード日付が混ざるため使わない(誤検出回避)。
+  function _extractYMFromLabel(label) {
+    if (!label) return null;
+    // 「YYYY年M月」(日本語表記)
+    var m = String(label).match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
+    if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+    // 「YYYY-MM」「YYYY/MM」
+    m = String(label).match(/(\d{4})[\-\/](\d{1,2})/);
     if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
     return null;
   }
@@ -5233,14 +5210,15 @@ function renderMonthlyMenuCard() {
     var href = it.pdfUrl || it.articleUrl || '';   // PDF優先、なければ記事ページ
     if (!href) continue;
 
-    // 年月情報が判別できる場合は当月/来月以外を除外
-    var _ym = _extractYM(it.label) || _extractYM(it.pdfUrl) || _extractYM(it.imageUrl) || _extractYM(it.articleUrl);
+    // ラベルから年月が明示的に取れた場合のみ、当月/来月以外を除外
+    var _ym = _extractYMFromLabel(it.label);
     if (_ym) {
       var _itemYM = _ym.year * 12 + _ym.month;
-      if (_itemYM !== _curYM && _itemYM !== _nextYM) {
-        console.log('[render-monthly] skip item: year/month mismatch label="' + it.label + '" detected=' + _ym.year + '-' + _ym.month);
-        continue;
-      }
+      var _keep = (_itemYM === _curYM || _itemYM === _nextYM);
+      console.log('[render-monthly] item="' + it.label + '" detected=' + _ym.year + '-' + _ym.month + ' → ' + (_keep ? 'keep' : 'skip'));
+      if (!_keep) continue;
+    } else {
+      console.log('[render-monthly] item="' + it.label + '" → keep (年月不明)');
     }
 
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
