@@ -6367,21 +6367,30 @@ function noShowOrderStep() {
   document.getElementById('no-deliveryNote').value  = cd.deliveryNote || '';
   document.getElementById('no-absentAction').value  = cd.absentAction || '';
 
-  // 「何でお知りになりましたか?」は初回のみ表示
-  // = 既存注文(usageData)が空 かつ referral 未入力 の場合に表示
+  // 「何でお知りになりましたか?」は新規登録フローでのみ表示。
+  // マイページから入った既存顧客(userId+顧客情報あり)には常に非表示。
   var referralWrap = document.getElementById('no-referral-wrap');
-  var hasAnyOrder = false;
-  if (usageData) {
-    Object.keys(usageData).forEach(function(k){
-      if (usageData[k] && usageData[k].days && usageData[k].days.length > 0) hasAnyOrder = true;
-    });
-  }
-  var alreadyAnswered = !!(cd.referral && cd.referral.length > 0);
-  if (hasAnyOrder || alreadyAnswered) {
+  var isMypageUser = userId &&
+                     (cd.name    || '').trim() &&
+                     (cd.address || '').trim() &&
+                     (cd.phone   || '').trim();
+  if (isMypageUser) {
     referralWrap.style.display = 'none';
   } else {
-    referralWrap.style.display = 'block';
-    document.getElementById('no-referral').value = '';
+    // 新規登録フロー: 既存注文があるか / 既に答えたかで判定
+    var hasAnyOrder = false;
+    if (usageData) {
+      Object.keys(usageData).forEach(function(k){
+        if (usageData[k] && usageData[k].days && usageData[k].days.length > 0) hasAnyOrder = true;
+      });
+    }
+    var alreadyAnswered = !!(cd.referral && cd.referral.length > 0);
+    if (hasAnyOrder || alreadyAnswered) {
+      referralWrap.style.display = 'none';
+    } else {
+      referralWrap.style.display = 'block';
+      document.getElementById('no-referral').value = '';
+    }
   }
 
   // 注文入力のレンダリング
