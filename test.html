@@ -1836,6 +1836,51 @@ body.cancel-mode-active {
     </div>
   </div>
 
+  <!-- まとめて内容変更(Phase 2b: 曜日・種類をまとめて差替える) -->
+  <div id="form-bulkChange" class="form-wrap">
+    <div class="form-title">🔁 まとめて内容変更</div>
+
+    <div id="bulkchange-form-area">
+      <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:14px 16px;margin-bottom:18px;font-size:13.5px;color:#444;line-height:1.7;">
+        現在のご利用内容を、新しい曜日・お弁当の組み合わせに切り替えます。<br>
+        指定した「切替日」から新しい内容で配達を開始し、それまでは現在の内容のままです。
+      </div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:8px 0 8px;">📅 切替日(いつから新しい内容にしますか?)</div>
+      <select id="bc-start-date" onchange="bcOnStartDateChange()"
+              style="width:100%;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;background:white;">
+        <option value="">▼ 切替日を選んでください</option>
+      </select>
+      <div style="font-size:11.5px;color:#999;margin-top:5px;line-height:1.5;">
+        ※ 月〜金から選択できます。切替日の前日までは現在の内容で配達を続けます。
+      </div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:22px 0 8px;">🍱 新しいお弁当の種類・数量</div>
+      <div id="bc-bento-grid"></div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:22px 0 8px;">📆 新しい配達曜日<span style="font-size:12px;color:#999;font-weight:normal;margin-left:5px;">(週3日以上)</span></div>
+      <div id="bc-day-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;"></div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:22px 0 8px;">✏️ 備考<span style="font-size:12px;color:#999;font-weight:normal;margin-left:5px;">(任意)</span></div>
+      <textarea id="bc-note" placeholder="例:第2,第4水曜日のみなどイレギュラーなご希望" rows="3"
+                style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+
+      <button id="bc-submit-btn" onclick="submitBulkChange()"
+              style="width:100%;margin-top:20px;padding:14px;background:#F08300;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">
+        変更を申請する
+      </button>
+    </div>
+
+    <div id="bulkchange-success" style="display:none;margin-top:20px;padding:24px 20px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">✅</div>
+      <div style="font-size:16px;font-weight:bold;color:#2E7D32;margin-bottom:6px;">変更を申請しました</div>
+      <div style="font-size:13px;color:#555;line-height:1.6;">
+        店舗で内容を確認後、切替日から新しい内容で配達いたします。<br>
+        ご質問はLINEまたはお電話でお気軽にどうぞ。
+      </div>
+    </div>
+  </div>
+
   <!-- 登録情報・お問い合わせ(Phase 2b: リッチメニュー⑤の入口) -->
   <div id="form-settings" class="form-wrap">
     <div class="form-title">⚙️ 登録情報・お問い合わせ</div>
@@ -2055,8 +2100,18 @@ body.cancel-mode-active {
         <div class="cm-row">
           <div class="cm-icon">🔁</div>
           <div class="cm-body">
-            <div class="cm-title">内容を変える</div>
-            <div class="cm-desc">食数を変える／曜日・回数を変える</div>
+            <div class="cm-title">個別の日を変える</div>
+            <div class="cm-desc">カレンダーから特定の日の数量を変える</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmGoBulkChange()">
+        <div class="cm-row">
+          <div class="cm-icon">✨</div>
+          <div class="cm-body">
+            <div class="cm-title">まとめて内容変更</div>
+            <div class="cm-desc">来週からの曜日・お弁当の組合せをまとめて変える</div>
           </div>
           <div class="cm-arrow">›</div>
         </div>
@@ -2702,6 +2757,210 @@ function resetShopTalkForm() {
   var fs = document.getElementById('shoptalk-success');
   if (fa) fa.style.display = '';
   if (fs) fs.style.display = 'none';
+}
+
+// ============================================================
+// ★Phase 2b: まとめて内容変更(schedule_change)
+//   現在の利用内容(曜日・お弁当タイプ)を、指定した切替日から
+//   新しいパターンにまるごと差し替える申請を bento に送信する。
+// ============================================================
+var bcState = {
+  startDate: '',                  // 'YYYY-MM-DD'
+  items: {},                      // { 'うちくるおかず': qty, ... }
+  dows: [],                       // [1=月, 2=火, ..., 5=金]
+  note: ''
+};
+
+// ⑥相談 用ボタンから遷移
+function cmGoBulkChange() { loadAndShow('bulkChange'); }
+
+// 切替日選択肢を生成(来週月曜から4週分の月-金)
+function bcBuildStartDateOptions() {
+  var sel = document.getElementById('bc-start-date');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">▼ 切替日を選んでください</option>';
+
+  // 来週月曜を取得
+  var today = new Date();
+  var nextMon = new Date(today);
+  var daysUntilMon = (1 - today.getDay() + 7) % 7;  // 1=月
+  if (daysUntilMon === 0) daysUntilMon = 7;          // 今日が月なら次週月へ
+  nextMon.setDate(today.getDate() + daysUntilMon);
+
+  var DOW_JA = ['日','月','火','水','木','金','土'];
+  for (var w = 0; w < 4; w++) {                       // 4週分
+    for (var d = 0; d < 5; d++) {                     // 月-金
+      var dt = new Date(nextMon);
+      dt.setDate(nextMon.getDate() + (w * 7) + d);
+      var iso = dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate());
+      var label = (dt.getMonth()+1) + '月' + dt.getDate() + '日(' + DOW_JA[dt.getDay()] + ')';
+      var opt = document.createElement('option');
+      opt.value = iso;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+  }
+}
+
+function bcOnStartDateChange() {
+  var sel = document.getElementById('bc-start-date');
+  bcState.startDate = sel ? sel.value : '';
+}
+
+// 弁当グリッド描画
+function bcRenderBentoGrid() {
+  var grid = document.getElementById('bc-bento-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  var COLOR_MAP = {
+    'うちくるおかず':'#4CAF50',
+    'うちくる小箱':'#2196F3',
+    'うちくるダブル':'#E91E63',
+    'うちくるご膳':'#D32F2F',
+    'ごはん':'#FFA726'
+  };
+  BENTO_LIST.forEach(function(name){
+    var qty = bcState.items[name] || 0;
+    var checked = qty > 0;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;border:1.5px solid ' + (checked ? '#F08300' : '#ddd') +
+                        ';border-radius:6px;background:white;margin-bottom:8px;overflow:hidden;';
+    row.innerHTML =
+      '<div onclick="bcToggleBento(\'' + name + '\')" style="width:46px;display:flex;align-items:center;justify-content:center;background:#f8f8f8;border-right:1.5px solid #ddd;cursor:pointer;align-self:stretch;">' +
+        '<div style="width:22px;height:22px;border:2px solid ' + (checked?'#F08300':'#ccc') + ';background:' + (checked?'#F08300':'white') + ';border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;color:white;">' + (checked?'✓':'') + '</div>' +
+      '</div>' +
+      '<div onclick="bcToggleBento(\'' + name + '\')" style="flex:1;padding:12px;cursor:pointer;display:flex;align-items:center;gap:10px;">' +
+        '<span style="width:14px;height:14px;background:' + (COLOR_MAP[name]||'#888') + ';border-radius:3px;display:inline-block;"></span>' +
+        '<span style="font-size:15px;font-weight:bold;">' + name + '</span>' +
+      '</div>' +
+      (checked ? (
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-left:1.5px solid #eee;">' +
+          '<button onclick="bcChangeBentoQty(\'' + name + '\',-1)" style="width:32px;height:32px;border:1.5px solid #F08300;background:white;color:#F08300;border-radius:5px;font-size:18px;font-weight:bold;cursor:pointer;">−</button>' +
+          '<span style="min-width:28px;text-align:center;font-size:16px;font-weight:bold;">' + qty + '</span>' +
+          '<button onclick="bcChangeBentoQty(\'' + name + '\',1)" style="width:32px;height:32px;border:1.5px solid #F08300;background:#F08300;color:white;border-radius:5px;font-size:18px;font-weight:bold;cursor:pointer;">+</button>' +
+        '</div>'
+      ) : '');
+    grid.appendChild(row);
+  });
+}
+
+function bcToggleBento(name) {
+  if (bcState.items[name] && bcState.items[name] > 0) {
+    bcState.items[name] = 0;
+  } else {
+    bcState.items[name] = 1;
+  }
+  bcRenderBentoGrid();
+}
+
+function bcChangeBentoQty(name, delta) {
+  var cur = bcState.items[name] || 0;
+  cur = Math.max(0, Math.min(9, cur + delta));
+  bcState.items[name] = cur;
+  bcRenderBentoGrid();
+}
+
+// 曜日グリッド描画
+function bcRenderDayGrid() {
+  var grid = document.getElementById('bc-day-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  var DOWS = [
+    { num: 1, label: '月' },
+    { num: 2, label: '火' },
+    { num: 3, label: '水' },
+    { num: 4, label: '木' },
+    { num: 5, label: '金' }
+  ];
+  DOWS.forEach(function(d){
+    var on = bcState.dows.indexOf(d.num) !== -1;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.onclick = function(){ bcToggleDow(d.num); };
+    btn.style.cssText = 'padding:14px 0;border:2px solid ' + (on?'#F08300':'#ddd') +
+                        ';background:' + (on?'#F08300':'white') +
+                        ';color:' + (on?'white':'#666') +
+                        ';border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;';
+    btn.textContent = d.label;
+    grid.appendChild(btn);
+  });
+}
+
+function bcToggleDow(num) {
+  var idx = bcState.dows.indexOf(num);
+  if (idx !== -1) bcState.dows.splice(idx, 1);
+  else bcState.dows.push(num);
+  bcState.dows.sort(function(a,b){ return a-b; });
+  bcRenderDayGrid();
+}
+
+// フォーム初期化(画面表示時に呼ぶ)
+function bcInitForm() {
+  bcState = { startDate: '', items: {}, dows: [], note: '' };
+  bcBuildStartDateOptions();
+  bcRenderBentoGrid();
+  bcRenderDayGrid();
+  var noteEl = document.getElementById('bc-note');
+  if (noteEl) noteEl.value = '';
+  var btn = document.getElementById('bc-submit-btn');
+  if (btn) { btn.disabled = false; btn.textContent = '変更を申請する'; }
+  var fa = document.getElementById('bulkchange-form-area');
+  var su = document.getElementById('bulkchange-success');
+  if (fa) fa.style.display = '';
+  if (su) su.style.display = 'none';
+}
+
+// 送信
+function submitBulkChange() {
+  // バリデーション
+  if (!bcState.startDate) {
+    alert('切替日を選んでください');
+    return;
+  }
+  var selectedItems = [];
+  Object.keys(bcState.items).forEach(function(k){
+    if (bcState.items[k] > 0) selectedItems.push({ bento_type: k, quantity: bcState.items[k] });
+  });
+  if (selectedItems.length === 0) {
+    alert('新しいお弁当を1種類以上お選びください');
+    return;
+  }
+  if (bcState.dows.length < 3) {
+    alert('週3日以上の曜日を選んでください');
+    return;
+  }
+  if (!userId) {
+    alert('ユーザー情報が取得できません。LINEから再度開き直してください。');
+    return;
+  }
+
+  var btn = document.getElementById('bc-submit-btn');
+  var noteEl = document.getElementById('bc-note');
+  bcState.note = noteEl ? (noteEl.value || '').trim() : '';
+  if (btn) { btn.disabled = true; btn.textContent = '送信中...'; }
+
+  var payload = {
+    action:             'change',
+    change_type:        'schedule_change',
+    line_user_id:       userId,
+    client_request_id:  genRequestId('scd'),
+    client_timestamp:   new Date().toISOString(),
+    start_date:         bcState.startDate,
+    items:              selectedItems,
+    schedule_days:      bcState.dows.slice(),
+    note:               bcState.note
+  };
+
+  apiPost(payload, function(res){
+    var fa = document.getElementById('bulkchange-form-area');
+    var su = document.getElementById('bulkchange-success');
+    if (fa) fa.style.display = 'none';
+    if (su) su.style.display = 'block';
+  }, function(err){
+    console.error('schedule_change API error:', err);
+    alert('送信に失敗しました。電波状況をご確認のうえ再度お試しください。');
+    if (btn) { btn.disabled = false; btn.textContent = '変更を申請する'; }
+  });
 }
 
 // ★Phase 3: 献立アンケートの送信
@@ -3712,7 +3971,7 @@ function loadAndShow(type) {
   if(!formEl){showMenu();return;}
 
   // userId がある場合は顧客情報を取得してからフォームを表示
-  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback','shoptalk','settings'].indexOf(type)!==-1){
+  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback','shoptalk','settings','bulkChange'].indexOf(type)!==-1){
     document.getElementById('statusMsg').textContent='お客様情報を確認中...';
     document.getElementById('statusMsg').style.display='block';
     loadCustomerInfoThen(type, function(){
@@ -3772,6 +4031,11 @@ function onFormShown(type) {
       var existingPhone = (window._customerData && window._customerData.phone) || '';
       stPhoneEl.value = existingPhone;
     }
+    return;
+  }
+  if (type === 'bulkChange') {
+    // ★Phase 2b: まとめて内容変更フォームの初期化
+    if (typeof bcInitForm === 'function') bcInitForm();
     return;
   }
   if (type === 'mypage') {
