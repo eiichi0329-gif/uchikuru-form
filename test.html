@@ -1794,6 +1794,48 @@ body.cancel-mode-active {
     <div id="monthly-menu-card" style="display:none;margin-top:20px;"></div>
   </div>
 
+  <!-- ご相談・お問い合わせ(Phase 2b: ⑥相談 から遷移) -->
+  <div id="form-shoptalk" class="form-wrap">
+    <div class="form-title">💬 ご相談・お問い合わせ</div>
+
+    <!-- 入力エリア -->
+    <div id="shoptalk-form-area" style="margin-top:8px;">
+      <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:14px 16px;margin-bottom:18px;font-size:13.5px;color:#444;line-height:1.7;">
+        他のメニューに当てはまらないご相談・ご質問は、こちらにお書きください。<br>
+        店舗のスタッフが内容を確認の上、LINEまたはお電話でご連絡いたします。
+      </div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin-bottom:8px;">📝 ご相談内容</div>
+      <textarea id="st-message" placeholder="例:&#10;・第2,第4水曜日だけ配達してほしい&#10;・現金から口座振替に変えたい&#10;・最近食が細くなったので量を減らしたい" rows="6"
+                style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:18px 0 8px;">📞 ご連絡用電話番号 <span style="font-size:12px;color:#999;font-weight:normal;">(任意)</span></div>
+      <input type="tel" id="st-phone" placeholder="例:090-1234-5678"
+             style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;">
+      <div style="font-size:11.5px;color:#999;margin-top:6px;line-height:1.5;">
+        登録済の電話番号と異なる番号にご連絡が必要な場合のみご記入ください。
+      </div>
+
+      <button id="st-submit-btn" onclick="submitShopTalk()"
+              style="width:100%;margin-top:18px;padding:14px;background:#F08300;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">
+        送信する
+      </button>
+    </div>
+
+    <!-- 送信完了 -->
+    <div id="shoptalk-success" style="display:none;margin-top:20px;padding:24px 20px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">✅</div>
+      <div style="font-size:16px;font-weight:bold;color:#2E7D32;margin-bottom:6px;">送信しました</div>
+      <div style="font-size:13px;color:#555;line-height:1.6;">
+        ご相談ありがとうございます。<br>店舗で内容を確認の上、ご連絡いたします。
+      </div>
+      <button onclick="resetShopTalkForm()"
+              style="margin-top:14px;padding:10px 20px;background:#fff;color:#F08300;border:2px solid #F08300;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;">
+        もう一度相談する
+      </button>
+    </div>
+  </div>
+
   <!-- 新規注文(顧客情報登録 → 注文入力 の2ステップ式) -->
   <div id="form-newOrder" class="form-wrap">
     <div class="form-title">🍱 新規ご注文</div>
@@ -2648,7 +2690,59 @@ function cmGoDateCancel()   { actionCancel(); }
 function cmGoEndService()   { actionEndService(); }
 function cmGoProfileEdit()  { openCustomerEditModal(); }
 function cmGoSuspend()      { alert('「しばらくお休み」機能は次回更新(Phase 2b)で実装予定です。\n現在は「特定の日だけお休み」または「やめる(利用終了)」をご利用ください。'); }
-function cmGoShopTalk()     { alert('「店舗に相談」フリーメッセージ機能は次回更新(Phase 2b)で実装予定です。\nお急ぎの場合はお電話でお問い合わせください。'); }
+// ★Phase 2b: ⑥相談 → 専用フォームへ遷移
+function cmGoShopTalk()     { loadAndShow('shoptalk'); }
+
+// ★Phase 2b: ご相談・お問い合わせ送信
+function submitShopTalk() {
+  var msgEl   = document.getElementById('st-message');
+  var phoneEl = document.getElementById('st-phone');
+  var btn     = document.getElementById('st-submit-btn');
+  if (!msgEl || !btn) return;
+  var msg = (msgEl.value || '').trim();
+  if (!msg) { alert('ご相談内容を入力してください'); return; }
+  if (!userId) { alert('ユーザー情報が取得できません。LINEから再度開き直してください。'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  var customerName = (window._customerData && window._customerData.name) || '';
+  var phone = phoneEl ? (phoneEl.value || '').trim() : '';
+
+  apiGet('submitConsultation', {
+    line_user_id:  userId,
+    customer_name: customerName,
+    phone:         phone,
+    message:       msg
+  }, function(data) {
+    if (data && data.ok) {
+      document.getElementById('shoptalk-form-area').style.display = 'none';
+      document.getElementById('shoptalk-success').style.display   = 'block';
+    } else {
+      alert('送信に失敗しました:' + (data && data.error ? data.error : '不明なエラー'));
+      btn.disabled = false;
+      btn.textContent = '送信する';
+    }
+  }, function(err) {
+    alert('送信に失敗しました。電波状況をご確認のうえ再度お試しください。');
+    btn.disabled = false;
+    btn.textContent = '送信する';
+  });
+}
+
+// ★Phase 2b: ご相談フォームのリセット(再送信用)
+function resetShopTalkForm() {
+  var msgEl   = document.getElementById('st-message');
+  var phoneEl = document.getElementById('st-phone');
+  var btn     = document.getElementById('st-submit-btn');
+  if (msgEl)   msgEl.value = '';
+  if (phoneEl) phoneEl.value = '';
+  if (btn)     { btn.disabled = false; btn.textContent = '送信する'; }
+  var fa = document.getElementById('shoptalk-form-area');
+  var fs = document.getElementById('shoptalk-success');
+  if (fa) fa.style.display = '';
+  if (fs) fs.style.display = 'none';
+}
 
 // ★Phase 3: 献立アンケートの送信
 function submitMenuFeedback() {
@@ -3618,7 +3712,7 @@ function loadAndShow(type) {
   if(!formEl){showMenu();return;}
 
   // userId がある場合は顧客情報を取得してからフォームを表示
-  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback'].indexOf(type)!==-1){
+  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback','shoptalk'].indexOf(type)!==-1){
     document.getElementById('statusMsg').textContent='お客様情報を確認中...';
     document.getElementById('statusMsg').style.display='block';
     loadCustomerInfoThen(type, function(){
@@ -3666,6 +3760,18 @@ function onFormShown(type) {
 
     // ★Phase 3: フォーム状態をリセット
     if (typeof resetFeedbackForm === 'function') resetFeedbackForm();
+    return;
+  }
+  if (type === 'shoptalk') {
+    // ★Phase 2b: ご相談フォーム表示時の処理
+    //   - フォーム状態をリセット(前回送信後の成功表示が残らないように)
+    //   - 電話番号欄に登録済み電話番号をプリフィル(差し替え可能)
+    if (typeof resetShopTalkForm === 'function') resetShopTalkForm();
+    var stPhoneEl = document.getElementById('st-phone');
+    if (stPhoneEl) {
+      var existingPhone = (window._customerData && window._customerData.phone) || '';
+      stPhoneEl.value = existingPhone;
+    }
     return;
   }
   if (type === 'mypage') {
