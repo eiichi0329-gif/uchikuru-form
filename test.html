@@ -5189,36 +5189,52 @@ function renderMonthlyMenuCard() {
   }
   var itemsHtml = '';
   // ★Phase 2b: 当月・来月以外の年月(例:昨年同月の残骸)を除外
-  //   labelからのみ「YYYY年M月」「YYYY-MM」を抽出して年月チェック。
-  //   URL は過去のアップロード日付が混ざるため使わない(誤検出回避)。
+  //   ① label から「YYYY年M月」「YYYY-MM」を抽出して年月チェック
+  //   ② URL のWP系アップロードパス `/uploads/YYYY/MM/` から年抽出
+  //   いずれかで「現在より前の年」が検出されたら除外する。
   function _extractYMFromLabel(label) {
     if (!label) return null;
-    // 「YYYY年M月」(日本語表記)
     var m = String(label).match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
     if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
-    // 「YYYY-MM」「YYYY/MM」
     m = String(label).match(/(\d{4})[\-\/](\d{1,2})/);
     if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
     return null;
   }
+  function _extractUploadYear(url) {
+    if (!url) return null;
+    // WordPress: /uploads/YYYY/MM/ または /wp-content/uploads/YYYY/MM/
+    var m = String(url).match(/\/uploads?\/(\d{4})\/\d{1,2}\//);
+    if (m) return parseInt(m[1]);
+    return null;
+  }
   var _now = new Date();
-  var _curYM = _now.getFullYear() * 12 + (_now.getMonth() + 1);
+  var _curYear = _now.getFullYear();
+  var _curYM  = _curYear * 12 + (_now.getMonth() + 1);
   var _nextYM = _curYM + 1;
-  console.log('[render-monthly] items=' + monthlyMenuData.items.length + ', current=' + _now.getFullYear() + '-' + (_now.getMonth()+1));
+  console.log('[render-monthly] items=' + monthlyMenuData.items.length + ', current=' + _curYear + '-' + (_now.getMonth()+1));
   for (var i = 0; i < monthlyMenuData.items.length; i++) {
     var it = monthlyMenuData.items[i];
-    var href = it.pdfUrl || it.articleUrl || '';   // PDF優先、なければ記事ページ
+    var href = it.pdfUrl || it.articleUrl || '';
     if (!href) continue;
 
-    // ラベルから年月が明示的に取れた場合のみ、当月/来月以外を除外
+    // ① labelから年月を抽出して当月/来月以外を除外
     var _ym = _extractYMFromLabel(it.label);
     if (_ym) {
       var _itemYM = _ym.year * 12 + _ym.month;
       var _keep = (_itemYM === _curYM || _itemYM === _nextYM);
-      console.log('[render-monthly] item="' + it.label + '" detected=' + _ym.year + '-' + _ym.month + ' → ' + (_keep ? 'keep' : 'skip'));
+      console.log('[render-monthly] item="' + it.label + '" labelYM=' + _ym.year + '-' + _ym.month + ' → ' + (_keep ? 'keep' : 'skip'));
       if (!_keep) continue;
-    } else {
-      console.log('[render-monthly] item="' + it.label + '" → keep (年月不明)');
+    }
+
+    // ② URLのアップロード年が現在より古ければ除外(WP系サイトで前年同月の残骸を弾く)
+    var _uploadYear = _extractUploadYear(it.pdfUrl) || _extractUploadYear(it.imageUrl) || _extractUploadYear(it.articleUrl);
+    if (_uploadYear && _uploadYear < _curYear) {
+      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' < ' + _curYear + ' → skip');
+      continue;
+    }
+
+    if (!_ym) {
+      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' → keep (年月不明だがUL年OK)');
     }
 
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
@@ -6330,18 +6346,23 @@ function noShowOrderStep() {
   document.getElementById('no-step-confirm-order').style.display = 'none';
   document.getElementById('no-step-order').style.display = 'block';
 
-  // 顧客情報サマリー
   var cd = window._customerData || {};
-  document.getElementById('no-cust-summary-name').textContent = (cd.name || '') + '様';
-  document.getElementById('no-cust-summary-address').textContent = cd.address || '―';
-  document.getElementById('no-cust-summary-phone').textContent = cd.phone || '―';
+
+  // ★Phase 2b: 顧客情報サマリーUIは削除済(マイページでは不要)。null-safe にして既存JS互換性を維持
+  var _setText = function(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  _setText('no-cust-summary-name', (cd.name || '') + '様');
+  _setText('no-cust-summary-address', cd.address || '―');
+  _setText('no-cust-summary-phone', cd.phone || '―');
   var paymentLabel = cd.payment || '―';
   if (cd.payment === 'クレジットカード' && cd.cardLast4) {
     paymentLabel += ' (****' + cd.cardLast4 + ')';
   }
-  document.getElementById('no-cust-summary-payment').textContent = paymentLabel;
+  _setText('no-cust-summary-payment', paymentLabel);
 
-  // 配達情報の前回値を設定
+  // 配達情報の前回値を設定(hidden inputに保持される)
   document.getElementById('no-emergency').value     = cd.emergency || '';
   document.getElementById('no-deliveryNote').value  = cd.deliveryNote || '';
   document.getElementById('no-absentAction').value  = cd.absentAction || '';
