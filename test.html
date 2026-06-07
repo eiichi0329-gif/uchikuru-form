@@ -2875,8 +2875,10 @@ function showCancelGuide() {
 
 function proceedCancelGuide() {
   closeOpModal();
-  enterCancelMode();
-  scrollToUsageCalendar();
+  ensureOnUsageCalendarPage(function() {
+    enterCancelMode();
+    scrollToUsageCalendar();
+  });
 }
 
 // ===== ご案内モーダル(種類変更) =====
@@ -2895,8 +2897,37 @@ function showTypeChangeGuide() {
 
 function proceedTypeChangeGuide() {
   closeOpModal();
-  enterTypeChangeMode();
-  scrollToUsageCalendar();
+  ensureOnUsageCalendarPage(function() {
+    enterTypeChangeMode();
+    scrollToUsageCalendar();
+  });
+}
+
+// ★Phase 2b: 利用状況カレンダーページに遷移完了してからコールバックを実行するヘルパー
+//   form-usage が既に表示されている → 即コールバック
+//   そうでない(form-change 等から呼ばれた) → loadAndShow('usage')で切替 → カレンダー描画を待ってコールバック
+function ensureOnUsageCalendarPage(callback) {
+  var usageEl = document.getElementById('form-usage');
+  var calendarReadyNow = !!document.getElementById('usage-calendar-anchor');
+  if (usageEl && usageEl.classList.contains('active') && calendarReadyNow) {
+    callback();
+    return;
+  }
+  loadAndShow('usage');
+  // form-usage が active になりカレンダー要素が出現するまでポーリング(最大3秒)
+  var attempts = 0;
+  var maxAttempts = 30;
+  var checker = function() {
+    attempts++;
+    var isActive = usageEl && usageEl.classList.contains('active');
+    var hasCal   = !!document.getElementById('usage-calendar-anchor');
+    if ((isActive && hasCal) || attempts >= maxAttempts) {
+      callback();
+    } else {
+      setTimeout(checker, 100);
+    }
+  };
+  setTimeout(checker, 150);
 }
 
 // カレンダー本体までスムーズスクロール
