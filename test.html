@@ -4059,12 +4059,9 @@ function onFormShown(type) {
     return;
   }
   if (type === 'mypage') {
-    // greeting表示
-    var cd = window._customerData || {};
-    if (cd.name) {
-      document.getElementById('greet-name-mypage').textContent = cd.name + '様';
-      document.getElementById('greet-mypage').style.display = 'block';
-    }
+    // ★Phase 2b: 顧客名挨拶は非表示(登録情報の変更は ?mode=settings から行うため)
+    var _gm = document.getElementById('greet-mypage');
+    if (_gm) _gm.style.display = 'none';
   } else if (type === 'billing') {
     if (!billingData) {
       loadBillingData(function(data){
@@ -5705,9 +5702,9 @@ function renderDailyMenuCard() {
 function applyViewMode() {
   var isUsage = (viewMode === 'usage' || viewMode === 'combined');
 
-  // 顧客情報カード:②利用状況のみ表示
+  // ★Phase 2b: 顧客情報カードは常に非表示(登録情報の変更は ?mode=settings から行う)
   var custCard = document.getElementById('cust-info-card');
-  if (custCard) custCard.style.display = isUsage ? '' : 'none';
+  if (custCard) custCard.style.display = 'none';
 
   // usage-content(カレンダー・操作ボタン・利用金額):②利用状況のみ表示
   var usageContentEl = document.getElementById('usage-content');
@@ -8819,6 +8816,12 @@ function renderBillingContent() {
   var contentEl = document.getElementById('billing-content');
   if (!contentEl || !billingData) return;
 
+  // ★Phase 2b: 支払方法を billingData から抽出して _customerData.payment に設定
+  //   (顧客APIには payment が無いので、ここで自前で埋める。冪等なので安全に呼べる)
+  if (typeof populatePaymentFromBilling === 'function') {
+    populatePaymentFromBilling();
+  }
+
   // currentBillingMonth が未設定なら自動選択
   ensureCurrentMonth('billing');
 
@@ -8831,9 +8834,12 @@ function renderBillingContent() {
   var html = '';
   // ★payment_status からバッジ/通知を生成
   var pay = buildPaymentStatus(d);
-  // ★Phase 2b: 支払方法をタイトル横に表示(支払い済みのときはバッジ優先)
+  // ★Phase 2b: 支払方法をタイトル横に表示
+  //   優先順位: _customerData.payment(日本語化済) > d.payment_method(英語コード)
+  //   支払い済みのときは pay.badge を優先表示するため重複させない
+  var cd = window._customerData || {};
   var pmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
-  var pmLabel = pmMap[d.payment_method] || '';
+  var pmLabel = cd.payment || pmMap[d.payment_method] || '';
   var pmBadge = '';
   if (pmLabel && !pay.badge) {
     pmBadge = '<span style="display:inline-block;margin-left:8px;padding:3px 10px;background:#fff5ea;border:1px solid #F08300;color:#C26900;border-radius:12px;font-size:12px;font-weight:bold;vertical-align:middle;">お支払い:' + pmLabel + '</span>';
