@@ -583,11 +583,16 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
 .usage-cell:nth-child(5n) { border-right: none; }
 .usage-cell.empty { background: #fafafa; min-height: 95px; }
 .usage-cell.wed-deadline { background: #fff5ec; }
-.usage-cell.today { background: #fff8f3; }
+/* ★Phase 2b: 今日のセルをはっきり表示(オレンジ強調) */
+.usage-cell.today { background: #FFE0B3; border: 2px solid #F08300; box-shadow: 0 0 0 1px #F08300 inset; }
+.usage-cell.today .cell-date { color: #C26900; font-weight: bold; }
+/* ★Phase 2b: 過去日はグレーアウト */
+.usage-cell.past { background: #f5f5f5; opacity: 0.55; }
+.usage-cell.past .cell-date { color: #999; }
 .usage-cell.editable { background: #fffbf6; cursor: pointer; }
 .usage-cell.editable.wed-deadline { background: #fff2e0; }
 .usage-cell.editable:active { background: #fff0e0; }
-.usage-cell.editable.today { background: #fff5ea; }
+.usage-cell.editable.today { background: #FFE0B3; }
 .usage-cell.no-delivery { /* 配達なしの日も通常表示 */ }
 
 .usage-cell .cell-date {
@@ -1722,8 +1727,9 @@ body.cancel-mode-active {
     <!-- ★通常画面(登録済みの時に表示する全コンテンツ) -->
     <div id="usage-main" style="display:none;">
 
-      <!-- ★v6+: 顧客情報カード(名前のみコンパクト版、最上段) -->
-      <div class="cust-info-card cust-info-card-compact" id="cust-info-card">
+      <!-- ★Phase 2b: 顧客情報カードは非表示(登録情報の変更は ?mode=settings から行うため)
+           DOM 要素自体は既存JSの参照を壊さないため残置 -->
+      <div class="cust-info-card cust-info-card-compact" id="cust-info-card" style="display:none;">
         <div class="cust-greet-block">
           <div class="cust-greet-hello-compact">こんにちは</div>
           <div class="cust-greet-name" id="cust-greet-name">お客様</div>
@@ -1846,13 +1852,13 @@ body.cancel-mode-active {
         指定した「切替日」から新しい内容で配達を開始し、それまでは現在の内容のままです。
       </div>
 
-      <div style="font-size:15px;font-weight:bold;color:#333;margin:8px 0 8px;">📅 切替日(いつから新しい内容にしますか?)</div>
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:8px 0 8px;">📅 変更開始日(いつから新しい内容にしますか?)</div>
       <select id="bc-start-date" onchange="bcOnStartDateChange()"
               style="width:100%;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;background:white;">
-        <option value="">▼ 切替日を選んでください</option>
+        <option value="">▼ 変更開始日を選んでください</option>
       </select>
       <div style="font-size:11.5px;color:#999;margin-top:5px;line-height:1.5;">
-        ※ 月〜金から選択できます。切替日の前日までは現在の内容で配達を続けます。
+        ※ 月〜金から選択できます。前週の水曜17時が締切のため、それ以降の日付のみ表示されます。
       </div>
 
       <div style="font-size:15px;font-weight:bold;color:#333;margin:22px 0 8px;">🍱 新しいお弁当の種類・数量</div>
@@ -2774,24 +2780,23 @@ var bcState = {
 // ⑥相談 用ボタンから遷移
 function cmGoBulkChange() { loadAndShow('bulkChange'); }
 
-// 切替日選択肢を生成(来週月曜から4週分の月-金)
+// 変更開始日の選択肢を生成
+//   既存の getEditableWeek() ロジック(前週水曜17時締切)を流用し、編集可能週の月曜から4週分の月〜金を表示
 function bcBuildStartDateOptions() {
   var sel = document.getElementById('bc-start-date');
   if (!sel) return;
-  sel.innerHTML = '<option value="">▼ 切替日を選んでください</option>';
+  sel.innerHTML = '<option value="">▼ 変更開始日を選んでください</option>';
 
-  // 来週月曜を取得
-  var today = new Date();
-  var nextMon = new Date(today);
-  var daysUntilMon = (1 - today.getDay() + 7) % 7;  // 1=月
-  if (daysUntilMon === 0) daysUntilMon = 7;          // 今日が月なら次週月へ
-  nextMon.setDate(today.getDate() + daysUntilMon);
+  // 締切ロジック: 新規注文と同じ getEditableWeek を使う
+  var ew = getEditableWeek();
+  var startMonday = ew && ew.monday ? new Date(ew.monday) : null;
+  if (!startMonday) return;
 
   var DOW_JA = ['日','月','火','水','木','金','土'];
   for (var w = 0; w < 4; w++) {                       // 4週分
     for (var d = 0; d < 5; d++) {                     // 月-金
-      var dt = new Date(nextMon);
-      dt.setDate(nextMon.getDate() + (w * 7) + d);
+      var dt = new Date(startMonday);
+      dt.setDate(startMonday.getDate() + (w * 7) + d);
       var iso = dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate());
       var label = (dt.getMonth()+1) + '月' + dt.getDate() + '日(' + DOW_JA[dt.getDay()] + ')';
       var opt = document.createElement('option');
@@ -3969,6 +3974,21 @@ function loadAndShow(type) {
   if(!type){showMenu();return;}
   var formEl=document.getElementById('form-'+type);
   if(!formEl){showMenu();return;}
+
+  // ★Phase 2b: 献立データを LIFF 起動時にバックグラウンドでプリフェッチ
+  //   (loadDailyMenu/loadMonthlyMenus は内部で sessionStorage キャッシュを参照するため、
+  //    既に取得済みなら何もしない / 未取得なら裏で取得しておく)
+  if (typeof loadDailyMenu === 'function' && dailyMenuData === null && !dailyMenuLoading) {
+    setTimeout(function(){ loadDailyMenu(function(){
+      // form-feedback or form-usage が表示中ならその場で再描画
+      if (typeof renderDailyMenuCard === 'function') renderDailyMenuCard();
+    }); }, 0);
+  }
+  if (typeof loadMonthlyMenus === 'function' && monthlyMenuData === null && !monthlyMenuLoading) {
+    setTimeout(function(){ loadMonthlyMenus(function(){
+      if (typeof renderMonthlyMenuCard === 'function') renderMonthlyMenuCard();
+    }); }, 0);
+  }
 
   // userId がある場合は顧客情報を取得してからフォームを表示
   if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback','shoptalk','settings','bulkChange'].indexOf(type)!==-1){
@@ -5345,7 +5365,26 @@ function renderDeliveryProgressCard() {
         '<span class="ico">🚚</span>' +
         '<span class="dpc-title transit">配達中です</span>' +
       '</div>';
+
+    // ★Phase 2b: 配達予想時間の終了時刻を過ぎたら「現在配達中です。もうしばらくお待ちください」に切替
+    var _etaPassed = false;
     if (etaLabel) {
+      // 「11:20〜13:20頃にお届け予定」→ 終了時刻 13:20 を抽出
+      var _m = etaLabel.match(/(\d{1,2}):(\d{2})\s*[〜~ー\-]\s*(\d{1,2}):(\d{2})/);
+      if (_m) {
+        var _now = new Date();
+        var _etaEnd = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate(),
+                               parseInt(_m[3]), parseInt(_m[4]), 0);
+        if (_now.getTime() > _etaEnd.getTime()) _etaPassed = true;
+      }
+    }
+
+    if (_etaPassed) {
+      msgHtml +=
+        '<div class="dpc-eta-label" style="font-size:15px;line-height:1.7;margin-top:8px;padding:12px 14px;background:#fff8f3;border-radius:6px;color:#444;">' +
+          '現在配達中です。<br>もうしばらくお待ちください。' +
+        '</div>';
+    } else if (etaLabel) {
       // eta_window.label が「11:20〜13:20頃にお届け予定」の場合、
       // 「にお届け予定」「お届け予定」などの末尾を取り除いて時間部分だけ抽出
       var etaTimeOnly = etaLabel
@@ -5419,6 +5458,21 @@ var monthlyMenuLoading = false;
 
 function loadMonthlyMenus(callback) {
   if (monthlyMenuLoading) return;
+
+  // ★Phase 2b: sessionStorage キャッシュ(当日中は再フェッチしない)
+  var _todayKey = '_uc_mmenu_' + (function(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  })();
+  try {
+    var _cached = sessionStorage.getItem(_todayKey);
+    if (_cached) {
+      monthlyMenuData = JSON.parse(_cached);
+      if (callback) callback(monthlyMenuData);
+      return;
+    }
+  } catch(e) {}
+
   monthlyMenuLoading = true;
   var cbName = 'monthlyMenuCb_' + Date.now();
   window[cbName] = function(data) {
@@ -5427,6 +5481,7 @@ function loadMonthlyMenus(callback) {
     var sc = document.getElementById(cbName + '_script');
     if (sc && sc.parentNode) sc.parentNode.removeChild(sc);
     monthlyMenuData = data || { ok: false, items: [] };
+    try { sessionStorage.setItem(_todayKey, JSON.stringify(monthlyMenuData)); } catch(e) {}
     if (callback) callback(monthlyMenuData);
   };
   var IG_MENU_URL = 'https://script.google.com/macros/s/AKfycbxR2G-zKplRX1nQHmE5sOTQjQ1g75HY5sGvpS6N-2ZV_R7SOCOuhyDmbq9hisDP_C25Tw/exec';
@@ -5523,6 +5578,21 @@ function renderMonthlyMenuCard() {
 function loadDailyMenu(callback) {
   // ★v8: demoモードでもInstagramから実献立を取得(旧デモ分岐を削除)
   if (dailyMenuLoading) return;
+
+  // ★Phase 2b: sessionStorage キャッシュ(当日中は再フェッチしない)
+  var _todayKey = '_uc_dmenu_' + (function(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  })();
+  try {
+    var _cached = sessionStorage.getItem(_todayKey);
+    if (_cached) {
+      dailyMenuData = JSON.parse(_cached);
+      if (callback) callback(dailyMenuData);
+      return;
+    }
+  } catch(e) {}
+
   dailyMenuLoading = true;
 
   var cbName = 'dailyMenuCb_' + Date.now();
@@ -5532,6 +5602,8 @@ function loadDailyMenu(callback) {
     var sc = document.getElementById(cbName + '_script');
     if (sc && sc.parentNode) sc.parentNode.removeChild(sc);
     dailyMenuData = data || { ok: false };
+    // キャッシュ保存(失敗時もok=falseで保存→当日中はリトライしない)
+    try { sessionStorage.setItem(_todayKey, JSON.stringify(dailyMenuData)); } catch(e) {}
     if (callback) callback(dailyMenuData);
   };
 
@@ -6140,10 +6212,12 @@ function renderUsageCalendar(monthData) {
     var dayData = dayMap[dateStr];
     var isEditable = isDateEditable(dateStr);
     var isToday = dateStr === todayStr;
+    var isPast  = dateStr < todayStr;  // ★Phase 2b: 過去日(YYYY-MM-DD文字列比較で十分)
 
     var cellClass = 'usage-cell';
     if (dow === 3) cellClass += ' wed-deadline'; // 水曜は全部ハイライト
     if (isToday) cellClass += ' today';
+    if (isPast)  cellClass += ' past';   // ★Phase 2b
     if (dayData && isEditable) cellClass += ' editable';
     if (!dayData) cellClass += ' no-delivery';
 
@@ -8757,8 +8831,15 @@ function renderBillingContent() {
   var html = '';
   // ★payment_status からバッジ/通知を生成
   var pay = buildPaymentStatus(d);
+  // ★Phase 2b: 支払方法をタイトル横に表示(支払い済みのときはバッジ優先)
+  var pmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
+  var pmLabel = pmMap[d.payment_method] || '';
+  var pmBadge = '';
+  if (pmLabel && !pay.badge) {
+    pmBadge = '<span style="display:inline-block;margin-left:8px;padding:3px 10px;background:#fff5ea;border:1px solid #F08300;color:#C26900;border-radius:12px;font-size:12px;font-weight:bold;vertical-align:middle;">お支払い:' + pmLabel + '</span>';
+  }
   html += '<div class="summary-card">';
-  html += '<div class="sc-title">ご請求サマリー' + pay.badge + '</div>';
+  html += '<div class="sc-title">ご請求サマリー' + pay.badge + pmBadge + '</div>';
   if (pay.notice) html += pay.notice;
   html += '<div class="sc-row"><span>集金済み</span><span class="sc-amount paid">' + (d.paid||0).toLocaleString() + '円</span></div>';
   html += '<div class="sc-row"><span>未集金</span><span class="sc-amount unpaid">' + (d.unpaid||0).toLocaleString() + '円</span></div>';
