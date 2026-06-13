@@ -283,20 +283,6 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
 .summary-card .sc-amount.paid { color: #27ae60; }
 .summary-card .sc-row.total .sc-amount { color: #F08300; font-size: 22px; }
 
-/* ★支払いステータス バッジ/通知(利用金額サマリー内) */
-.pay-badge {
-  display: inline-block; font-size: 11px; font-weight: bold;
-  padding: 3px 10px; border-radius: 999px; margin-left: 8px; vertical-align: middle;
-  white-space: nowrap;
-}
-.pay-badge.done { background: #e8f8ef; color: #1e9e5a; border: 1px solid #b9e6cd; }
-.pay-notice {
-  margin: 0 0 12px; padding: 10px 12px; border-radius: 8px;
-  font-size: 13px; line-height: 1.5; font-weight: bold;
-}
-.pay-notice.info   { background: #eef4fb; color: #2d6fb3; border: 1px solid #cadcf0; }
-.pay-notice.failed { background: #fdecea; color: #c0392b; border: 1px solid #f5c6c0; }
-
 .detail-list {
   background: white; border: 1.5px solid #e0d8d0; border-radius: 7px;
   overflow: hidden; margin-bottom: 14px;
@@ -1788,7 +1774,9 @@ body.cancel-mode-active {
           <option value="">選択してください</option>
           <option value="現金">現金</option>
           <option value="口座振替">口座振替</option>
+          <!-- ★クレジットカード:後日追加予定のため一旦非表示
           <option value="クレジットカード">クレジットカード</option>
+          -->
         </select>
       </div>
       <div id="no-cust-card-section" style="display:none;">
@@ -3167,8 +3155,7 @@ function setupDemoData() {
     delivery_status: 'in_transit',
     eta_window: { label: '11:20〜13:20頃にお届け予定' },
     substitute_status: 'none',
-    substitute_role: 'none',
-    delivery_time_changed: false   // ★true にすると代配/ルート手動変更時の表示を確認できる
+    substitute_role: 'none'
   };
 
   // ★v8: 今日の献立はdemoモードでもInstagramから実データを取得(テスト確認のため)
@@ -3749,40 +3736,13 @@ function loadBillingData(callback) {
       // bento_delivery のレスポンスをカレンダー表示用に整形
       // 当月請求金額のみ取得できるため、月別データはモック生成と組み合わせる
       var mock = generateMockBilling();
-      if (data && data.enrolled) {
-        // ★月別の支払い情報(months)があれば各月にマージ(bento拡張後はこちらを推奨)
-        //   months[YYYY-MM] = { amount_total, amount_charged, amount_uncharged,
-        //                       payment_method, payment_status, debit_start_month }
-        if (data.months && typeof data.months === 'object') {
-          Object.keys(data.months).forEach(function(k) {
-            if (!mock[k]) return;
-            var mb = data.months[k] || {};
-            // ★bentoが請求データを返した月は、配達スケジュール(getSchedule)に
-            //   その月の明細が無くても「利用金額」を表示する(請求はbentoが正)
-            var hasBentoBilling = (mb.amount_total != null && mb.amount_total > 0) ||
-                                  (mb.payment_status && mb.payment_status !== 'unpaid');
-            if (hasBentoBilling && !mock[k].hasData) {
-              mock[k] = { hasData: true, total: 0, paid: 0, unpaid: 0,
-                          details: (mock[k] && mock[k].details) || [] };
-            }
-            if (mb.amount_total     != null) mock[k].total  = mb.amount_total;
-            if (mb.amount_charged   != null) mock[k].paid   = mb.amount_charged;
-            if (mb.amount_uncharged != null) mock[k].unpaid = mb.amount_uncharged;
-            if (mb.payment_method)    mock[k].payment_method    = mb.payment_method;
-            if (mb.payment_status)    mock[k].payment_status    = mb.payment_status;
-            if (mb.debit_start_month) mock[k].debit_start_month = mb.debit_start_month;
-          });
-        } else if (data.amount_total != null) {
-          // 後方互換: 当月のみのレスポンス
-          var nowKey = data.month || (new Date().getFullYear() + '-' + pad(new Date().getMonth()+1));
-          if (mock[nowKey]) {
-            mock[nowKey].total = data.amount_total;
-            mock[nowKey].charged = data.amount_charged || 0;
-            mock[nowKey].uncharged = data.amount_uncharged || 0;
-            if (data.payment_method)    mock[nowKey].payment_method    = data.payment_method;
-            if (data.payment_status)    mock[nowKey].payment_status    = data.payment_status;
-            if (data.debit_start_month) mock[nowKey].debit_start_month = data.debit_start_month;
-          }
+      if (data && data.enrolled && data.amount_total != null) {
+        // 当月のキーを特定して上書き
+        var nowKey = data.month || (new Date().getFullYear() + '-' + pad(new Date().getMonth()+1));
+        if (mock[nowKey]) {
+          mock[nowKey].total = data.amount_total;
+          mock[nowKey].charged = data.amount_charged || 0;
+          mock[nowKey].uncharged = data.amount_uncharged || 0;
         }
       }
       callback(mock);
@@ -3883,22 +3843,6 @@ function renderEtaCard() {
   if (!etaData) return '';
   if (etaData.has_delivery === false) return '';   // 本日配達なし or 未紐付け
   if (!etaData.ok) return '';
-
-  // ★代配/ルート手動変更時 → 具体的な時間は出さず「変更+配達中」メッセージのみ表示
-  //   trigger: delivery_time_changed===true
-  //     = bento側で「代配を登録」または「ルート指定+ボタンで当日だけ手動変更」した場合に立つ
-  //   文言は delivery_time_changed_message があれば優先、無ければ既定文を使う
-  if (etaData.delivery_time_changed === true) {
-    var dtcMsg = etaData.delivery_time_changed_message ||
-                 '本日配達時間が通常と変更になっております。現在配達中ですのでしばらくお待ちください。';
-    return '<div class="eta-card substitute">' +
-             '<div class="eta-card-header">' +
-               '<span class="eta-card-icon">🚚</span>' +
-               '<span class="eta-card-title">配達時間変更のお知らせ</span>' +
-             '</div>' +
-             '<div class="eta-card-message">' + escapeHtml(dtcMsg) + '</div>' +
-           '</div>';
-  }
 
   // ★v5+: 代配影響中 → ETAは出さず、サーバから来た固定メッセージを表示
   //       要件書 §3.1 に準拠。文言はハードコードせず、必ず API の substitute_message を使う
@@ -4168,24 +4112,6 @@ function generateMockBilling() {
       unpaid: unpaid,
       details: details
     };
-
-    // ★支払いステータス: デモモードのみ合成(本番フォールバック時は付けない=偽バッジ防止)
-    //   実機ではこの値は bento の getBilling レスポンスから loadBillingData がマージする
-    if (isDemoMode) {
-      var demoPm = (window._customerData && window._customerData.payment) || '現金';
-      if (demoPm === '口座振替') {
-        data[m.key].payment_method = 'bank_transfer';
-        data[m.key].payment_status = m.isCurrent ? 'debit_scheduled' : (m.isPast ? 'debited' : '');
-        if (m.isCurrent) data[m.key].debit_start_month = m.key;
-      } else if (demoPm === 'クレジットカード') {
-        data[m.key].payment_method = 'credit';
-        data[m.key].payment_status = (m.isPast || m.isCurrent) ? 'charged' : '';
-      } else {
-        data[m.key].payment_method = 'cash';
-        data[m.key].payment_status = (m.isPast || m.isCurrent) ? 'paid' : '';
-      }
-      // ※ 'debit_failed' を確認したい時は上を一時的に 'debit_failed' に変更してください
-    }
   });
   return data;
 }
@@ -4577,11 +4503,6 @@ function renderDeliveryProgressCard() {
 
   // 非表示判定
   if (!etaData || !etaData.ok || etaData.has_delivery === false) {
-    cardEl.style.display = 'none';
-    return;
-  }
-  // ★代配/ルート手動変更時は具体的な時間を出さない → 進捗カード非表示(ETAカードのメッセージのみ表示)
-  if (etaData.delivery_time_changed === true) {
     cardEl.style.display = 'none';
     return;
   }
@@ -7436,7 +7357,8 @@ function renderCustomerEditView() {
   html += '<option value=""' + (modalState.cePayment === '' ? ' selected' : '') + '>選択してください</option>';
   html += '<option value="現金"' + (modalState.cePayment === '現金' ? ' selected' : '') + '>現金</option>';
   html += '<option value="口座振替"' + (modalState.cePayment === '口座振替' ? ' selected' : '') + '>口座振替</option>';
-  html += '<option value="クレジットカード"' + (modalState.cePayment === 'クレジットカード' ? ' selected' : '') + '>クレジットカード</option>';
+  // ★クレジットカード:後日追加予定のため一旦非表示
+  // html += '<option value="クレジットカード"' + (modalState.cePayment === 'クレジットカード' ? ' selected' : '') + '>クレジットカード</option>';
   html += '</select>';
   html += '</div>';
 
@@ -7872,45 +7794,6 @@ function renderMonthTabs(targetType) {
   });
 }
 
-/* ============================================================
-   ★支払いステータス バッジ/通知の生成
-   payment_status の値だけで表示が決まる(支払方法は bento 側で判定済み)
-     paid            → 「支払い済み」      (現金・集金完了)
-     debited         → 「引き落とし済み」  (口座振替・引落完了)
-     debit_scheduled → 「○月分から引き落とし予定」(口座振替・引落前 / debit_start_month を使用)
-     debit_failed    → 集金お願いの通知    (口座振替・引落失敗)
-     charged         → 「決済済み」        (クレジット・決済完了)
-     その他/空        → 何も出さない        (未確定/未払い=現状どおり未集金表示のまま)
-   ============================================================ */
-function buildPaymentStatus(d) {
-  var out = { badge: '', notice: '' };
-  if (!d) return out;
-  var status = d.payment_status || '';
-  if (status === 'paid') {
-    out.badge = '<span class="pay-badge done">支払い済み</span>';
-  } else if (status === 'debited') {
-    out.badge = '<span class="pay-badge done">引き落とし済み</span>';
-  } else if (status === 'charged') {
-    out.badge = '<span class="pay-badge done">決済済み</span>';
-  } else if (status === 'debit_scheduled') {
-    var ml = formatDebitStartLabel(d.debit_start_month || currentBillingMonth);
-    out.notice = '<div class="pay-notice info">📅 ' + escapeHtml(ml) + 'から引き落とし予定です</div>';
-  } else if (status === 'debit_failed') {
-    out.notice = '<div class="pay-notice failed">お引き落としができませんでしたので、お手数ですがご集金をお願いします。</div>';
-  }
-  return out;
-}
-
-// 'YYYY-MM' → '○月分'(口座振替の引落開始月ラベル)
-function formatDebitStartLabel(ym) {
-  var parts = String(ym || '').split('-');
-  if (parts.length >= 2) {
-    var mm = parseInt(parts[1], 10);
-    if (!isNaN(mm)) return mm + '月分';
-  }
-  return 'この月分';
-}
-
 function renderBillingContent() {
   var contentEl = document.getElementById('billing-content');
   if (!contentEl || !billingData) return;
@@ -7925,29 +7808,23 @@ function renderBillingContent() {
   }
 
   var html = '';
-  // ★payment_status からバッジ/通知を生成
-  var pay = buildPaymentStatus(d);
   html += '<div class="summary-card">';
-  html += '<div class="sc-title">ご請求サマリー' + pay.badge + '</div>';
-  if (pay.notice) html += pay.notice;
-  html += '<div class="sc-row"><span>集金済み</span><span class="sc-amount paid">' + (d.paid||0).toLocaleString() + '円</span></div>';
-  html += '<div class="sc-row"><span>未集金</span><span class="sc-amount unpaid">' + (d.unpaid||0).toLocaleString() + '円</span></div>';
-  html += '<div class="sc-row total"><span>合計</span><span class="sc-amount">' + (d.total||0).toLocaleString() + '円</span></div>';
+  html += '<div class="sc-title">ご請求サマリー</div>';
+  html += '<div class="sc-row"><span>集金済み</span><span class="sc-amount paid">' + d.paid.toLocaleString() + '円</span></div>';
+  html += '<div class="sc-row"><span>未集金</span><span class="sc-amount unpaid">' + d.unpaid.toLocaleString() + '円</span></div>';
+  html += '<div class="sc-row total"><span>合計</span><span class="sc-amount">' + d.total.toLocaleString() + '円</span></div>';
   html += '</div>';
 
-  var details = d.details || [];
-  if (details.length > 0) {
-    html += '<div class="sec-label">日別の内訳</div>';
-    html += '<div class="detail-list">';
-    details.forEach(function(item) {
-      html += '<div class="dl-row">';
-      html += '<span class="dl-date">' + item.date + '</span>';
-      html += '<span class="dl-content">' + item.content + '</span>';
-      html += '<span class="dl-amount">' + item.amount.toLocaleString() + '円</span>';
-      html += '</div>';
-    });
+  html += '<div class="sec-label">日別の内訳</div>';
+  html += '<div class="detail-list">';
+  d.details.forEach(function(item) {
+    html += '<div class="dl-row">';
+    html += '<span class="dl-date">' + item.date + '</span>';
+    html += '<span class="dl-content">' + item.content + '</span>';
+    html += '<span class="dl-amount">' + item.amount.toLocaleString() + '円</span>';
     html += '</div>';
-  }
+  });
+  html += '</div>';
 
   contentEl.innerHTML = html;
 }
