@@ -1903,12 +1903,12 @@ body.cancel-mode-active {
       </div>
     </button>
 
-    <button type="button" class="cm-item" onclick="loadAndShow('shoptalk')">
+    <button type="button" class="cm-item" onclick="goToLineChat()">
       <div class="cm-row">
         <div class="cm-icon">💬</div>
         <div class="cm-body">
           <div class="cm-title">店舗に相談・お問い合わせ</div>
-          <div class="cm-desc">他のメニューに当てはまらないご相談</div>
+          <div class="cm-desc">LINEトークでチャットによるご相談を承ります</div>
         </div>
         <div class="cm-arrow">›</div>
       </div>
@@ -2713,7 +2713,20 @@ function cmGoEndService()   { actionEndService(); }
 function cmGoProfileEdit()  { openCustomerEditModal(); }
 function cmGoSuspend()      { alert('「しばらくお休み」機能は次回更新(Phase 2b)で実装予定です。\n現在は「特定の日だけお休み」または「やめる(利用終了)」をご利用ください。'); }
 // ★Phase 2b: ⑥相談 → 専用フォームへ遷移
-function cmGoShopTalk()     { loadAndShow('shoptalk'); }
+function cmGoShopTalk()     { goToLineChat(); }
+
+// ★Phase 2b: 「店舗に相談・お問い合わせ」を押したらLIFFを閉じてLINEトーク画面に戻す
+//   トーク側でAIチャットボットが対応する想定。フォーム送信→スプレッドシート保存の旧フローは廃止。
+function goToLineChat() {
+  try {
+    if (typeof liff !== 'undefined' && liff.closeWindow) {
+      liff.closeWindow();
+      return;
+    }
+  } catch(e) { /* fallthrough */ }
+  // LIFF外(PCブラウザ直アクセス等)のフォールバック
+  alert('LINEのトーク画面からお気軽にお問い合わせください。');
+}
 
 // ★Phase 2b: ご相談・お問い合わせ送信
 function submitShopTalk() {
