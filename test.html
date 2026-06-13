@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <!--
@@ -584,11 +583,16 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
 .usage-cell:nth-child(5n) { border-right: none; }
 .usage-cell.empty { background: #fafafa; min-height: 95px; }
 .usage-cell.wed-deadline { background: #fff5ec; }
-.usage-cell.today { background: #fff8f3; }
+/* ★Phase 2b: 今日のセルをはっきり表示(オレンジ強調) */
+.usage-cell.today { background: #FFE0B3; border: 2px solid #F08300; box-shadow: 0 0 0 1px #F08300 inset; }
+.usage-cell.today .cell-date { color: #C26900; font-weight: bold; }
+/* ★Phase 2b: 過去日はグレーアウト */
+.usage-cell.past { background: #f5f5f5; opacity: 0.55; }
+.usage-cell.past .cell-date { color: #999; }
 .usage-cell.editable { background: #fffbf6; cursor: pointer; }
 .usage-cell.editable.wed-deadline { background: #fff2e0; }
 .usage-cell.editable:active { background: #fff0e0; }
-.usage-cell.editable.today { background: #fff5ea; }
+.usage-cell.editable.today { background: #FFE0B3; }
 .usage-cell.no-delivery { /* 配達なしの日も通常表示 */ }
 
 .usage-cell .cell-date {
@@ -982,6 +986,31 @@ body.cancel-mode-active {
   transform: translateY(1px);
   box-shadow: 0 2px 4px rgba(230, 126, 34, 0.3);
 }
+
+/* ===== ★Phase 2: 意図ベース変更メニュー(form-change) ===== */
+.cm-item {
+  display: block; width: 100%;
+  padding: 16px 18px; margin-bottom: 10px;
+  background: #fff; border: 2px solid #F08300; border-radius: 10px;
+  text-align: left; cursor: pointer;
+  font-family: inherit; font-size: inherit; color: inherit;
+}
+.cm-item:active { background: #FFF4E5; }
+.cm-row { display: flex; align-items: center; gap: 14px; }
+.cm-icon { font-size: 30px; line-height: 1; flex-shrink: 0; }
+.cm-body { flex: 1; min-width: 0; }
+.cm-title { font-size: 16px; font-weight: bold; color: #222; margin-bottom: 4px; line-height: 1.4; }
+.cm-desc  { font-size: 12.5px; color: #777; line-height: 1.5; }
+.cm-arrow { font-size: 24px; color: #F08300; flex-shrink: 0; }
+.cm-item.cm-warn-color { border-color: #d9534f; }
+.cm-item.cm-warn-color .cm-arrow { color: #d9534f; }
+.cm-section-title { font-size: 15px; font-weight: bold; color: #444; margin: 18px 0 12px; }
+.cm-back {
+  display: inline-block; padding: 8px 16px; margin-bottom: 14px;
+  background: #fff; color: #666; border: 1px solid #ccc; border-radius: 6px;
+  font-size: 13px; cursor: pointer;
+}
+.cm-back:active { background: #f5f5f5; }
 
 /* ===== 水曜の注文締切アラート ===== */
 /* ★v6: 水曜の注文締切アラート(縦配置に変更、確認ボタン付き) */
@@ -1687,13 +1716,10 @@ body.cancel-mode-active {
         <div class="welcome-title">ようこそ</div>
         <div class="welcome-subtitle">うちくる夕食宅配サービスをご利用いただきありがとうございます</div>
         <div class="welcome-desc">
-          すでにご利用中の方も、これからの方も、<br>こちらからお手続きいただけます。
+          すでにご利用中の方も、これからの方も、<br>LINEのリッチメニューよりお手続きいただけます。
         </div>
-        <button class="welcome-cta-btn" style="background:#F08300;color:white;" onclick="loadAndShow('newOrder')">
-          ご注文・お申込みへ進む
-        </button>
         <div style="font-size:13px;color:#666;margin-top:14px;line-height:1.7;text-align:left;background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:10px 12px;">
-          現在ご利用中の方・過去にご利用いただいた方は、注文フォーム内で<b>ご利用状況</b>をご選択ください。<br>店舗にて過去のご利用情報との紐付け後、マイページがご利用いただけます。
+          ご利用にあたっては、リッチメニューの<b>「新規登録」</b>からお申し込みをお願いいたします。<br>登録完了後、マイページがご利用いただけるようになります。
         </div>
       </div>
     </div>
@@ -1701,8 +1727,9 @@ body.cancel-mode-active {
     <!-- ★通常画面(登録済みの時に表示する全コンテンツ) -->
     <div id="usage-main" style="display:none;">
 
-      <!-- ★v6+: 顧客情報カード(名前のみコンパクト版、最上段) -->
-      <div class="cust-info-card cust-info-card-compact" id="cust-info-card">
+      <!-- ★Phase 2b: 顧客情報カードは非表示(登録情報の変更は ?mode=settings から行うため)
+           DOM 要素自体は既存JSの参照を壊さないため残置 -->
+      <div class="cust-info-card cust-info-card-compact" id="cust-info-card" style="display:none;">
         <div class="cust-greet-block">
           <div class="cust-greet-hello-compact">こんにちは</div>
           <div class="cust-greet-name" id="cust-greet-name">お客様</div>
@@ -1733,17 +1760,159 @@ body.cancel-mode-active {
       <!-- ★v5+: 配達進捗3段階カード(③お届け状況・献立モードで表示) -->
       <div id="delivery-progress-card" style="display:none;"></div>
 
-      <!-- ★v7: 今日の献立カード(③お届け状況・献立モードで表示) -->
-      <!--      v6でmenu.htmlに移したが、③でも配達状況とセットで表示する -->
-      <div id="daily-menu-card" style="display:none;"></div>
-
-      <!-- ★v8: 月間献立表カード(news サイトの当月・次月PDF/画像) -->
-      <div id="monthly-menu-card" style="display:none;"></div>
-
       <div id="usage-content">
         <div class="mypage-loading">読み込み中...</div>
       </div>
     </div>
+  </div>
+
+  <!-- 献立アンケート(今日の献立 + 月間献立を表示。アンケート入力欄はPhase 3で実装) -->
+  <div id="form-feedback" class="form-wrap">
+    <div class="form-title">📝 献立アンケート</div>
+
+    <!-- ① 今日の献立 -->
+    <div id="daily-menu-card" style="display:none;"></div>
+
+    <!-- ② ご意見入力 -->
+    <div id="feedback-form-area" style="margin-top:20px;">
+      <div style="font-size:15px;font-weight:bold;color:#333;margin-bottom:8px;">🍽 献立へのご感想・ご要望</div>
+      <div style="font-size:12.5px;color:#777;margin-bottom:10px;line-height:1.6;">
+        今日の献立への感想・ご要望をご自由にお書きください。<br>店舗で内容を確認させていただきます。
+      </div>
+      <textarea id="feedback-message" placeholder="例：今日の煮物の味付けがちょうど良くて美味しかったです。" rows="5"
+                style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+      <button id="feedback-submit-btn" onclick="submitMenuFeedback()"
+              style="width:100%;margin-top:12px;padding:14px;background:#F08300;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">
+        送信する
+      </button>
+    </div>
+    <div id="feedback-success" style="display:none;margin-top:20px;padding:24px 20px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">✅</div>
+      <div style="font-size:16px;font-weight:bold;color:#2E7D32;margin-bottom:6px;">送信しました</div>
+      <div style="font-size:13px;color:#555;line-height:1.6;">ご意見ありがとうございます。<br>店舗で内容を確認させていただきます。</div>
+      <button onclick="resetFeedbackForm()"
+              style="margin-top:14px;padding:10px 20px;background:#fff;color:#F08300;border:2px solid #F08300;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;">
+        もう一度送信する
+      </button>
+    </div>
+
+    <!-- ③ 月間献立 -->
+    <div id="monthly-menu-card" style="display:none;margin-top:20px;"></div>
+  </div>
+
+  <!-- ご相談・お問い合わせ(Phase 2b: ⑥相談 から遷移) -->
+  <div id="form-shoptalk" class="form-wrap">
+    <div class="form-title">💬 ご相談・お問い合わせ</div>
+
+    <!-- 入力エリア -->
+    <div id="shoptalk-form-area" style="margin-top:8px;">
+      <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:14px 16px;margin-bottom:18px;font-size:13.5px;color:#444;line-height:1.7;">
+        他のメニューに当てはまらないご相談・ご質問は、こちらにお書きください。<br>
+        店舗のスタッフが内容を確認の上、LINEまたはお電話でご連絡いたします。
+      </div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin-bottom:8px;">📝 ご相談内容</div>
+      <textarea id="st-message" placeholder="例:&#10;・第2,第4水曜日だけ配達してほしい&#10;・現金から口座振替に変えたい&#10;・最近食が細くなったので量を減らしたい" rows="6"
+                style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:18px 0 8px;">📞 ご連絡用電話番号 <span style="font-size:12px;color:#999;font-weight:normal;">(任意)</span></div>
+      <input type="tel" id="st-phone" placeholder="例:090-1234-5678"
+             style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;">
+      <div style="font-size:11.5px;color:#999;margin-top:6px;line-height:1.5;">
+        登録済の電話番号と異なる番号にご連絡が必要な場合のみご記入ください。
+      </div>
+
+      <button id="st-submit-btn" onclick="submitShopTalk()"
+              style="width:100%;margin-top:18px;padding:14px;background:#F08300;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">
+        送信する
+      </button>
+    </div>
+
+    <!-- 送信完了 -->
+    <div id="shoptalk-success" style="display:none;margin-top:20px;padding:24px 20px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">✅</div>
+      <div style="font-size:16px;font-weight:bold;color:#2E7D32;margin-bottom:6px;">送信しました</div>
+      <div style="font-size:13px;color:#555;line-height:1.6;">
+        ご相談ありがとうございます。<br>店舗で内容を確認の上、ご連絡いたします。
+      </div>
+      <button onclick="resetShopTalkForm()"
+              style="margin-top:14px;padding:10px 20px;background:#fff;color:#F08300;border:2px solid #F08300;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;">
+        もう一度相談する
+      </button>
+    </div>
+  </div>
+
+  <!-- お届け種類・曜日の変更(Phase 2b: 曜日・種類をまとめて差替える) -->
+  <div id="form-bulkChange" class="form-wrap">
+    <div class="form-title">✨ お届け種類・曜日の変更</div>
+
+    <div id="bulkchange-form-area">
+      <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:14px 16px;margin-bottom:18px;font-size:13.5px;color:#444;line-height:1.7;">
+        現在のご利用内容を、新しい曜日・お弁当の組み合わせに切り替えます。<br>
+        指定した「切替日」から新しい内容で配達を開始し、それまでは現在の内容のままです。
+      </div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:8px 0 8px;">📅 変更開始日(いつから新しい内容にしますか?)</div>
+      <select id="bc-start-date" onchange="bcOnStartDateChange()"
+              style="width:100%;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;background:white;">
+        <option value="">▼ 変更開始日を選んでください</option>
+      </select>
+      <div style="font-size:11.5px;color:#999;margin-top:5px;line-height:1.5;">
+        ※ 月〜金から選択できます。前週の水曜17時が締切のため、それ以降の日付のみ表示されます。
+      </div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:22px 0 8px;">🍱 新しいお弁当の種類・数量</div>
+      <div id="bc-bento-grid"></div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:22px 0 8px;">📆 新しい配達曜日<span style="font-size:12px;color:#999;font-weight:normal;margin-left:5px;">(週3日以上)</span></div>
+      <div id="bc-day-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;"></div>
+
+      <div style="font-size:15px;font-weight:bold;color:#333;margin:22px 0 8px;">✏️ 備考<span style="font-size:12px;color:#999;font-weight:normal;margin-left:5px;">(任意)</span></div>
+      <textarea id="bc-note" placeholder="例:第2,第4水曜日のみなどイレギュラーなご希望" rows="3"
+                style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;resize:vertical;line-height:1.6;"></textarea>
+
+      <button id="bc-submit-btn" onclick="submitBulkChange()"
+              style="width:100%;margin-top:20px;padding:14px;background:#F08300;color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">
+        変更を申請する
+      </button>
+    </div>
+
+    <div id="bulkchange-success" style="display:none;margin-top:20px;padding:24px 20px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:8px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">✅</div>
+      <div style="font-size:16px;font-weight:bold;color:#2E7D32;margin-bottom:6px;">変更を申請しました</div>
+      <div style="font-size:13px;color:#555;line-height:1.6;">
+        店舗で内容を確認後、切替日から新しい内容で配達いたします。<br>
+        ご質問はLINEまたはお電話でお気軽にどうぞ。
+      </div>
+    </div>
+  </div>
+
+  <!-- 登録情報・お問い合わせ(Phase 2b: リッチメニュー⑤の入口) -->
+  <div id="form-settings" class="form-wrap">
+    <div class="form-title">⚙️ 登録情報・お問い合わせ</div>
+    <div class="cm-section-title" style="margin-top:8px;">ご用件をお選びください</div>
+
+    <button type="button" class="cm-item" onclick="openCustomerEditModal()">
+      <div class="cm-row">
+        <div class="cm-icon">👤</div>
+        <div class="cm-body">
+          <div class="cm-title">登録情報の変更</div>
+          <div class="cm-desc">お名前・ご住所・電話番号・お支払い方法</div>
+        </div>
+        <div class="cm-arrow">›</div>
+      </div>
+    </button>
+
+    <button type="button" class="cm-item" onclick="loadAndShow('shoptalk')">
+      <div class="cm-row">
+        <div class="cm-icon">💬</div>
+        <div class="cm-body">
+          <div class="cm-title">店舗に相談・お問い合わせ</div>
+          <div class="cm-desc">他のメニューに当てはまらないご相談</div>
+        </div>
+        <div class="cm-arrow">›</div>
+      </div>
+    </button>
   </div>
 
   <!-- 新規注文(顧客情報登録 → 注文入力 の2ステップ式) -->
@@ -1861,30 +2030,6 @@ body.cancel-mode-active {
 
     <!-- ステップ2: 注文入力(顧客情報があれば直接ここから) -->
     <div id="no-step-order" style="display:none;">
-      <!-- 顧客情報サマリー(ステップ2で表示) -->
-      <div class="cust-info-card" id="no-cust-summary" style="margin-bottom:14px;">
-        <div class="cust-greet-row">
-          <div>
-            <div class="cust-greet-name" id="no-cust-summary-name">お客様</div>
-          </div>
-          <button class="cust-edit-btn" onclick="onNoBackToCustomerStep()">✏️ 変更</button>
-        </div>
-        <div class="cust-info-rows">
-          <div class="cust-info-row">
-            <span class="cust-info-lbl">ご住所</span>
-            <span class="cust-info-val" id="no-cust-summary-address">―</span>
-          </div>
-          <div class="cust-info-row">
-            <span class="cust-info-lbl">電話番号</span>
-            <span class="cust-info-val" id="no-cust-summary-phone">―</span>
-          </div>
-          <div class="cust-info-row">
-            <span class="cust-info-lbl">お支払い</span>
-            <span class="cust-info-val" id="no-cust-summary-payment">―</span>
-          </div>
-        </div>
-      </div>
-
       <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius: 7px;padding:14px 16px;margin-bottom:14px;font-size:14px;color:#444;line-height:1.7;">
         同じ種類で<b>合計週3日以上</b>のご注文を承ります。<br>
         ※ ごはんは他のお弁当とセットでのご注文となります。
@@ -1923,17 +2068,13 @@ body.cancel-mode-active {
       <div style="font-size:13px;color:#888;margin-bottom:10px;">前回ご入力された内容が表示されています。変更がなければそのままで結構です。</div>
 
       <div class="field">
-        <label>緊急時のご連絡先<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
-        <input type="tel" id="no-emergency" placeholder="例:080-9876-5432(ご家族など)">
-      </div>
-      <div class="field">
         <label>配達時の注意事項<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
         <textarea id="no-deliveryNote" placeholder="例:インターホンを鳴らさず、玄関前に置いてください"></textarea>
       </div>
-      <div class="field">
-        <label>不在時の対応<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
-        <textarea id="no-absentAction" placeholder="例:玄関前に置いてください / 宅配ボックスに入れてください / 電話で連絡をください"></textarea>
-      </div>
+
+      <!-- ★Phase 2b: 緊急連絡先・不在時対応はUI非表示(登録情報の変更 から編集する想定)。値はhiddenで保持して既存JSとの互換性を維持 -->
+      <input type="hidden" id="no-emergency">
+      <input type="hidden" id="no-absentAction">
 
       <!-- 「何でお知りになりましたか?」は初回注文時のみ表示 -->
       <div id="no-referral-wrap" style="display:none;">
@@ -1957,7 +2098,80 @@ body.cancel-mode-active {
 
   <!-- 注文変更 -->
   <div id="form-change" class="form-wrap">
-    <div class="form-title">📝 注文内容の変更</div>
+    <div class="form-title">📝 変更のお手続き</div>
+
+    <!-- ★Phase 2: 意図ベース・トップメニュー(6項目) -->
+    <div id="change-menu-top">
+      <button type="button" class="cm-item" onclick="cmGoTypeChange()">
+        <div class="cm-row">
+          <div class="cm-icon">🔁</div>
+          <div class="cm-body">
+            <div class="cm-title">数量の変更</div>
+            <div class="cm-desc">カレンダーから特定の日の数量を変える</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmGoBulkChange()">
+        <div class="cm-row">
+          <div class="cm-icon">✨</div>
+          <div class="cm-body">
+            <div class="cm-title">お届け種類・曜日の変更</div>
+            <div class="cm-desc">来週からの曜日・お弁当の組合せをまとめて変える</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmShowRestMenu()">
+        <div class="cm-row">
+          <div class="cm-icon">⏸</div>
+          <div class="cm-body">
+            <div class="cm-title">お届けのキャンセル</div>
+            <div class="cm-desc">特定日のキャンセル／しばらくキャンセル から選びます</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item cm-warn-color" onclick="cmGoEndService()">
+        <div class="cm-row">
+          <div class="cm-icon">🛑</div>
+          <div class="cm-body">
+            <div class="cm-title">利用終了</div>
+            <div class="cm-desc">今後の配達を終了する</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- ★Phase 2: お休み 3分岐サブメニュー -->
+    <div id="change-menu-rest" style="display:none;">
+      <button type="button" class="cm-back" onclick="cmShowTopMenu()">‹ 戻る</button>
+      <div class="cm-section-title">キャンセルの種類を選んでください</div>
+      <button type="button" class="cm-item" onclick="cmGoDateCancel()">
+        <div class="cm-row">
+          <div class="cm-icon">📅</div>
+          <div class="cm-body">
+            <div class="cm-title">特定日のキャンセル</div>
+            <div class="cm-desc">例：来週の月曜だけ届け不要</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+      <button type="button" class="cm-item" onclick="cmGoSuspend()">
+        <div class="cm-row">
+          <div class="cm-icon">🏖</div>
+          <div class="cm-body">
+            <div class="cm-title">しばらくキャンセル(再開予定あり)</div>
+            <div class="cm-desc">例：旅行・入院などで一定期間お休み</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- ★旧UI(select方式)。Phase 2導入後は非表示。既存JSとの互換性のため要素は残存 -->
+    <div id="change-legacy-content" style="display:none;">
     <div class="customer-card" id="ccard-change" style="display:none;"></div>
     <div id="fields-change">
       <div class="sec-label">お客様情報</div>
@@ -2042,6 +2256,7 @@ body.cancel-mode-active {
     <div class="sec-label">店舗への伝達事項<span style="font-size:12px;color:#aaa;font-weight:normal;"> （任意）</span></div>
     <div class="field"><textarea id="ch-note" placeholder="その他ご要望など"></textarea></div>
     <button class="btn-submit" onclick="submitForm('change')">送信する</button>
+    </div>  <!-- /#change-legacy-content -->
   </div>
 
   <!-- 利用停止 -->
@@ -2477,6 +2692,354 @@ function actionTypeChange()  { withModeCheck(function(){ showTypeChangeGuide(); 
 function actionCancel()      { withModeCheck(function(){ showCancelGuide(); }); }
 function actionEndService()  { withModeCheck(function(){ openEndServiceModal(); }); }
 
+// ★Phase 2: 意図ベース変更メニューのナビゲーション
+function cmShowTopMenu() {
+  var t = document.getElementById('change-menu-top');
+  var r = document.getElementById('change-menu-rest');
+  if (t) t.style.display = '';
+  if (r) r.style.display = 'none';
+}
+function cmShowRestMenu() {
+  var t = document.getElementById('change-menu-top');
+  var r = document.getElementById('change-menu-rest');
+  if (t) t.style.display = 'none';
+  if (r) r.style.display = '';
+}
+function cmGoOrder()        { actionNewOrder(); }
+function cmGoTypeChange()   { actionTypeChange(); }
+function cmGoDateCancel()   { actionCancel(); }
+function cmGoEndService()   { actionEndService(); }
+function cmGoProfileEdit()  { openCustomerEditModal(); }
+function cmGoSuspend()      { alert('「しばらくお休み」機能は次回更新(Phase 2b)で実装予定です。\n現在は「特定の日だけお休み」または「やめる(利用終了)」をご利用ください。'); }
+// ★Phase 2b: ⑥相談 → 専用フォームへ遷移
+function cmGoShopTalk()     { loadAndShow('shoptalk'); }
+
+// ★Phase 2b: ご相談・お問い合わせ送信
+function submitShopTalk() {
+  var msgEl   = document.getElementById('st-message');
+  var phoneEl = document.getElementById('st-phone');
+  var btn     = document.getElementById('st-submit-btn');
+  if (!msgEl || !btn) return;
+  var msg = (msgEl.value || '').trim();
+  if (!msg) { alert('ご相談内容を入力してください'); return; }
+  if (!userId) { alert('ユーザー情報が取得できません。LINEから再度開き直してください。'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  var customerName = (window._customerData && window._customerData.name) || '';
+  var phone = phoneEl ? (phoneEl.value || '').trim() : '';
+
+  apiGet('submitConsultation', {
+    line_user_id:  userId,
+    customer_name: customerName,
+    phone:         phone,
+    message:       msg
+  }, function(data) {
+    if (data && data.ok) {
+      document.getElementById('shoptalk-form-area').style.display = 'none';
+      document.getElementById('shoptalk-success').style.display   = 'block';
+    } else {
+      alert('送信に失敗しました:' + (data && data.error ? data.error : '不明なエラー'));
+      btn.disabled = false;
+      btn.textContent = '送信する';
+    }
+  }, function(err) {
+    alert('送信に失敗しました。電波状況をご確認のうえ再度お試しください。');
+    btn.disabled = false;
+    btn.textContent = '送信する';
+  });
+}
+
+// ★Phase 2b: ご相談フォームのリセット(再送信用)
+function resetShopTalkForm() {
+  var msgEl   = document.getElementById('st-message');
+  var phoneEl = document.getElementById('st-phone');
+  var btn     = document.getElementById('st-submit-btn');
+  if (msgEl)   msgEl.value = '';
+  if (phoneEl) phoneEl.value = '';
+  if (btn)     { btn.disabled = false; btn.textContent = '送信する'; }
+  var fa = document.getElementById('shoptalk-form-area');
+  var fs = document.getElementById('shoptalk-success');
+  if (fa) fa.style.display = '';
+  if (fs) fs.style.display = 'none';
+}
+
+// ============================================================
+// ★Phase 2b: まとめて内容変更(schedule_change)
+//   現在の利用内容(曜日・お弁当タイプ)を、指定した切替日から
+//   新しいパターンにまるごと差し替える申請を bento に送信する。
+// ============================================================
+var bcState = {
+  startDate: '',                  // 'YYYY-MM-DD'
+  items: {},                      // { 'うちくるおかず': qty, ... }
+  dows: [],                       // [1=月, 2=火, ..., 5=金]
+  note: ''
+};
+
+// ⑥相談 用ボタンから遷移
+function cmGoBulkChange() { loadAndShow('bulkChange'); }
+
+// 変更開始日の選択肢を生成
+//   既存の getEditableWeek() ロジック(前週水曜17時締切)を流用し、編集可能週の月曜から4週分の月〜金を表示
+function bcBuildStartDateOptions() {
+  var sel = document.getElementById('bc-start-date');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">▼ 変更開始日を選んでください</option>';
+
+  // 締切ロジック: 新規注文と同じ getEditableWeek を使う
+  var ew = getEditableWeek();
+  var startMonday = ew && ew.monday ? new Date(ew.monday) : null;
+  if (!startMonday) return;
+
+  var DOW_JA = ['日','月','火','水','木','金','土'];
+  for (var w = 0; w < 4; w++) {                       // 4週分
+    for (var d = 0; d < 5; d++) {                     // 月-金
+      var dt = new Date(startMonday);
+      dt.setDate(startMonday.getDate() + (w * 7) + d);
+      var iso = dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate());
+      var label = (dt.getMonth()+1) + '月' + dt.getDate() + '日(' + DOW_JA[dt.getDay()] + ')';
+      var opt = document.createElement('option');
+      opt.value = iso;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+  }
+}
+
+function bcOnStartDateChange() {
+  var sel = document.getElementById('bc-start-date');
+  bcState.startDate = sel ? sel.value : '';
+}
+
+// 弁当グリッド描画
+function bcRenderBentoGrid() {
+  var grid = document.getElementById('bc-bento-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  var COLOR_MAP = {
+    'うちくるおかず':'#4CAF50',
+    'うちくる小箱':'#2196F3',
+    'うちくるダブル':'#E91E63',
+    'うちくるご膳':'#D32F2F',
+    'ごはん':'#FFA726'
+  };
+  BENTO_LIST.forEach(function(name){
+    var qty = bcState.items[name] || 0;
+    var checked = qty > 0;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;border:1.5px solid ' + (checked ? '#F08300' : '#ddd') +
+                        ';border-radius:6px;background:white;margin-bottom:8px;overflow:hidden;';
+    row.innerHTML =
+      '<div onclick="bcToggleBento(\'' + name + '\')" style="width:46px;display:flex;align-items:center;justify-content:center;background:#f8f8f8;border-right:1.5px solid #ddd;cursor:pointer;align-self:stretch;">' +
+        '<div style="width:22px;height:22px;border:2px solid ' + (checked?'#F08300':'#ccc') + ';background:' + (checked?'#F08300':'white') + ';border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;color:white;">' + (checked?'✓':'') + '</div>' +
+      '</div>' +
+      '<div onclick="bcToggleBento(\'' + name + '\')" style="flex:1;padding:12px;cursor:pointer;display:flex;align-items:center;gap:10px;">' +
+        '<span style="width:14px;height:14px;background:' + (COLOR_MAP[name]||'#888') + ';border-radius:3px;display:inline-block;"></span>' +
+        '<span style="font-size:15px;font-weight:bold;">' + name + '</span>' +
+      '</div>' +
+      (checked ? (
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-left:1.5px solid #eee;">' +
+          '<button onclick="bcChangeBentoQty(\'' + name + '\',-1)" style="width:32px;height:32px;border:1.5px solid #F08300;background:white;color:#F08300;border-radius:5px;font-size:18px;font-weight:bold;cursor:pointer;">−</button>' +
+          '<span style="min-width:28px;text-align:center;font-size:16px;font-weight:bold;">' + qty + '</span>' +
+          '<button onclick="bcChangeBentoQty(\'' + name + '\',1)" style="width:32px;height:32px;border:1.5px solid #F08300;background:#F08300;color:white;border-radius:5px;font-size:18px;font-weight:bold;cursor:pointer;">+</button>' +
+        '</div>'
+      ) : '');
+    grid.appendChild(row);
+  });
+}
+
+function bcToggleBento(name) {
+  if (bcState.items[name] && bcState.items[name] > 0) {
+    bcState.items[name] = 0;
+  } else {
+    bcState.items[name] = 1;
+  }
+  bcRenderBentoGrid();
+}
+
+function bcChangeBentoQty(name, delta) {
+  var cur = bcState.items[name] || 0;
+  cur = Math.max(0, Math.min(9, cur + delta));
+  bcState.items[name] = cur;
+  bcRenderBentoGrid();
+}
+
+// 曜日グリッド描画
+function bcRenderDayGrid() {
+  var grid = document.getElementById('bc-day-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  var DOWS = [
+    { num: 1, label: '月' },
+    { num: 2, label: '火' },
+    { num: 3, label: '水' },
+    { num: 4, label: '木' },
+    { num: 5, label: '金' }
+  ];
+  DOWS.forEach(function(d){
+    var on = bcState.dows.indexOf(d.num) !== -1;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.onclick = function(){ bcToggleDow(d.num); };
+    btn.style.cssText = 'padding:14px 0;border:2px solid ' + (on?'#F08300':'#ddd') +
+                        ';background:' + (on?'#F08300':'white') +
+                        ';color:' + (on?'white':'#666') +
+                        ';border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;';
+    btn.textContent = d.label;
+    grid.appendChild(btn);
+  });
+}
+
+function bcToggleDow(num) {
+  var idx = bcState.dows.indexOf(num);
+  if (idx !== -1) bcState.dows.splice(idx, 1);
+  else bcState.dows.push(num);
+  bcState.dows.sort(function(a,b){ return a-b; });
+  bcRenderDayGrid();
+}
+
+// フォーム初期化(画面表示時に呼ぶ)
+function bcInitForm() {
+  bcState = { startDate: '', items: {}, dows: [], note: '' };
+  bcBuildStartDateOptions();
+  bcRenderBentoGrid();
+  bcRenderDayGrid();
+  var noteEl = document.getElementById('bc-note');
+  if (noteEl) noteEl.value = '';
+  var btn = document.getElementById('bc-submit-btn');
+  if (btn) { btn.disabled = false; btn.textContent = '変更を申請する'; }
+  var fa = document.getElementById('bulkchange-form-area');
+  var su = document.getElementById('bulkchange-success');
+  if (fa) fa.style.display = '';
+  if (su) su.style.display = 'none';
+}
+
+// 送信
+function submitBulkChange() {
+  // バリデーション
+  if (!bcState.startDate) {
+    alert('切替日を選んでください');
+    return;
+  }
+  var selectedItems = [];
+  Object.keys(bcState.items).forEach(function(k){
+    if (bcState.items[k] > 0) selectedItems.push({ bento_type: k, quantity: bcState.items[k] });
+  });
+  if (selectedItems.length === 0) {
+    alert('新しいお弁当を1種類以上お選びください');
+    return;
+  }
+  if (bcState.dows.length < 3) {
+    alert('週3日以上の曜日を選んでください');
+    return;
+  }
+  if (!userId) {
+    alert('ユーザー情報が取得できません。LINEから再度開き直してください。');
+    return;
+  }
+
+  var btn = document.getElementById('bc-submit-btn');
+  var noteEl = document.getElementById('bc-note');
+  bcState.note = noteEl ? (noteEl.value || '').trim() : '';
+  if (btn) { btn.disabled = true; btn.textContent = '送信中...'; }
+
+  var payload = {
+    action:             'change',
+    change_type:        'schedule_change',
+    line_user_id:       userId,
+    client_request_id:  genRequestId('scd'),
+    client_timestamp:   new Date().toISOString(),
+    start_date:         bcState.startDate,
+    items:              selectedItems,
+    schedule_days:      bcState.dows.slice(),
+    note:               bcState.note
+  };
+
+  apiPost(payload, function(res){
+    var fa = document.getElementById('bulkchange-form-area');
+    var su = document.getElementById('bulkchange-success');
+    if (fa) fa.style.display = 'none';
+    if (su) su.style.display = 'block';
+  }, function(err){
+    console.error('schedule_change API error:', err);
+    alert('送信に失敗しました。電波状況をご確認のうえ再度お試しください。');
+    if (btn) { btn.disabled = false; btn.textContent = '変更を申請する'; }
+  });
+}
+
+// ★Phase 3: 献立アンケートの送信
+function submitMenuFeedback() {
+  var msgEl = document.getElementById('feedback-message');
+  var btn   = document.getElementById('feedback-submit-btn');
+  if (!msgEl || !btn) return;
+  var msg = (msgEl.value || '').trim();
+  if (!msg) { alert('メッセージを入力してください'); return; }
+  if (!userId) { alert('ユーザー情報が取得できません。LINEから再度開き直してください。'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  // 今日の日付(JST想定。端末ローカル時刻でOK)
+  var t = new Date();
+  var todayStr = t.getFullYear() + '-' +
+                 ('0'+(t.getMonth()+1)).slice(-2) + '-' +
+                 ('0'+t.getDate()).slice(-2);
+
+  // 顧客名(loadCustomerInfoThenで読み込み済みなら入る)
+  var customerName = (window._customerData && window._customerData.name) || '';
+
+  // 今日の弁当種別(usageData にあれば抽出。無ければ空)
+  var bentoTypes = '';
+  try {
+    if (typeof usageData !== 'undefined' && usageData) {
+      var mKey = todayStr.substring(0,7);
+      var md = usageData[mKey];
+      if (md && md.days) {
+        var todayItem = null;
+        for (var i=0; i<md.days.length; i++) {
+          if (md.days[i].date === todayStr) { todayItem = md.days[i]; break; }
+        }
+        if (todayItem && todayItem.items) {
+          bentoTypes = todayItem.items.map(function(x){ return x.bento_type + (x.quantity > 1 ? '×'+x.quantity : ''); }).join(', ');
+        }
+      }
+    }
+  } catch(e) { /* 取得失敗時は空 */ }
+
+  apiGet('submitMenuFeedback', {
+    line_user_id:  userId,
+    customer_name: customerName,
+    delivery_date: todayStr,
+    bento_types:   bentoTypes,
+    message:       msg
+  }, function(data) {
+    if (data && data.ok) {
+      document.getElementById('feedback-form-area').style.display = 'none';
+      document.getElementById('feedback-success').style.display = 'block';
+    } else {
+      alert('送信に失敗しました：' + (data && data.error ? data.error : '不明なエラー'));
+      btn.disabled = false;
+      btn.textContent = '送信する';
+    }
+  }, function(err) {
+    alert('送信に失敗しました：' + (err && err.message ? err.message : '通信エラー'));
+    btn.disabled = false;
+    btn.textContent = '送信する';
+  });
+}
+
+function resetFeedbackForm() {
+  var msgEl = document.getElementById('feedback-message');
+  var btn   = document.getElementById('feedback-submit-btn');
+  if (msgEl) msgEl.value = '';
+  if (btn)   { btn.disabled = false; btn.textContent = '送信する'; }
+  var fa = document.getElementById('feedback-form-area');
+  var fs = document.getElementById('feedback-success');
+  if (fa) fa.style.display = '';
+  if (fs) fs.style.display = 'none';
+}
+
 // === はい/いいえ確認モーダル ===
 function showConfirmModal(icon, title, msg, yesLabel, noLabel, onYes) {
   setModalIcon(icon);
@@ -2536,8 +3099,10 @@ function showCancelGuide() {
 
 function proceedCancelGuide() {
   closeOpModal();
-  enterCancelMode();
-  scrollToUsageCalendar();
+  ensureOnUsageCalendarPage(function() {
+    enterCancelMode();
+    scrollToUsageCalendar();
+  });
 }
 
 // ===== ご案内モーダル(種類変更) =====
@@ -2556,8 +3121,37 @@ function showTypeChangeGuide() {
 
 function proceedTypeChangeGuide() {
   closeOpModal();
-  enterTypeChangeMode();
-  scrollToUsageCalendar();
+  ensureOnUsageCalendarPage(function() {
+    enterTypeChangeMode();
+    scrollToUsageCalendar();
+  });
+}
+
+// ★Phase 2b: 利用状況カレンダーページに遷移完了してからコールバックを実行するヘルパー
+//   form-usage が既に表示されている → 即コールバック
+//   そうでない(form-change 等から呼ばれた) → loadAndShow('usage')で切替 → カレンダー描画を待ってコールバック
+function ensureOnUsageCalendarPage(callback) {
+  var usageEl = document.getElementById('form-usage');
+  var calendarReadyNow = !!document.getElementById('usage-calendar-anchor');
+  if (usageEl && usageEl.classList.contains('active') && calendarReadyNow) {
+    callback();
+    return;
+  }
+  loadAndShow('usage');
+  // form-usage が active になりカレンダー要素が出現するまでポーリング(最大3秒)
+  var attempts = 0;
+  var maxAttempts = 30;
+  var checker = function() {
+    attempts++;
+    var isActive = usageEl && usageEl.classList.contains('active');
+    var hasCal   = !!document.getElementById('usage-calendar-anchor');
+    if ((isActive && hasCal) || attempts >= maxAttempts) {
+      callback();
+    } else {
+      setTimeout(checker, 100);
+    }
+  };
+  setTimeout(checker, 150);
 }
 
 // カレンダー本体までスムーズスクロール
@@ -3267,6 +3861,13 @@ window.onload = function() {
     else if(modeParam === 'usage')   { type = 'usage'; viewMode = 'usage'; }
     else if(modeParam === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
     else if(modeParam === 'mypage')  { type = 'usage'; viewMode = 'usage'; } // 後方互換
+    // ★v8: 新ナビゲーション(4分類)
+    // ★Phase 2b: リッチメニュー5分割に対応(newOrder/settings 追加)
+    else if(modeParam === 'change')  { type = 'change'; }                    // 変更(意図ベース6項目メニュー)
+    else if(modeParam === 'status')  { type = 'usage'; viewMode = 'combined'; } // 利用状況・配達状況統合
+    else if(modeParam === 'feedback'){ type = 'feedback'; }                  // 献立アンケート(Phase 3)
+    else if(modeParam === 'newOrder'){ type = 'newOrder'; }                  // 新規注文(Phase 2b)
+    else if(modeParam === 'settings'){ type = 'settings'; }                  // 登録情報の変更+お問い合わせ(Phase 2b)
   }
 
   // ★v7: デモモード検出(?demo=true)
@@ -3295,6 +3896,13 @@ window.onload = function() {
           else if(modeFromState === 'usage')   { type = 'usage'; viewMode = 'usage'; }
           else if(modeFromState === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
           else if(modeFromState === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
+          // ★v8: 新ナビゲーション(4分類)
+          // ★Phase 2b: リッチメニュー5分割
+          else if(modeFromState === 'change')  { type = 'change'; }
+          else if(modeFromState === 'status')  { type = 'usage'; viewMode = 'combined'; }
+          else if(modeFromState === 'feedback'){ type = 'feedback'; }
+          else if(modeFromState === 'newOrder'){ type = 'newOrder'; }
+          else if(modeFromState === 'settings'){ type = 'settings'; }
         }
       }catch(e){}
     }
@@ -3332,6 +3940,13 @@ window.onload = function() {
                 else if(m === 'usage')   { type = 'usage'; viewMode = 'usage'; }
                 else if(m === 'delivery'){ type = 'usage'; viewMode = 'delivery'; }
                 else if(m === 'mypage')  { type = 'usage'; viewMode = 'usage'; }
+                // ★v8: 新ナビゲーション(4分類)
+                // ★Phase 2b: リッチメニュー5分割
+                else if(m === 'change')  { type = 'change'; }
+                else if(m === 'status')  { type = 'usage'; viewMode = 'combined'; }
+                else if(m === 'feedback'){ type = 'feedback'; }
+                else if(m === 'newOrder'){ type = 'newOrder'; }
+                else if(m === 'settings'){ type = 'settings'; }
               }
               // ★v7: liff.state 内の ?demo=true も読む(LIFF経由のデモ起動)
               if(lsp.get('demo') === 'true'){
@@ -3360,8 +3975,23 @@ function loadAndShow(type) {
   var formEl=document.getElementById('form-'+type);
   if(!formEl){showMenu();return;}
 
+  // ★Phase 2b: 献立データを LIFF 起動時にバックグラウンドでプリフェッチ
+  //   (loadDailyMenu/loadMonthlyMenus は内部で sessionStorage キャッシュを参照するため、
+  //    既に取得済みなら何もしない / 未取得なら裏で取得しておく)
+  if (typeof loadDailyMenu === 'function' && dailyMenuData === null && !dailyMenuLoading) {
+    setTimeout(function(){ loadDailyMenu(function(){
+      // form-feedback or form-usage が表示中ならその場で再描画
+      if (typeof renderDailyMenuCard === 'function') renderDailyMenuCard();
+    }); }, 0);
+  }
+  if (typeof loadMonthlyMenus === 'function' && monthlyMenuData === null && !monthlyMenuLoading) {
+    setTimeout(function(){ loadMonthlyMenus(function(){
+      if (typeof renderMonthlyMenuCard === 'function') renderMonthlyMenuCard();
+    }); }, 0);
+  }
+
   // userId がある場合は顧客情報を取得してからフォームを表示
-  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage'].indexOf(type)!==-1){
+  if(userId && ['newOrder','change','stop','resume','mypage','billing','usage','feedback','shoptalk','settings','bulkChange'].indexOf(type)!==-1){
     document.getElementById('statusMsg').textContent='お客様情報を確認中...';
     document.getElementById('statusMsg').style.display='block';
     loadCustomerInfoThen(type, function(){
@@ -3382,13 +4012,56 @@ function onFormShown(type) {
     initNewOrderPage();
     return;
   }
-  if (type === 'mypage') {
-    // greeting表示
-    var cd = window._customerData || {};
-    if (cd.name) {
-      document.getElementById('greet-name-mypage').textContent = cd.name + '様';
-      document.getElementById('greet-mypage').style.display = 'block';
+  if (type === 'change') {
+    // ★Phase 2: 変更メニューに入ったら必ずトップメニューにリセット
+    cmShowTopMenu();
+    return;
+  }
+  if (type === 'feedback') {
+    // ★Phase 3: 献立アンケートページ → 献立カード(今日 + 月間)を表示
+    console.log('[feedback] onFormShown enter. dailyMenuData=' + (dailyMenuData?'loaded':'null') +
+                ' monthlyMenuData=' + (monthlyMenuData?'loaded':'null') +
+                ' dailyLoading=' + dailyMenuLoading + ' monthlyLoading=' + monthlyMenuLoading);
+
+    // 今日の献立: null/未ロード→読込+描画、既にデータあり→即描画、ロード中→そのまま(完了時に描画される想定)
+    if (dailyMenuData === null && !dailyMenuLoading) {
+      loadDailyMenu(function(){ renderDailyMenuCard(); });
+    } else if (dailyMenuData) {
+      renderDailyMenuCard();
     }
+
+    // 月間献立: 同様
+    if (monthlyMenuData === null && !monthlyMenuLoading) {
+      loadMonthlyMenus(function(){ renderMonthlyMenuCard(); });
+    } else if (monthlyMenuData) {
+      renderMonthlyMenuCard();
+    }
+
+    // ★Phase 3: フォーム状態をリセット
+    if (typeof resetFeedbackForm === 'function') resetFeedbackForm();
+    return;
+  }
+  if (type === 'shoptalk') {
+    // ★Phase 2b: ご相談フォーム表示時の処理
+    //   - フォーム状態をリセット(前回送信後の成功表示が残らないように)
+    //   - 電話番号欄に登録済み電話番号をプリフィル(差し替え可能)
+    if (typeof resetShopTalkForm === 'function') resetShopTalkForm();
+    var stPhoneEl = document.getElementById('st-phone');
+    if (stPhoneEl) {
+      var existingPhone = (window._customerData && window._customerData.phone) || '';
+      stPhoneEl.value = existingPhone;
+    }
+    return;
+  }
+  if (type === 'bulkChange') {
+    // ★Phase 2b: まとめて内容変更フォームの初期化
+    if (typeof bcInitForm === 'function') bcInitForm();
+    return;
+  }
+  if (type === 'mypage') {
+    // ★Phase 2b: 顧客名挨拶は非表示(登録情報の変更は ?mode=settings から行うため)
+    var _gm = document.getElementById('greet-mypage');
+    if (_gm) _gm.style.display = 'none';
   } else if (type === 'billing') {
     if (!billingData) {
       loadBillingData(function(data){
@@ -3567,13 +4240,10 @@ function renderInitialWelcome() {
       '<div class="welcome-title">ようこそ</div>' +
       '<div class="welcome-subtitle">うちくる夕食宅配サービスをご利用いただきありがとうございます</div>' +
       '<div class="welcome-desc">' +
-        'すでにご利用中の方も、これからの方も、<br>こちらからお手続きいただけます。' +
+        'すでにご利用中の方も、これからの方も、<br>LINEのリッチメニューよりお手続きいただけます。' +
       '</div>' +
-      '<button class="welcome-cta-btn" style="background:#F08300;color:white;" onclick="loadAndShow(\'newOrder\')">' +
-        'ご注文・お申込みへ進む' +
-      '</button>' +
       '<div style="font-size:13px;color:#666;margin-top:14px;line-height:1.7;text-align:left;background:#fffdf8;border:1px solid #f0d8b8;border-radius:6px;padding:10px 12px;">' +
-        '現在ご利用中の方・過去にご利用いただいた方は、注文フォーム内で<b>ご利用状況</b>をご選択ください。<br>店舗にて過去のご利用情報との紐付け後、マイページがご利用いただけます。' +
+        'ご利用にあたっては、リッチメニューの<b>「新規登録」</b>からお申し込みをお願いいたします。<br>登録完了後、マイページがご利用いただけるようになります。' +
       '</div>' +
     '</div>';
 }
@@ -3635,9 +4305,20 @@ function loadCustomerInfoThen(type, callback) {
   // ★v7: デモモードは API を叩かず、setupDemoData でセットした顧客情報をそのまま使う
   if (isDemoMode) { if(callback) callback(); return; }
 
-  fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
-    .then(function(r){ return r.json(); })
+  // ★Phase 3: sessionStorage キャッシュ(ページ間移動を高速化)
+  //   一度取得した顧客情報は同セッション中は再取得しない。
+  //   セッション終了(LIFF閉じる)で自動的に消える。
+  (function(){
+    try {
+      var __raw = sessionStorage.getItem('_uc_cust_' + userId);
+      if (__raw) return Promise.resolve(JSON.parse(__raw));
+    } catch(e) {}
+    return fetch(GAS_URL+'?action=getCustomer&userId='+encodeURIComponent(userId))
+      .then(function(r){ return r.json(); });
+  })()
     .then(function(data){
+      // 取得結果をキャッシュに格納(以後のページ移動が高速化)
+      try { sessionStorage.setItem('_uc_cust_' + userId, JSON.stringify(data)); } catch(e) {}
 
       var EMPTY_VALS = ['未登録','(未登録)','(未登録)','未入力','(未入力)','(未入力)',
                         'なし','ー','―','-','−','未','ない','なし','none','null','undefined'];
@@ -4272,6 +4953,7 @@ function pendingShortLabel(type) {
   if (type === 'date_cancel')     return '申請中:取消';
   if (type === 'cancel')          return '申請中:利用終了';
   if (type === 'profile_change')  return '申請中:プロフィール変更';
+  if (type === 'schedule_change') return '申請中:内容変更';
   return '申請中';
 }
 
@@ -4281,6 +4963,7 @@ function pendingFullLabel(type) {
   if (type === 'date_cancel')     return '日付キャンセルの申請';
   if (type === 'cancel')          return '利用終了の申請';
   if (type === 'profile_change')  return 'プロフィール変更の申請';
+  if (type === 'schedule_change') return 'お届け種類・曜日変更の申請';
   return '変更の申請';
 }
 
@@ -4413,7 +5096,7 @@ function renderWeeklyDeadlineAlert() {
   if (!alertEl) return;
 
   // ★v7: 水曜アラートは②利用状況モードのみ表示
-  if (viewMode !== 'usage') {
+  if (viewMode !== 'usage' && viewMode !== 'combined') {
     alertEl.style.display = 'none';
     return;
   }
@@ -4498,7 +5181,7 @@ function renderPreStartCard() {
   if (!cardEl) return;
 
   // ③お届け状況・献立モードのみ
-  if (viewMode !== 'delivery') {
+  if (viewMode !== 'delivery' && viewMode !== 'combined') {
     cardEl.style.display = 'none';
     return;
   }
@@ -4580,7 +5263,7 @@ function renderDeliveryProgressCard() {
   if (!cardEl) return;
 
   // ★v7: 配達進捗カードは③お届け状況・献立モードのみ表示
-  if (viewMode !== 'delivery') {
+  if (viewMode !== 'delivery' && viewMode !== 'combined') {
     cardEl.style.display = 'none';
     return;
   }
@@ -4679,7 +5362,26 @@ function renderDeliveryProgressCard() {
         '<span class="ico">🚚</span>' +
         '<span class="dpc-title transit">配達中です</span>' +
       '</div>';
+
+    // ★Phase 2b: 配達予想時間の終了時刻を過ぎたら「現在配達中です。もうしばらくお待ちください」に切替
+    var _etaPassed = false;
     if (etaLabel) {
+      // 「11:20〜13:20頃にお届け予定」→ 終了時刻 13:20 を抽出
+      var _m = etaLabel.match(/(\d{1,2}):(\d{2})\s*[〜~ー\-]\s*(\d{1,2}):(\d{2})/);
+      if (_m) {
+        var _now = new Date();
+        var _etaEnd = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate(),
+                               parseInt(_m[3]), parseInt(_m[4]), 0);
+        if (_now.getTime() > _etaEnd.getTime()) _etaPassed = true;
+      }
+    }
+
+    if (_etaPassed) {
+      msgHtml +=
+        '<div class="dpc-eta-label" style="font-size:15px;line-height:1.7;margin-top:8px;padding:12px 14px;background:#fff8f3;border-radius:6px;color:#444;">' +
+          '現在配達中です。<br>もうしばらくお待ちください。' +
+        '</div>';
+    } else if (etaLabel) {
       // eta_window.label が「11:20〜13:20頃にお届け予定」の場合、
       // 「にお届け予定」「お届け予定」などの末尾を取り除いて時間部分だけ抽出
       var etaTimeOnly = etaLabel
@@ -4753,6 +5455,21 @@ var monthlyMenuLoading = false;
 
 function loadMonthlyMenus(callback) {
   if (monthlyMenuLoading) return;
+
+  // ★Phase 2b: sessionStorage キャッシュ(当日中は再フェッチしない)
+  var _todayKey = '_uc_mmenu_' + (function(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  })();
+  try {
+    var _cached = sessionStorage.getItem(_todayKey);
+    if (_cached) {
+      monthlyMenuData = JSON.parse(_cached);
+      if (callback) callback(monthlyMenuData);
+      return;
+    }
+  } catch(e) {}
+
   monthlyMenuLoading = true;
   var cbName = 'monthlyMenuCb_' + Date.now();
   window[cbName] = function(data) {
@@ -4761,6 +5478,7 @@ function loadMonthlyMenus(callback) {
     var sc = document.getElementById(cbName + '_script');
     if (sc && sc.parentNode) sc.parentNode.removeChild(sc);
     monthlyMenuData = data || { ok: false, items: [] };
+    try { sessionStorage.setItem(_todayKey, JSON.stringify(monthlyMenuData)); } catch(e) {}
     if (callback) callback(monthlyMenuData);
   };
   var IG_MENU_URL = 'https://script.google.com/macros/s/AKfycbxR2G-zKplRX1nQHmE5sOTQjQ1g75HY5sGvpS6N-2ZV_R7SOCOuhyDmbq9hisDP_C25Tw/exec';
@@ -4778,17 +5496,65 @@ function loadMonthlyMenus(callback) {
 function renderMonthlyMenuCard() {
   var cardEl = document.getElementById('monthly-menu-card');
   if (!cardEl) return;
-  // ③お届け状況・献立モードのみ
-  if (viewMode !== 'delivery') { cardEl.style.display = 'none'; return; }
+  // ★Phase 2: 「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
+  var _fbEl2 = document.getElementById('form-feedback');
+  var _isFeedback2 = _fbEl2 && _fbEl2.classList.contains('active');
+  if (viewMode !== 'delivery' && !_isFeedback2) { console.log('[render-monthly] hide: not in delivery/feedback (viewMode=' + viewMode + ', feedback=' + _isFeedback2 + ')'); cardEl.style.display = 'none'; return; }
   if (!monthlyMenuData || !monthlyMenuData.ok || !monthlyMenuData.items || monthlyMenuData.items.length === 0) {
+    console.log('[render-monthly] hide: data check failed. data=' + JSON.stringify(monthlyMenuData ? {ok:monthlyMenuData.ok, itemsCount:(monthlyMenuData.items||[]).length} : null));
     cardEl.style.display = 'none';
     return;
   }
   var itemsHtml = '';
+  // ★Phase 2b: 当月・来月以外の年月(例:昨年同月の残骸)を除外
+  //   ① label から「YYYY年M月」「YYYY-MM」を抽出して年月チェック
+  //   ② URL のWP系アップロードパス `/uploads/YYYY/MM/` から年抽出
+  //   いずれかで「現在より前の年」が検出されたら除外する。
+  function _extractYMFromLabel(label) {
+    if (!label) return null;
+    var m = String(label).match(/(\d{4})\s*年\s*(\d{1,2})\s*月/);
+    if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+    m = String(label).match(/(\d{4})[\-\/](\d{1,2})/);
+    if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+    return null;
+  }
+  function _extractUploadYear(url) {
+    if (!url) return null;
+    // WordPress: /uploads/YYYY/MM/ または /wp-content/uploads/YYYY/MM/
+    var m = String(url).match(/\/uploads?\/(\d{4})\/\d{1,2}\//);
+    if (m) return parseInt(m[1]);
+    return null;
+  }
+  var _now = new Date();
+  var _curYear = _now.getFullYear();
+  var _curYM  = _curYear * 12 + (_now.getMonth() + 1);
+  var _nextYM = _curYM + 1;
+  console.log('[render-monthly] items=' + monthlyMenuData.items.length + ', current=' + _curYear + '-' + (_now.getMonth()+1));
   for (var i = 0; i < monthlyMenuData.items.length; i++) {
     var it = monthlyMenuData.items[i];
-    var href = it.pdfUrl || it.articleUrl || '';   // PDF優先、なければ記事ページ
+    var href = it.pdfUrl || it.articleUrl || '';
     if (!href) continue;
+
+    // ① labelから年月を抽出して当月/来月以外を除外
+    var _ym = _extractYMFromLabel(it.label);
+    if (_ym) {
+      var _itemYM = _ym.year * 12 + _ym.month;
+      var _keep = (_itemYM === _curYM || _itemYM === _nextYM);
+      console.log('[render-monthly] item="' + it.label + '" labelYM=' + _ym.year + '-' + _ym.month + ' → ' + (_keep ? 'keep' : 'skip'));
+      if (!_keep) continue;
+    }
+
+    // ② URLのアップロード年が現在より古ければ除外(WP系サイトで前年同月の残骸を弾く)
+    var _uploadYear = _extractUploadYear(it.pdfUrl) || _extractUploadYear(it.imageUrl) || _extractUploadYear(it.articleUrl);
+    if (_uploadYear && _uploadYear < _curYear) {
+      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' < ' + _curYear + ' → skip');
+      continue;
+    }
+
+    if (!_ym) {
+      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' → keep (年月不明だがUL年OK)');
+    }
+
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
     var imgHtml = it.imageUrl
       ? '<img class="mmc-item-img" src="' + escapeHtml(it.imageUrl) + '" alt="' + escapeHtml(it.label) + '" loading="lazy" onerror="this.style.display=\'none\';">'
@@ -4809,6 +5575,21 @@ function renderMonthlyMenuCard() {
 function loadDailyMenu(callback) {
   // ★v8: demoモードでもInstagramから実献立を取得(旧デモ分岐を削除)
   if (dailyMenuLoading) return;
+
+  // ★Phase 2b: sessionStorage キャッシュ(当日中は再フェッチしない)
+  var _todayKey = '_uc_dmenu_' + (function(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  })();
+  try {
+    var _cached = sessionStorage.getItem(_todayKey);
+    if (_cached) {
+      dailyMenuData = JSON.parse(_cached);
+      if (callback) callback(dailyMenuData);
+      return;
+    }
+  } catch(e) {}
+
   dailyMenuLoading = true;
 
   var cbName = 'dailyMenuCb_' + Date.now();
@@ -4818,6 +5599,8 @@ function loadDailyMenu(callback) {
     var sc = document.getElementById(cbName + '_script');
     if (sc && sc.parentNode) sc.parentNode.removeChild(sc);
     dailyMenuData = data || { ok: false };
+    // キャッシュ保存(失敗時もok=falseで保存→当日中はリトライしない)
+    try { sessionStorage.setItem(_todayKey, JSON.stringify(dailyMenuData)); } catch(e) {}
     if (callback) callback(dailyMenuData);
   };
 
@@ -4838,8 +5621,11 @@ function renderDailyMenuCard() {
   var cardEl = document.getElementById('daily-menu-card');
   if (!cardEl) return;
 
-  // ★v7: 今日の献立カードは③お届け状況・献立モードのみ表示
-  if (viewMode !== 'delivery') {
+  // ★Phase 2: 「お届け状況(delivery)」モード or 「献立アンケート(feedback)」ページで表示
+  //   form-feedback の active クラスで判定(typeグローバル変数に依存せず確実)
+  var _fbEl = document.getElementById('form-feedback');
+  var _isFeedback = _fbEl && _fbEl.classList.contains('active');
+  if (viewMode !== 'delivery' && !_isFeedback) {
     cardEl.style.display = 'none';
     return;
   }
@@ -4914,11 +5700,11 @@ function renderDailyMenuCard() {
    - ②利用状況(usage):顧客情報・水曜アラート・カレンダー・操作ボタン・利用金額
    - ③お届け状況・献立(delivery):配達進捗カード・今日の献立 */
 function applyViewMode() {
-  var isUsage = (viewMode === 'usage');
+  var isUsage = (viewMode === 'usage' || viewMode === 'combined');
 
-  // 顧客情報カード:②利用状況のみ表示
+  // ★Phase 2b: 顧客情報カードは常に非表示(登録情報の変更は ?mode=settings から行う)
   var custCard = document.getElementById('cust-info-card');
-  if (custCard) custCard.style.display = isUsage ? '' : 'none';
+  if (custCard) custCard.style.display = 'none';
 
   // usage-content(カレンダー・操作ボタン・利用金額):②利用状況のみ表示
   var usageContentEl = document.getElementById('usage-content');
@@ -4940,7 +5726,7 @@ function renderUsageContent() {
   // ★v5+: 配達進捗3段階カードを更新(③お届け状況・献立モードでのみ表示)
   renderDeliveryProgressCard();
 
-  // ★v7: 今日の献立カード(③お届け状況・献立モードでのみ表示)
+  // ★v7: 今日の献立カード(③お届け状況モードでのみ表示。Phase 2で献立アンケートページへ移動)
   if (viewMode === 'delivery') {
     if (dailyMenuData === null && !dailyMenuLoading) {
       loadDailyMenu(function(){ renderDailyMenuCard(); });
@@ -4976,26 +5762,10 @@ function renderUsageContent() {
 
   var html = '';
 
-  // === 操作ボタン(カレンダーより上) ===
-  var weekOptions = getEditableWeekOptions();
-  if (weekOptions.length > 0) {
-    html += '<div class="op-btn-grid">';
-    html += '<button class="op-btn-main" onclick="actionNewOrder()">新規注文</button>';
-    html += '<button class="op-btn-main" onclick="actionTypeChange()">数量の変更</button>';
-    html += '<button class="op-btn-main" onclick="actionCancel()">キャンセル</button>';
-    html += '<button class="op-btn-main" onclick="actionEndService()">配達ストップ</button>';
-    html += '</div>';
-  } else {
-    // 操作可能週がなくても新規注文はできるようにする
-    html += '<div class="op-btn-grid">';
-    html += '<button class="op-btn-main" onclick="actionNewOrder()">新規注文</button>';
-    html += '</div>';
-    html += '<div style="background:#f5f5f5;border:1px solid #ddd;border-radius: 6px;padding:11px 14px;font-size:13px;color:#888;margin-bottom:14px;text-align:center;">';
-    html += '現在、変更・キャンセル可能な配達週がありません';
-    html += '</div>';
-  }
+  // ★Phase 2: 操作ボタン(新規注文/数量変更/キャンセル/配達ストップ)は削除。
+  //           変更操作は「変更」ページ(?mode=change)の6項目メニューに統合済み。
 
-  // === 月タブ(ご利用終了ボタンの直下、カレンダーの直前) ===
+  // === 月タブ(カレンダーの直前) ===
   html += '<div class="month-tabs" id="month-tabs-usage"></div>';
 
   // === カレンダー本体(id付き:スクロール先のアンカー) ===
@@ -5439,10 +6209,12 @@ function renderUsageCalendar(monthData) {
     var dayData = dayMap[dateStr];
     var isEditable = isDateEditable(dateStr);
     var isToday = dateStr === todayStr;
+    var isPast  = dateStr < todayStr;  // ★Phase 2b: 過去日(YYYY-MM-DD文字列比較で十分)
 
     var cellClass = 'usage-cell';
     if (dow === 3) cellClass += ' wed-deadline'; // 水曜は全部ハイライト
     if (isToday) cellClass += ' today';
+    if (isPast)  cellClass += ' past';   // ★Phase 2b
     if (dayData && isEditable) cellClass += ' editable';
     if (!dayData) cellClass += ' no-delivery';
 
@@ -5679,6 +6451,52 @@ function onNoUsageStatusChange(value) {
   onUsUsageStatusChange(value);
 }
 
+// ★Phase 2b: 支払方法を billing API から確実にロードして _customerData.payment にセット
+//   getCustomer は顧客データシートからしか取らないため、支払方法は bento の billing API 経由で取得する。
+//   既に _customerData.payment があれば何もせず即callback。
+//   billingData がメモリにあれば即抽出。なければ loadBillingData を実行。
+function ensurePaymentMethodLoaded(callback) {
+  if (!callback) callback = function(){};
+  // 既に payment 設定済み → そのまま
+  if (window._customerData && (window._customerData.payment || '').trim()) {
+    callback();
+    return;
+  }
+  // billingData がメモリにある → 抽出
+  if (typeof billingData !== 'undefined' && billingData) {
+    populatePaymentFromBilling();
+    callback();
+    return;
+  }
+  // billingData 未取得 → fetch
+  if (typeof loadBillingData === 'function') {
+    loadBillingData(function(data){
+      billingData = data;
+      populatePaymentFromBilling();
+      callback();
+    });
+    return;
+  }
+  // fallback
+  callback();
+}
+
+// billingData から最新月の payment_method を抽出して _customerData.payment に設定
+function populatePaymentFromBilling() {
+  if (!window._customerData) window._customerData = {};
+  if ((window._customerData.payment || '').trim()) return;
+  if (!billingData) return;
+  var bentoPmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
+  var monthKeys = Object.keys(billingData).sort().reverse();
+  for (var mi = 0; mi < monthKeys.length; mi++) {
+    var bpm = billingData[monthKeys[mi]] && billingData[monthKeys[mi]].payment_method;
+    if (bpm && bentoPmMap[bpm]) {
+      window._customerData.payment = bentoPmMap[bpm];
+      return;
+    }
+  }
+}
+
 function initNewOrderPage() {
   // 注文入力部分を初期化
   noState.types = {};
@@ -5702,7 +6520,27 @@ function initNewOrderPage() {
     rows[j].style.background = 'white';
   }
 
-  // ★v5: 必ず利用状況選択ステップから開始
+  // ★Phase 2b: マイページ経由(LIFFで顧客情報が揃っている)場合は
+  //   ご利用状況選択(step-0)と顧客情報ステップ(step-1)を全てスキップして「現在利用中(active)」固定で確認ステップへ。
+  //   理由: マイページに入れる=既登録顧客 なので利用状況や顧客情報の再確認は不要。
+  //   支払い方法は bento の billing API から自動取得する。
+  var cdInit = window._customerData || {};
+  if (!isDemoMode && userId &&
+      (cdInit.name    || '').trim() &&
+      (cdInit.address || '').trim() &&
+      (cdInit.phone   || '').trim()) {
+    noState.usageStatus = 'active';
+    noState.requestOnlyLink = false;
+
+    // 支払方法を billing から確実にロードしてから注文入力ステップへ直行
+    //   (既登録顧客なので「ご注文を続けますか?」の確認画面は不要)
+    ensurePaymentMethodLoaded(function(){
+      noShowOrderStep();
+    });
+    return;
+  }
+
+  // ★v5: 通常の新規登録フロー(uchikuru-form/index.html 経由)は従来通り step-0 から
   noShowUsageSelectStep();
 }
 
@@ -5845,37 +6683,51 @@ function noShowOrderStep() {
   document.getElementById('no-step-confirm-order').style.display = 'none';
   document.getElementById('no-step-order').style.display = 'block';
 
-  // 顧客情報サマリー
   var cd = window._customerData || {};
-  document.getElementById('no-cust-summary-name').textContent = (cd.name || '') + '様';
-  document.getElementById('no-cust-summary-address').textContent = cd.address || '―';
-  document.getElementById('no-cust-summary-phone').textContent = cd.phone || '―';
+
+  // ★Phase 2b: 顧客情報サマリーUIは削除済(マイページでは不要)。null-safe にして既存JS互換性を維持
+  var _setText = function(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  _setText('no-cust-summary-name', (cd.name || '') + '様');
+  _setText('no-cust-summary-address', cd.address || '―');
+  _setText('no-cust-summary-phone', cd.phone || '―');
   var paymentLabel = cd.payment || '―';
   if (cd.payment === 'クレジットカード' && cd.cardLast4) {
     paymentLabel += ' (****' + cd.cardLast4 + ')';
   }
-  document.getElementById('no-cust-summary-payment').textContent = paymentLabel;
+  _setText('no-cust-summary-payment', paymentLabel);
 
-  // 配達情報の前回値を設定
+  // 配達情報の前回値を設定(hidden inputに保持される)
   document.getElementById('no-emergency').value     = cd.emergency || '';
   document.getElementById('no-deliveryNote').value  = cd.deliveryNote || '';
   document.getElementById('no-absentAction').value  = cd.absentAction || '';
 
-  // 「何でお知りになりましたか?」は初回のみ表示
-  // = 既存注文(usageData)が空 かつ referral 未入力 の場合に表示
+  // 「何でお知りになりましたか?」は新規登録フローでのみ表示。
+  // マイページから入った既存顧客(userId+顧客情報あり)には常に非表示。
   var referralWrap = document.getElementById('no-referral-wrap');
-  var hasAnyOrder = false;
-  if (usageData) {
-    Object.keys(usageData).forEach(function(k){
-      if (usageData[k] && usageData[k].days && usageData[k].days.length > 0) hasAnyOrder = true;
-    });
-  }
-  var alreadyAnswered = !!(cd.referral && cd.referral.length > 0);
-  if (hasAnyOrder || alreadyAnswered) {
+  var isMypageUser = userId &&
+                     (cd.name    || '').trim() &&
+                     (cd.address || '').trim() &&
+                     (cd.phone   || '').trim();
+  if (isMypageUser) {
     referralWrap.style.display = 'none';
   } else {
-    referralWrap.style.display = 'block';
-    document.getElementById('no-referral').value = '';
+    // 新規登録フロー: 既存注文があるか / 既に答えたかで判定
+    var hasAnyOrder = false;
+    if (usageData) {
+      Object.keys(usageData).forEach(function(k){
+        if (usageData[k] && usageData[k].days && usageData[k].days.length > 0) hasAnyOrder = true;
+      });
+    }
+    var alreadyAnswered = !!(cd.referral && cd.referral.length > 0);
+    if (hasAnyOrder || alreadyAnswered) {
+      referralWrap.style.display = 'none';
+    } else {
+      referralWrap.style.display = 'block';
+      document.getElementById('no-referral').value = '';
+    }
   }
 
   // 注文入力のレンダリング
@@ -7431,20 +8283,23 @@ function openCustomerRegisterModal() {
   renderCustomerEditView();
 }
 function openCustomerEditModal() {
-  modalState.view = 'customerEdit';
-  modalState.ceMode = 'edit';
-  var cd = window._customerData || {};
-  modalState.ceName = cd.name || '';
-  // 既存の name を「姓 名」のスペース区切りで分割
-  // スペースがなければ全部「姓」とする(後方互換)
-  var parts = String(cd.name || '').split(/[\s 　]+/).filter(function(s){ return s; });
-  modalState.ceLastName  = parts[0] || '';
-  modalState.ceFirstName = parts.slice(1).join(' ') || '';
-  modalState.ceAddress = cd.address || '';
-  modalState.cePhone = cd.phone || '';
-  modalState.cePayment = cd.payment || '';
-  modalState.ceCardLast4 = cd.cardLast4 || '';
-  renderCustomerEditView();
+  // ★Phase 2b: 開く前に支払方法を billing API から確実にロード(getCustomerは支払いを返さないため)
+  ensurePaymentMethodLoaded(function(){
+    modalState.view = 'customerEdit';
+    modalState.ceMode = 'edit';
+    var cd = window._customerData || {};
+    modalState.ceName = cd.name || '';
+    // 既存の name を「姓 名」のスペース区切りで分割
+    // スペースがなければ全部「姓」とする(後方互換)
+    var parts = String(cd.name || '').split(/[\s 　]+/).filter(function(s){ return s; });
+    modalState.ceLastName  = parts[0] || '';
+    modalState.ceFirstName = parts.slice(1).join(' ') || '';
+    modalState.ceAddress = cd.address || '';
+    modalState.cePhone = cd.phone || '';
+    modalState.cePayment = cd.payment || '';
+    modalState.ceCardLast4 = cd.cardLast4 || '';
+    renderCustomerEditView();
+  });
 }
 function renderCustomerEditView() {
   var isRegister = (modalState.ceMode === 'register');
@@ -7961,6 +8816,12 @@ function renderBillingContent() {
   var contentEl = document.getElementById('billing-content');
   if (!contentEl || !billingData) return;
 
+  // ★Phase 2b: 支払方法を billingData から抽出して _customerData.payment に設定
+  //   (顧客APIには payment が無いので、ここで自前で埋める。冪等なので安全に呼べる)
+  if (typeof populatePaymentFromBilling === 'function') {
+    populatePaymentFromBilling();
+  }
+
   // currentBillingMonth が未設定なら自動選択
   ensureCurrentMonth('billing');
 
@@ -7973,8 +8834,18 @@ function renderBillingContent() {
   var html = '';
   // ★payment_status からバッジ/通知を生成
   var pay = buildPaymentStatus(d);
+  // ★Phase 2b: 支払方法をタイトル横に表示
+  //   優先順位: _customerData.payment(日本語化済) > d.payment_method(英語コード)
+  //   支払い済みのときは pay.badge を優先表示するため重複させない
+  var cd = window._customerData || {};
+  var pmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
+  var pmLabel = cd.payment || pmMap[d.payment_method] || '';
+  var pmBadge = '';
+  if (pmLabel && !pay.badge) {
+    pmBadge = '<span style="display:inline-block;margin-left:8px;padding:3px 10px;background:#fff5ea;border:1px solid #F08300;color:#C26900;border-radius:12px;font-size:12px;font-weight:bold;vertical-align:middle;">お支払い:' + pmLabel + '</span>';
+  }
   html += '<div class="summary-card">';
-  html += '<div class="sc-title">ご請求サマリー' + pay.badge + '</div>';
+  html += '<div class="sc-title">ご請求サマリー' + pay.badge + pmBadge + '</div>';
   if (pay.notice) html += pay.notice;
   html += '<div class="sc-row"><span>集金済み</span><span class="sc-amount paid">' + (d.paid||0).toLocaleString() + '円</span></div>';
   html += '<div class="sc-row"><span>未集金</span><span class="sc-amount unpaid">' + (d.unpaid||0).toLocaleString() + '円</span></div>';
@@ -8229,4 +9100,3 @@ function showComplete(type){
 </script>
 </body>
 </html>
-<script async data-explicit-opt-in="true" data-deployment-id="dpl_6hVrjoYdYPtLBFfZuzzH6sGG1PUQ" src="https://vercel.live/_next-live/feedback/feedback.js"></script>
