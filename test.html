@@ -4136,7 +4136,10 @@ function renderCustomerInfoCard() {
     var payEl = document.getElementById('cust-info-payment');
     if (payEl) {
       var paymentLabel = pm;
-      if (pm === 'クレジットカード' && cd.cardLast4) {
+      // ★クレジットカード:後日追加予定のため一旦非表示
+      if (pm === 'クレジットカード') {
+        paymentLabel = '―';
+      } else if (pm === 'クレジットカード' && cd.cardLast4) {
         paymentLabel += ' (****' + cd.cardLast4 + ')';
       }
       payEl.textContent = paymentLabel;
@@ -6695,7 +6698,10 @@ function noShowOrderStep() {
   _setText('no-cust-summary-address', cd.address || '―');
   _setText('no-cust-summary-phone', cd.phone || '―');
   var paymentLabel = cd.payment || '―';
-  if (cd.payment === 'クレジットカード' && cd.cardLast4) {
+  // ★クレジットカード:後日追加予定のため一旦非表示
+  if (cd.payment === 'クレジットカード') {
+    paymentLabel = '―';
+  } else if (cd.payment === 'クレジットカード' && cd.cardLast4) {
     paymentLabel += ' (****' + cd.cardLast4 + ')';
   }
   _setText('no-cust-summary-payment', paymentLabel);
@@ -6752,7 +6758,10 @@ function noShowConfirmOrderStep() {
   document.getElementById('co-cust-summary-address').textContent = cd.address || '―';
   document.getElementById('co-cust-summary-phone').textContent = cd.phone || '―';
   var paymentLabel = cd.payment || '―';
-  if (cd.payment === 'クレジットカード' && cd.cardLast4) {
+  // ★クレジットカード:後日追加予定のため一旦非表示
+  if (cd.payment === 'クレジットカード') {
+    paymentLabel = '―';
+  } else if (cd.payment === 'クレジットカード' && cd.cardLast4) {
     paymentLabel += ' (****' + cd.cardLast4 + ')';
   }
   document.getElementById('co-cust-summary-payment').textContent = paymentLabel;
@@ -8343,7 +8352,9 @@ function renderCustomerEditView() {
   html += '</select>';
   html += '</div>';
 
-  // === クレジットカード選択時のみカード入力欄を表示 ===
+  // === ★クレジットカード:後日追加予定のため一旦非表示 ===
+  // クレジットカード選択時のみカード入力欄を表示(復活時にコメントアウト解除)
+  /*
   if (modalState.cePayment === 'クレジットカード') {
     html += '<div class="stripe-payment-section">';
     html += '<h4>💳 クレジットカード情報</h4>';
@@ -8362,6 +8373,7 @@ function renderCustomerEditView() {
     html += '<div class="stripe-secure-note">SSL暗号化通信で安全に登録されます</div>';
     html += '</div>';
   }
+  */
 
   html += '<button class="op-modal-confirm" onclick="submitCustomerInfo()">' + (isRegister ? 'この内容で登録する' : 'この内容で更新する') + '</button>';
   html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="closeOpModal()">キャンセル</button>';
@@ -8842,6 +8854,8 @@ function renderBillingContent() {
   var cd = window._customerData || {};
   var pmMap = { 'cash':'現金', 'bank_transfer':'口座振替', 'credit':'クレジットカード' };
   var pmLabel = cd.payment || pmMap[d.payment_method] || '';
+  // ★クレジットカード:後日追加予定のため一旦非表示(バッジを出さない)
+  if (pmLabel === 'クレジットカード') pmLabel = '';
   var pmBadge = '';
   if (pmLabel && !pay.badge) {
     pmBadge = '<span style="display:inline-block;margin-left:8px;padding:3px 10px;background:#fff5ea;border:1px solid #F08300;color:#C26900;border-radius:12px;font-size:12px;font-weight:bold;vertical-align:middle;">お支払い:' + pmLabel + '</span>';
