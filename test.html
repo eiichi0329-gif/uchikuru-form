@@ -1967,7 +1967,8 @@ body.cancel-mode-active {
           <option value="">選択してください</option>
           <option value="現金">現金</option>
           <option value="口座振替">口座振替</option>
-          <option value="クレジットカード">クレジットカード</option>
+          <!-- ★クレジットカード:後日追加予定のため一旦非表示 -->
+          <!-- <option value="クレジットカード">クレジットカード</option> -->
         </select>
       </div>
       <div id="no-cust-card-section" style="display:none;">
@@ -8337,7 +8338,8 @@ function renderCustomerEditView() {
   html += '<option value=""' + (modalState.cePayment === '' ? ' selected' : '') + '>選択してください</option>';
   html += '<option value="現金"' + (modalState.cePayment === '現金' ? ' selected' : '') + '>現金</option>';
   html += '<option value="口座振替"' + (modalState.cePayment === '口座振替' ? ' selected' : '') + '>口座振替</option>';
-  html += '<option value="クレジットカード"' + (modalState.cePayment === 'クレジットカード' ? ' selected' : '') + '>クレジットカード</option>';
+  // ★クレジットカード:後日追加予定のため一旦非表示
+  // html += '<option value="クレジットカード"' + (modalState.cePayment === 'クレジットカード' ? ' selected' : '') + '>クレジットカード</option>';
   html += '</select>';
   html += '</div>';
 
