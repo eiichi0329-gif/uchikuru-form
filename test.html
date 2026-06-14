@@ -4445,6 +4445,8 @@ function loadCustomerInfoThen(type, callback) {
       // APIから取得できた値があればそれを使用、無ければ既存(テスト用初期値含む)を維持
       var existing = window._customerData || {};
       window._customerData = {
+        // ★Phase 2c: bentoの enrolled フィールドを保持(紐付け済み顧客は newOrder の step-0 をスキップ)
+        enrolled: (data && data.enrolled === true),
         name:    nm || existing.name    || '',
         address: ad || existing.address || '',
         phone:   ph || existing.phone   || '',
@@ -6635,11 +6637,16 @@ function initNewOrderPage() {
   //   ご利用状況選択(step-0)と顧客情報ステップ(step-1)を全てスキップして「現在利用中(active)」固定で確認ステップへ。
   //   理由: マイページに入れる=既登録顧客 なので利用状況や顧客情報の再確認は不要。
   //   支払い方法は bento の billing API から自動取得する。
+  // ★Phase 2c: 判定キーを「名前+住所+電話」→ bento の enrolled に変更
+  //   - enrolled=true: bento で LINE ID が顧客に紐付け済み → 申請不要、直接注文入力へ
+  //   - enrolled=false: 未紐付け → 従来通り step-0 から(本人確認/情報入力フロー)
+  //   旧ロジック(名前+住所+電話 が揃っている)もフォールバックとして残置(bento ダウン時の安全網)
   var cdInit = window._customerData || {};
-  if (!isDemoMode && userId &&
-      (cdInit.name    || '').trim() &&
-      (cdInit.address || '').trim() &&
-      (cdInit.phone   || '').trim()) {
+  var isEnrolled = (cdInit.enrolled === true);
+  var hasLocalCustomer = (cdInit.name || '').trim() &&
+                         (cdInit.address || '').trim() &&
+                         (cdInit.phone || '').trim();
+  if (!isDemoMode && userId && (isEnrolled || hasLocalCustomer)) {
     noState.usageStatus = 'active';
     noState.requestOnlyLink = false;
 
