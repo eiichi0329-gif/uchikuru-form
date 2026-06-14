@@ -1634,18 +1634,16 @@ body.cancel-mode-active {
 </head>
 <body>
 
-<!-- ★デバッグバー: ?debug=1 で常時表示。LIFF初期化前から表示し、初期化後にuserIdを差し込む。後で削除予定 -->
+<!-- ★デバッグバー: 常時表示版(本番ローンチ後の切り分け用、後で削除予定) -->
 <script>
 (function(){
-  if (location.search.indexOf('debug=1') === -1) return;
   var d = document.createElement('div');
   d.id = 'debug-bar';
-  d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fff8f3;border-bottom:2px solid #F08300;padding:10px 14px;font-size:11px;color:#333;z-index:99999;word-break:break-all;font-family:monospace;line-height:1.4;';
-  d.innerHTML = '<b>[DEBUG]</b> loading... waiting for LIFF init';
-  // body はまだ存在しないので DOMContentLoaded で挿入
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fff8f3;border-bottom:2px solid #F08300;padding:10px 14px;font-size:10px;color:#333;z-index:99999;word-break:break-all;font-family:monospace;line-height:1.5;max-height:120px;overflow-y:auto;';
+  d.innerHTML = '<b>[DEBUG]</b> URL:<br>' + location.href + '<br>search: ' + (location.search || '(none)') + '<br>waiting for LIFF init...';
   document.addEventListener('DOMContentLoaded', function(){
     document.body.insertBefore(d, document.body.firstChild);
-    document.body.style.paddingTop = '70px';
+    document.body.style.paddingTop = '130px';
   });
 })();
 </script>
@@ -4087,17 +4085,17 @@ window.onload = function() {
         liff.getProfile()
           .then(function(profile){
             userId=profile.userId;
-            // ★デバッグモード: ?debug=1 で userId を画面上部に表示(問題切り分け用、後で削除)
+            // ★デバッグ表示の更新(常時表示版)
             var dbg = document.getElementById('debug-bar');
             if (dbg) {
-              dbg.innerHTML = '<b>[DEBUG]</b> LIFF userId:<br>' + (userId || '(empty)') + '<br>displayName: ' + (profile.displayName || '');
+              dbg.innerHTML = '<b>[DEBUG]</b> LIFF userId:<br>' + (userId || '(empty)') + '<br>displayName: ' + (profile.displayName || '') + '<br>URL: ' + location.href;
             }
             checkExistingCustomerThenLoad(type);
           })
           .catch(function(err){
             var dbg = document.getElementById('debug-bar');
             if (dbg) {
-              dbg.innerHTML = '<b>[DEBUG]</b> liff.getProfile FAILED:<br>' + (err && err.message ? err.message : String(err));
+              dbg.innerHTML = '<b>[DEBUG]</b> liff.getProfile FAILED:<br>' + (err && err.message ? err.message : String(err)) + '<br>URL: ' + location.href;
             }
             checkExistingCustomerThenLoad(type);
           });
