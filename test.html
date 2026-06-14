@@ -1634,20 +1634,6 @@ body.cancel-mode-active {
 </head>
 <body>
 
-<!-- ★デバッグバー: 常時表示版(本番ローンチ後の切り分け用、後で削除予定) -->
-<script>
-(function(){
-  var d = document.createElement('div');
-  d.id = 'debug-bar';
-  d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fff8f3;border-bottom:2px solid #F08300;padding:10px 14px;font-size:10px;color:#333;z-index:99999;word-break:break-all;font-family:monospace;line-height:1.5;max-height:120px;overflow-y:auto;';
-  d.innerHTML = '<b>[DEBUG]</b> URL:<br>' + location.href + '<br>search: ' + (location.search || '(none)') + '<br>waiting for LIFF init...';
-  document.addEventListener('DOMContentLoaded', function(){
-    document.body.insertBefore(d, document.body.firstChild);
-    document.body.style.paddingTop = '130px';
-  });
-})();
-</script>
-
 <div id="uc-modal-overlay">
   <div id="uc-modal-box" onclick="event.stopPropagation()">
     <div id="uc-modal-icon">⚠️</div>
@@ -4084,22 +4070,8 @@ window.onload = function() {
           }catch(e){}
         }
         liff.getProfile()
-          .then(function(profile){
-            userId=profile.userId;
-            // ★デバッグ表示の更新(常時表示版)
-            var dbg = document.getElementById('debug-bar');
-            if (dbg) {
-              dbg.innerHTML = '<b>[DEBUG]</b> LIFF userId:<br>' + (userId || '(empty)') + '<br>displayName: ' + (profile.displayName || '') + '<br>URL: ' + location.href;
-            }
-            checkExistingCustomerThenLoad(type);
-          })
-          .catch(function(err){
-            var dbg = document.getElementById('debug-bar');
-            if (dbg) {
-              dbg.innerHTML = '<b>[DEBUG]</b> liff.getProfile FAILED:<br>' + (err && err.message ? err.message : String(err)) + '<br>URL: ' + location.href;
-            }
-            checkExistingCustomerThenLoad(type);
-          });
+          .then(function(profile){userId=profile.userId;checkExistingCustomerThenLoad(type);})
+          .catch(function(){checkExistingCustomerThenLoad(type);});
       })
       .catch(function(){clearTimeout(liffTimeout);loadAndShow(type);});
   } else { loadAndShow(type); }
