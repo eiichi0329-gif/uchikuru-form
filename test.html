@@ -1634,6 +1634,22 @@ body.cancel-mode-active {
 </head>
 <body>
 
+<!-- ★デバッグバー: ?debug=1 で常時表示。LIFF初期化前から表示し、初期化後にuserIdを差し込む。後で削除予定 -->
+<script>
+(function(){
+  if (location.search.indexOf('debug=1') === -1) return;
+  var d = document.createElement('div');
+  d.id = 'debug-bar';
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fff8f3;border-bottom:2px solid #F08300;padding:10px 14px;font-size:11px;color:#333;z-index:99999;word-break:break-all;font-family:monospace;line-height:1.4;';
+  d.innerHTML = '<b>[DEBUG]</b> loading... waiting for LIFF init';
+  // body はまだ存在しないので DOMContentLoaded で挿入
+  document.addEventListener('DOMContentLoaded', function(){
+    document.body.insertBefore(d, document.body.firstChild);
+    document.body.style.paddingTop = '70px';
+  });
+})();
+</script>
+
 <div id="uc-modal-overlay">
   <div id="uc-modal-box" onclick="event.stopPropagation()">
     <div id="uc-modal-icon">⚠️</div>
@@ -4072,16 +4088,19 @@ window.onload = function() {
           .then(function(profile){
             userId=profile.userId;
             // ★デバッグモード: ?debug=1 で userId を画面上部に表示(問題切り分け用、後で削除)
-            if (location.search.indexOf('debug=1') !== -1) {
-              var dbg = document.createElement('div');
-              dbg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#fff8f3;border-bottom:2px solid #F08300;padding:10px 14px;font-size:11px;color:#333;z-index:99999;word-break:break-all;font-family:monospace;line-height:1.4;';
+            var dbg = document.getElementById('debug-bar');
+            if (dbg) {
               dbg.innerHTML = '<b>[DEBUG]</b> LIFF userId:<br>' + (userId || '(empty)') + '<br>displayName: ' + (profile.displayName || '');
-              document.body.insertBefore(dbg, document.body.firstChild);
-              document.body.style.paddingTop = '70px';
             }
             checkExistingCustomerThenLoad(type);
           })
-          .catch(function(){checkExistingCustomerThenLoad(type);});
+          .catch(function(err){
+            var dbg = document.getElementById('debug-bar');
+            if (dbg) {
+              dbg.innerHTML = '<b>[DEBUG]</b> liff.getProfile FAILED:<br>' + (err && err.message ? err.message : String(err));
+            }
+            checkExistingCustomerThenLoad(type);
+          });
       })
       .catch(function(){clearTimeout(liffTimeout);loadAndShow(type);});
   } else { loadAndShow(type); }
