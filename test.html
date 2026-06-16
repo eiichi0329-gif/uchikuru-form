@@ -1852,6 +1852,23 @@ body.cancel-mode-active {
         指定した「切替日」から新しい内容で配達を開始し、それまでは現在の内容のままです。
       </div>
 
+      <!-- ★お客様情報入力エリア(顧客マスタに登録がない場合のみ表示) -->
+      <div id="bc-profile-area" style="display:none;background:#fff8e1;border:1.5px solid #FFA000;border-radius:7px;padding:14px 16px;margin-bottom:18px;">
+        <div style="font-size:13.5px;color:#444;line-height:1.7;margin-bottom:10px;">
+          お客様のご登録情報が見つかりませんでした。<br>
+          スムーズな対応のため、お名前・ご住所・お電話番号のご入力をお願いいたします。
+        </div>
+        <div style="font-size:14px;font-weight:bold;color:#333;margin-top:10px;margin-bottom:4px;">お名前 <span style="color:#d32f2f;">*</span></div>
+        <input id="bc-name" type="text" placeholder="例:山田 太郎"
+               style="width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;">
+        <div style="font-size:14px;font-weight:bold;color:#333;margin-top:12px;margin-bottom:4px;">ご住所 <span style="color:#d32f2f;">*</span></div>
+        <input id="bc-address" type="text" placeholder="例:下関市〇〇町1-2-3"
+               style="width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;">
+        <div style="font-size:14px;font-weight:bold;color:#333;margin-top:12px;margin-bottom:4px;">電話番号 <span style="color:#d32f2f;">*</span></div>
+        <input id="bc-phone" type="tel" placeholder="例:090-1234-5678"
+               style="width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;">
+      </div>
+
       <div style="font-size:15px;font-weight:bold;color:#333;margin:8px 0 8px;">📅 変更開始日(いつから新しい内容にしますか?)</div>
       <select id="bc-start-date" onchange="bcOnStartDateChange()"
               style="width:100%;padding:12px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:inherit;background:white;">
@@ -3019,6 +3036,25 @@ function bcInitForm() {
   var su = document.getElementById('bulkchange-success');
   if (fa) fa.style.display = '';
   if (su) su.style.display = 'none';
+
+  // ★お客様情報のチェック:enrolled または name/address/phoneが揃っていれば入力不要
+  var cd = window._customerData || {};
+  var hasAllInfo = !!(cd.name && cd.address && cd.phone);
+  var profileArea = document.getElementById('bc-profile-area');
+  if (profileArea) {
+    if (hasAllInfo) {
+      profileArea.style.display = 'none';
+    } else {
+      profileArea.style.display = '';
+      // 一部だけある場合は事前入力(お客様の手間を減らす)
+      var nameEl = document.getElementById('bc-name');
+      var addrEl = document.getElementById('bc-address');
+      var phoneEl = document.getElementById('bc-phone');
+      if (nameEl && cd.name) nameEl.value = cd.name;
+      if (addrEl && cd.address) addrEl.value = cd.address;
+      if (phoneEl && cd.phone) phoneEl.value = cd.phone;
+    }
+  }
 }
 
 // 送信
@@ -3045,6 +3081,25 @@ function submitBulkChange() {
     return;
   }
 
+  // ★お客様情報の取得・バリデーション
+  // 顧客マスタにあれば優先、なければ画面入力値を使う
+  var cd = window._customerData || {};
+  var nameEl = document.getElementById('bc-name');
+  var addrEl = document.getElementById('bc-address');
+  var phoneEl = document.getElementById('bc-phone');
+  var nameVal  = cd.name    || (nameEl  ? (nameEl.value  || '').trim() : '');
+  var addrVal  = cd.address || (addrEl  ? (addrEl.value  || '').trim() : '');
+  var phoneVal = cd.phone   || (phoneEl ? (phoneEl.value || '').trim() : '');
+
+  var errors = [];
+  if (!nameVal)  errors.push('お名前');
+  if (!addrVal)  errors.push('ご住所');
+  if (!phoneVal) errors.push('電話番号');
+  if (errors.length > 0) {
+    alert('以下のご入力をお願いします:\n\n・' + errors.join('\n・') + '\n\n上の入力欄からご記入ください。');
+    return;
+  }
+
   var btn = document.getElementById('bc-submit-btn');
   var noteEl = document.getElementById('bc-note');
   bcState.note = noteEl ? (noteEl.value || '').trim() : '';
@@ -3056,6 +3111,9 @@ function submitBulkChange() {
     line_user_id:       userId,
     client_request_id:  genRequestId('scd'),
     client_timestamp:   new Date().toISOString(),
+    name:               nameVal,
+    address:            addrVal,
+    phone:              phoneVal,
     start_date:         bcState.startDate,
     items:              selectedItems,
     schedule_days:      bcState.dows.slice(),
