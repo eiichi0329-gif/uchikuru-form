@@ -5729,7 +5729,7 @@ function renderMonthlyMenuCard() {
 
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
     var imgHtml = it.imageUrl
-      ? '<img class="mmc-item-img" src="' + escapeHtml(it.imageUrl) + '" alt="' + escapeHtml(it.label) + '" loading="lazy" onerror="this.style.display=\'none\';">'
+      ? '<img class="mmc-item-img" src="' + escapeHtml(it.imageUrl) + '" alt="' + escapeHtml(it.label) + '" data-src="' + escapeHtml(it.imageUrl) + '" onerror="window.__menuImgRetry(this);">'
       : '<div class="mmc-item-noimg"><span class="noimg-icon">📄</span><span>タップしてPDFで献立表を見る</span></div>';
     itemsHtml +=
       '<a class="mmc-item" href="' + escapeHtml(href) + '" target="_blank" rel="noopener">' +
@@ -5789,6 +5789,28 @@ function loadDailyMenu(callback) {
   document.body.appendChild(script);
 }
 
+// ★Instagram画像など、外部CDNの初回コールド読込失敗対策のリトライヘルパー
+// onerror で呼ばれ、最大2回までリトライ(500ms, 1000ms後)。それでも失敗したら非表示。
+window.__menuImgRetry = function(img) {
+  try {
+    var count = parseInt(img.getAttribute('data-retry') || '0', 10);
+    if (count < 2) {
+      img.setAttribute('data-retry', String(count + 1));
+      var origUrl = img.getAttribute('data-src') || '';
+      if (!origUrl) { img.style.display = 'none'; return; }
+      var sep = origUrl.indexOf('?') >= 0 ? '&' : '?';
+      var delay = 500 * (count + 1);
+      setTimeout(function() {
+        img.src = origUrl + sep + '_r=' + Date.now();
+      }, delay);
+    } else {
+      img.style.display = 'none';
+    }
+  } catch(e) {
+    img.style.display = 'none';
+  }
+};
+
 function renderDailyMenuCard() {
   var cardEl = document.getElementById('daily-menu-card');
   if (!cardEl) return;
@@ -5837,12 +5859,14 @@ function renderDailyMenuCard() {
   }
 
   // ★v8: Instagram の料理写真(あれば表示)
+  //   loading="lazy" を外して即時読み込み、初回失敗時は __menuImgRetry が最大2回リトライ
   var imageUrl = dailyMenuData.imageUrl || '';
   var imageHtml = '';
   if (imageUrl) {
     imageHtml = '<img src="' + escapeHtml(imageUrl) + '" alt="今日のお弁当" ' +
-                'style="width:100%;border-radius:12px;margin:10px 0 4px;display:block;" loading="lazy" ' +
-                'onerror="this.style.display=\'none\';">';
+                'style="width:100%;border-radius:12px;margin:10px 0 4px;display:block;" ' +
+                'data-src="' + escapeHtml(imageUrl) + '" ' +
+                'onerror="window.__menuImgRetry(this);">';
   }
 
   // ★v8: 配達開始前(本日配達なし・将来予定あり)は「参考の献立」と明示する
