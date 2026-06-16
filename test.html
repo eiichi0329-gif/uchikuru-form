@@ -2651,6 +2651,27 @@ function genRequestId(prefix) {
   return (prefix || 'req') + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
 }
 
+// ★変更系の送信前チェック:お客様の登録情報(名前/住所/電話)が揃っているか確認
+//   揃っていない場合はモーダルで通知して false を返す。submit 関数はこれを呼んで false なら return する。
+function ensureProfileForChange() {
+  var cd = window._customerData || {};
+  if (cd.name && cd.address && cd.phone) return true;
+  showModal('🙏', 'ご登録情報の確認をお願いします',
+    'お名前・ご住所・お電話番号のご登録が見つかりませんでした。\n\n' +
+    'お手数ですが、リッチメニュー「⚙ 設定」→「登録情報の変更」より、まずお客様情報のご登録をお願いいたします。');
+  return false;
+}
+
+// ★変更系の payload に name/address/phone を自動添付
+//   _customerData から取得。bento 側のフォールバック処理に依存せず、確実に送る。
+function attachProfileToPayload(payload) {
+  var cd = window._customerData || {};
+  payload.name    = cd.name    || '';
+  payload.address = cd.address || '';
+  payload.phone   = cd.phone   || '';
+  return payload;
+}
+
 // === v6: 顧客マッチング・紐付け関数(customerMatch/customerLink)を撤去 ===
 // 紐付けは bento_delivery CMS (/cms/line-orders) で店舗スタッフが目視で実行する運用に変更
 // 撤去日: 2026-05-12 / 要件書 4.2 / 5.3 に基づく
@@ -3513,6 +3534,9 @@ function submitTypeChangeMode() {
   var keys = Object.keys(typeChangeMode.changes || {});
   if (keys.length === 0) return;
 
+  // ★お客様情報のチェック:未登録なら送信できない
+  if (!ensureProfileForChange()) return;
+
   // === API 送信(複数の変更を1つのリクエストにまとめて送信) ===
   // GAS側で changes[] を受け取り、bento_delivery API には個別に転送する
   // (Google Chat 通知や LINE プッシュ通知は1通にまとめられる)
@@ -3533,6 +3557,8 @@ function submitTypeChangeMode() {
       client_timestamp: new Date().toISOString(),
       changes: changesList
     };
+    // ★お名前・ご住所・電話番号を payload に必ず含める(未登録なら直前で reject されるので不要だがフォールバック)
+    attachProfileToPayload(apiPayload);
     apiPost(apiPayload, function(){
       // ★送信成功後、サーバから最新の承認済データ + pending_changes を再フェッチ
       reloadUsageDataAfterSubmit();
@@ -3675,6 +3701,9 @@ function submitCancelMode() {
   var keys = Object.keys(cancelMode.selected);
   if (keys.length === 0) return;
 
+  // ★お客様情報のチェック:未登録なら送信できない
+  if (!ensureProfileForChange()) return;
+
   // === API用ペイロード組立(状態変更前にスナップショット取得) ===
   // 日付ごとに弁当をグループ化
   var cancellationsMap = {}; // {date: {bento_type: quantity}}
@@ -3708,6 +3737,8 @@ function submitCancelMode() {
       client_timestamp: new Date().toISOString(),
       cancellations: cancellations
     };
+    // ★お名前・ご住所・電話番号を payload に必ず含める
+    attachProfileToPayload(apiPayload);
     apiPost(apiPayload, function(){
       // ★送信成功後、サーバから最新の承認済データ + pending_changes を再フェッチ
       reloadUsageDataAfterSubmit();
@@ -7925,6 +7956,9 @@ function renderEndServiceConfirmStep() {
 }
 
 function submitEndService() {
+  // ★お客様情報のチェック:未登録なら送信できない
+  if (!ensureProfileForChange()) return;
+
   // ★ローカル状態の即時書き換えは廃止(B方式: 承認制を保つため、bento_delivery 側の pending_changes に従う)
   // 旧: ここで pending_cancel に書き換え + applyGohanAutoCancel() していた
 
@@ -7955,6 +7989,8 @@ function submitEndService() {
       bento_types: selected.slice(),     // ★停止する弁当種類
       reason: modalState.esReason || ''
     };
+    // ★お名前・ご住所・電話番号を payload に必ず含める
+    attachProfileToPayload(apiPayload);
     apiPost(apiPayload, function(){
       reloadUsageDataAfterSubmit();
     }, function(err){
