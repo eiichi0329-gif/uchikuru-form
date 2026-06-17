@@ -558,37 +558,26 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
   font-size: 16px; font-weight: bold; color: #c0392b;
   text-align: center; border-bottom: 1px solid #f0e8e0;
 }
-/* ★変更/キャンセルモード時:当週は注文締切過ぎを明示するバナー */
-.change-locked-banner {
-  background: #fff8e1;
-  border: 1px solid #f5d97e;
+/* ★変更/キャンセルモード時:当週のセル列に重なるオーバーレイ(締切過ぎを明示) */
+.usage-cell.cell-this-week-anchor::after {
+  content: "⚠️ 注文締切過ぎ・変更不可";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 500%;
+  transform: translateY(-50%);
+  background: rgba(255, 248, 225, 0.96);
+  border: 2px solid #f5b800;
   border-radius: 8px;
-  padding: 12px 14px;
-  margin: 10px 12px 12px;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-.change-locked-banner .clb-icon {
-  font-size: 22px;
-  flex-shrink: 0;
-  line-height: 1.2;
-}
-.change-locked-banner .clb-body {
-  flex: 1;
-  min-width: 0;
-}
-.change-locked-banner .clb-title {
-  font-weight: bold;
-  font-size: 14px;
+  padding: 8px 6px;
   color: #8a6500;
-  margin-bottom: 4px;
-  line-height: 1.5;
-}
-.change-locked-banner .clb-text {
+  font-weight: bold;
   font-size: 13px;
-  color: #6b5100;
-  line-height: 1.6;
+  text-align: center;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  white-space: nowrap;
 }
 .usage-cal-days-row {
   display: grid; grid-template-columns: repeat(5, 1fr);
@@ -6491,21 +6480,6 @@ function renderUsageCalendar(monthData) {
   }
 
   html += '<div class="usage-cal-deadline-notice">⏰ 水曜日17時が翌週の注文締切です</div>';
-
-  // ★変更/キャンセルモード時:当週は注文締切過ぎで変更できないことを明示
-  //   (利用状況の表示時には非表示。変更・キャンセル時のみカレンダー上部に表示)
-  if (isInCancelMode() || isInTypeChangeMode()) {
-    var _twMon = getThisWeekMonday();
-    var _twFri = new Date(_twMon); _twFri.setDate(_twMon.getDate() + 4);
-    var _fmtMd = function(d) { return (d.getMonth() + 1) + '月' + d.getDate() + '日'; };
-    html += '<div class="change-locked-banner">';
-    html += '<span class="clb-icon">⚠️</span>';
-    html += '<div class="clb-body">';
-    html += '<div class="clb-title">今週(' + _fmtMd(_twMon) + '〜' + _fmtMd(_twFri) + ')は変更・キャンセルができません</div>';
-    html += '<div class="clb-text">ご注文締切日(前週水曜17時)を過ぎているため、お受けできかねます。お手数ですが翌週以降の日付をご指定ください。</div>';
-    html += '</div></div>';
-  }
-
   html += '<div class="usage-cal-days-row">';
   html += '<span>月</span><span>火</span><span class="wed">水</span><span>木</span><span>金</span>';
   html += '</div>';
@@ -6528,6 +6502,20 @@ function renderUsageCalendar(monthData) {
     }
   }
 
+  // ★変更/キャンセルモード時、当週(月〜金)のセルに重ねるオーバーレイ用の判定
+  //   当週の最初に出現するセル(=月曜、または月初が火曜以降ならその日)に anchor クラスを付ける
+  //   ::after で「⚠️ 注文締切過ぎ・変更不可」のメッセージが5列分にまたがって表示される
+  var _isChangeMode = (isInCancelMode() || isInTypeChangeMode());
+  var _thisWeekMonStr = '';
+  var _thisWeekFriStr = '';
+  var _thisWeekAnchorSet = false;
+  if (_isChangeMode) {
+    var _twMon = getThisWeekMonday();
+    var _twFri = new Date(_twMon); _twFri.setDate(_twMon.getDate() + 4);
+    _thisWeekMonStr = _twMon.getFullYear() + '-' + pad(_twMon.getMonth()+1) + '-' + pad(_twMon.getDate());
+    _thisWeekFriStr = _twFri.getFullYear() + '-' + pad(_twFri.getMonth()+1) + '-' + pad(_twFri.getDate());
+  }
+
   // 各日付セル(月〜金のみ)
   var lastColIdx = -1;
   for (var d2 = 1; d2 <= daysInMonth; d2++) {
@@ -6548,6 +6536,13 @@ function renderUsageCalendar(monthData) {
     if (isPast)  cellClass += ' past';   // ★Phase 2b
     if (dayData && isEditable) cellClass += ' editable';
     if (!dayData) cellClass += ' no-delivery';
+
+    // ★変更モード時:当週セルにアンカークラス(最初に出てきたセルのみに付与)
+    if (_isChangeMode && !_thisWeekAnchorSet &&
+        dateStr >= _thisWeekMonStr && dateStr <= _thisWeekFriStr) {
+      cellClass += ' cell-this-week-anchor';
+      _thisWeekAnchorSet = true;
+    }
 
     // ★この日付に紐づく pending_changes を取得
     var cellPending = getPendingForDate(dateStr);
