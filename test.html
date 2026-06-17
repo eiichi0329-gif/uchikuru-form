@@ -558,6 +558,38 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
   font-size: 16px; font-weight: bold; color: #c0392b;
   text-align: center; border-bottom: 1px solid #f0e8e0;
 }
+/* ★変更/キャンセルモード時:当週は注文締切過ぎを明示するバナー */
+.change-locked-banner {
+  background: #fff8e1;
+  border: 1px solid #f5d97e;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 10px 12px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.change-locked-banner .clb-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.change-locked-banner .clb-body {
+  flex: 1;
+  min-width: 0;
+}
+.change-locked-banner .clb-title {
+  font-weight: bold;
+  font-size: 14px;
+  color: #8a6500;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+.change-locked-banner .clb-text {
+  font-size: 13px;
+  color: #6b5100;
+  line-height: 1.6;
+}
 .usage-cal-days-row {
   display: grid; grid-template-columns: repeat(5, 1fr);
   background: #fafafa; border-bottom: 1px solid #f0e8e0;
@@ -2144,6 +2176,16 @@ body.cancel-mode-active {
 
     <!-- ★Phase 2: 意図ベース・トップメニュー(6項目) -->
     <div id="change-menu-top">
+      <button type="button" class="cm-item" onclick="cmShowRestMenu()">
+        <div class="cm-row">
+          <div class="cm-icon">⏸</div>
+          <div class="cm-body">
+            <div class="cm-title">お届けのキャンセル</div>
+            <div class="cm-desc">特定日のキャンセル／しばらくキャンセル から選びます</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
       <button type="button" class="cm-item" onclick="cmGoTypeChange()">
         <div class="cm-row">
           <div class="cm-icon">🔁</div>
@@ -2160,16 +2202,6 @@ body.cancel-mode-active {
           <div class="cm-body">
             <div class="cm-title">お届け種類・曜日の変更</div>
             <div class="cm-desc">来週からの曜日・お弁当の組合せをまとめて変える</div>
-          </div>
-          <div class="cm-arrow">›</div>
-        </div>
-      </button>
-      <button type="button" class="cm-item" onclick="cmShowRestMenu()">
-        <div class="cm-row">
-          <div class="cm-icon">⏸</div>
-          <div class="cm-body">
-            <div class="cm-title">お届けのキャンセル</div>
-            <div class="cm-desc">特定日のキャンセル／しばらくキャンセル から選びます</div>
           </div>
           <div class="cm-arrow">›</div>
         </div>
@@ -5794,24 +5826,25 @@ function renderMonthlyMenuCard() {
     var href = it.pdfUrl || it.articleUrl || '';
     if (!href) continue;
 
-    // ① labelから年月を抽出して当月/来月以外を除外
+    // ★年月判定の優先順位:
+    //   1. label に「YYYY年M月」が明記されていればそれを信頼(URLの年は無視)
+    //      → WordPress で古い記事のタイトルだけ書き換えるケースに対応
+    //   2. label に年月が無い場合のみ、URL のアップロード年で「昨年以前」を除外
     var _ym = _extractYMFromLabel(it.label);
     if (_ym) {
+      // ① label に年月明記あり → label を真として判定
       var _itemYM = _ym.year * 12 + _ym.month;
       var _keep = (_itemYM === _curYM || _itemYM === _nextYM);
       console.log('[render-monthly] item="' + it.label + '" labelYM=' + _ym.year + '-' + _ym.month + ' → ' + (_keep ? 'keep' : 'skip'));
       if (!_keep) continue;
-    }
-
-    // ② URLのアップロード年が現在より古ければ除外(WP系サイトで前年同月の残骸を弾く)
-    var _uploadYear = _extractUploadYear(it.pdfUrl) || _extractUploadYear(it.imageUrl) || _extractUploadYear(it.articleUrl);
-    if (_uploadYear && _uploadYear < _curYear) {
-      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' < ' + _curYear + ' → skip');
-      continue;
-    }
-
-    if (!_ym) {
-      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' → keep (年月不明だがUL年OK)');
+    } else {
+      // ② label に年月情報なし → URLのアップロード年で前年分を除外
+      var _uploadYear = _extractUploadYear(it.pdfUrl) || _extractUploadYear(it.imageUrl) || _extractUploadYear(it.articleUrl);
+      if (_uploadYear && _uploadYear < _curYear) {
+        console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' < ' + _curYear + ' → skip');
+        continue;
+      }
+      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' → keep (label年月不明だがUL年OK)');
     }
 
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
@@ -6458,6 +6491,21 @@ function renderUsageCalendar(monthData) {
   }
 
   html += '<div class="usage-cal-deadline-notice">⏰ 水曜日17時が翌週の注文締切です</div>';
+
+  // ★変更/キャンセルモード時:当週は注文締切過ぎで変更できないことを明示
+  //   (利用状況の表示時には非表示。変更・キャンセル時のみカレンダー上部に表示)
+  if (isInCancelMode() || isInTypeChangeMode()) {
+    var _twMon = getThisWeekMonday();
+    var _twFri = new Date(_twMon); _twFri.setDate(_twMon.getDate() + 4);
+    var _fmtMd = function(d) { return (d.getMonth() + 1) + '月' + d.getDate() + '日'; };
+    html += '<div class="change-locked-banner">';
+    html += '<span class="clb-icon">⚠️</span>';
+    html += '<div class="clb-body">';
+    html += '<div class="clb-title">今週(' + _fmtMd(_twMon) + '〜' + _fmtMd(_twFri) + ')は変更・キャンセルができません</div>';
+    html += '<div class="clb-text">ご注文締切日(前週水曜17時)を過ぎているため、お受けできかねます。お手数ですが翌週以降の日付をご指定ください。</div>';
+    html += '</div></div>';
+  }
+
   html += '<div class="usage-cal-days-row">';
   html += '<span>月</span><span>火</span><span class="wed">水</span><span>木</span><span>金</span>';
   html += '</div>';
