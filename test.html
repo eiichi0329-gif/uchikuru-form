@@ -1383,6 +1383,30 @@ body.cancel-mode-active {
 .dpc-notice-icon { font-size: 22px; }
 .dpc-notice-title { font-size: 15px; font-weight: bold; color: #8A6500; letter-spacing: 0.05em; }
 .dpc-notice-text { color: #4A3500; font-size: 15px; line-height: 1.7; }
+/* ★ETAデータ取得中のローディング表示 */
+#delivery-progress-card.dpc-loading {
+  background: #fafafa;
+  border-color: #e0e0e0;
+  border-style: dashed;
+}
+.dpc-loading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 0;
+  color: #888;
+  font-size: 14px;
+}
+.dpc-loading-icon {
+  font-size: 18px;
+  animation: dpc-spin 2s linear infinite;
+  display: inline-block;
+}
+@keyframes dpc-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
 .dpc-steps {
   display: flex;
   align-items: flex-start;
@@ -4741,11 +4765,30 @@ function loadEtaData(callback) {
       }, delay);
       return;
     }
+    // ★初回ロードでデータが不十分な場合も短期間リトライ
+    //   (bento 側の初回 API 応答が遅延 or 一時的に欠損するケースに対応)
+    if (etaRetryCount < etaMaxRetry &&
+        (!data || data.ok === false ||
+         (data.has_delivery === true && !data.delivery_status))) {
+      etaRetryCount++;
+      setTimeout(function() {
+        loadEtaData(callback);
+      }, 1500);
+      return;
+    }
     // 確定 or 最大リトライ到達 → リトライカウンタリセット
     etaRetryCount = 0;
     if (callback) callback(data);
   }, function(err) {
     console.error('getEta error:', err);
+    // ★ネットワークエラー時も短期間リトライ(初回ロード時の取りこぼし対策)
+    if (etaRetryCount < etaMaxRetry) {
+      etaRetryCount++;
+      setTimeout(function() {
+        loadEtaData(callback);
+      }, 2000);
+      return;
+    }
     etaData = null;
     etaRetryCount = 0;
     if (callback) callback(null);
@@ -5471,8 +5514,21 @@ function renderDeliveryProgressCard() {
     return;
   }
 
-  // 非表示判定
-  if (!etaData || !etaData.ok || etaData.has_delivery === false) {
+  // ★ETAデータがまだ取得中(初回ロード時の空白を防ぐ)
+  //   loadEtaData が完了するか、has_delivery=false が確定するまでローディング表示
+  if (!etaData) {
+    cardEl.className = 'dpc-loading';
+    cardEl.innerHTML =
+      '<div class="dpc-loading-row">' +
+        '<span class="dpc-loading-icon">⏳</span>' +
+        '<span>配達状況を取得しています...</span>' +
+      '</div>';
+    cardEl.style.display = 'block';
+    return;
+  }
+
+  // 非表示判定(取得完了したが配達なし or エラー)
+  if (!etaData.ok || etaData.has_delivery === false) {
     cardEl.style.display = 'none';
     return;
   }
