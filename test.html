@@ -5832,33 +5832,54 @@ function renderMonthlyMenuCard() {
   }
   var _now = new Date();
   var _curYear = _now.getFullYear();
-  var _curYM  = _curYear * 12 + (_now.getMonth() + 1);
+  var _curMonth = _now.getMonth() + 1;
+  var _nextMonth = (_curMonth === 12) ? 1 : (_curMonth + 1);
+  var _curYM  = _curYear * 12 + _curMonth;
   var _nextYM = _curYM + 1;
-  console.log('[render-monthly] items=' + monthlyMenuData.items.length + ', current=' + _curYear + '-' + (_now.getMonth()+1));
+  console.log('[render-monthly] items=' + monthlyMenuData.items.length + ', current=' + _curYear + '-' + _curMonth);
   for (var i = 0; i < monthlyMenuData.items.length; i++) {
     var it = monthlyMenuData.items[i];
     var href = it.pdfUrl || it.articleUrl || '';
     if (!href) continue;
 
     // ★年月判定の優先順位:
-    //   1. label に「YYYY年M月」が明記されていればそれを信頼(URLの年は無視)
-    //      → WordPress で古い記事のタイトルだけ書き換えるケースに対応
-    //   2. label に年月が無い場合のみ、URL のアップロード年で「昨年以前」を除外
-    var _ym = _extractYMFromLabel(it.label);
-    if (_ym) {
-      // ① label に年月明記あり → label を真として判定
-      var _itemYM = _ym.year * 12 + _ym.month;
-      var _keep = (_itemYM === _curYM || _itemYM === _nextYM);
-      console.log('[render-monthly] item="' + it.label + '" labelYM=' + _ym.year + '-' + _ym.month + ' → ' + (_keep ? 'keep' : 'skip'));
-      if (!_keep) continue;
-    } else {
-      // ② label に年月情報なし → URLのアップロード年で前年分を除外
-      var _uploadYear = _extractUploadYear(it.pdfUrl) || _extractUploadYear(it.imageUrl) || _extractUploadYear(it.articleUrl);
-      if (_uploadYear && _uploadYear < _curYear) {
-        console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' < ' + _curYear + ' → skip');
+    //   1. GAS が `month` フィールドを返している場合 → GAS の判定を信頼(URLの年は無視)
+    //      → 田中さんの「2026年7月」記事のように、ファイル(/uploads/2025/06/)は前年でも、
+    //        GAS が「7月の献立」として認識していればそれを採用する
+    //   2. label に「YYYY年M月」が明記されていればそれを信頼
+    //   3. label に年月情報なし → URLのアップロード年で前年分を除外
+    var _hasGasMonth = (it.month !== undefined && it.month !== null && it.month !== '');
+    if (_hasGasMonth) {
+      var _gm = parseInt(it.month);
+      if (isNaN(_gm) || _gm < 1 || _gm > 12) {
+        // パース失敗 → 既存ロジックへフォールバック
+        _hasGasMonth = false;
+      } else if (_gm !== _curMonth && _gm !== _nextMonth) {
+        // GAS が返した月が、当月でも来月でもない → 異常データ、スキップ
+        console.log('[render-monthly] item="' + it.label + '" gasMonth=' + _gm + ' ≠ ' + _curMonth + '/' + _nextMonth + ' → skip');
         continue;
+      } else {
+        // 当月 or 来月 → そのまま採用
+        console.log('[render-monthly] item="' + it.label + '" gasMonth=' + _gm + ' → keep (trust GAS)');
       }
-      console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' → keep (label年月不明だがUL年OK)');
+    }
+    if (!_hasGasMonth) {
+      var _ym = _extractYMFromLabel(it.label);
+      if (_ym) {
+        // ① label に年月明記あり → label を真として判定
+        var _itemYM = _ym.year * 12 + _ym.month;
+        var _keep = (_itemYM === _curYM || _itemYM === _nextYM);
+        console.log('[render-monthly] item="' + it.label + '" labelYM=' + _ym.year + '-' + _ym.month + ' → ' + (_keep ? 'keep' : 'skip'));
+        if (!_keep) continue;
+      } else {
+        // ② label に年月情報なし → URLのアップロード年で前年分を除外
+        var _uploadYear = _extractUploadYear(it.pdfUrl) || _extractUploadYear(it.imageUrl) || _extractUploadYear(it.articleUrl);
+        if (_uploadYear && _uploadYear < _curYear) {
+          console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' < ' + _curYear + ' → skip');
+          continue;
+        }
+        console.log('[render-monthly] item="' + it.label + '" uploadYear=' + _uploadYear + ' → keep (label年月不明だがUL年OK)');
+      }
     }
 
     var badge = it.isCurrent ? '<span class="badge">今月</span>' : '<span class="badge">来月</span>';
@@ -7823,6 +7844,20 @@ function applyGohanAutoCancel(dateFilter) {
    ご利用終了モーダル
    ============================================================ */
 function openEndServiceModal() {
+  // ★form-change から直接「利用終了」を選んだ場合、まだ usageData が未ロードのことがある
+  //   (actionTypeChange/actionCancel は ensureOnUsageCalendarPage 経由でロードされるが、
+  //    利用終了は本来カレンダー操作不要のため、ここで自前で usageData をロードする)
+  var hasUsage = !!(usageData && Object.keys(usageData).length > 0);
+  if (!hasUsage && typeof loadUsage === 'function') {
+    loadUsage(function() {
+      _openEndServiceModalActual();
+    });
+    return;
+  }
+  _openEndServiceModalActual();
+}
+
+function _openEndServiceModalActual() {
   modalState.view = 'endService';
   modalState.esStep = 'kinds';   // 'kinds' | 'pick' | 'confirm'
   modalState.esWeekIdx = null;  // 選択した週のindex
