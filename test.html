@@ -558,13 +558,14 @@ body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f
   font-size: 16px; font-weight: bold; color: #c0392b;
   text-align: center; border-bottom: 1px solid #f0e8e0;
 }
-/* ★変更/キャンセルモード時:当週のセル列に重なるオーバーレイ(締切過ぎを明示) */
+/* ★変更/キャンセルモード時:編集不可週のセル列に重なるオーバーレイ(締切過ぎを明示) */
+/*   --cells-remaining でセル数を受け取り、その分の幅まで横に広がる(月=5, 火=4, ..., 金=1) */
 .usage-cell.cell-this-week-anchor::after {
   content: "⚠️ 注文締切過ぎ・変更不可";
   position: absolute;
   top: 50%;
   left: 0;
-  width: 500%;
+  width: calc(100% * var(--cells-remaining, 5));
   transform: translateY(-50%);
   background: rgba(255, 248, 225, 0.96);
   border: 2px solid #f5b800;
@@ -2696,14 +2697,33 @@ function genRequestId(prefix) {
   return (prefix || 'req') + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
 }
 
-// ★変更系の送信前チェック:お客様の登録情報(名前/住所/電話)が揃っているか確認
-//   揃っていない場合はモーダルで通知して false を返す。submit 関数はこれを呼んで false なら return する。
-function ensureProfileForChange() {
+// ★操作開始前の検証:お客様の登録情報(名前/住所/電話)が揃っているか確認
+//   揃っている場合は onProceed を即実行
+//   揃っていない場合は onProceed を保留 → 登録モーダルを開く → 登録完了後に onProceed を自動実行
+//
+//   使用例:
+//     ensureProfileForChange(function(){ proceedCancelGuide(); });
+//
+//   これにより、各動線が「先にお客様情報入力 → 完了後に元の操作続行」になる。
+function ensureProfileForChange(onProceed) {
   var cd = window._customerData || {};
-  if (cd.name && cd.address && cd.phone) return true;
-  showModal('🙏', 'ご登録情報の確認をお願いします',
-    'お名前・ご住所・お電話番号のご登録が見つかりませんでした。\n\n' +
-    'お手数ですが、リッチメニュー「⚙ 設定」→「登録情報の変更」より、まずお客様情報のご登録をお願いいたします。');
+  if (cd.name && cd.address && cd.phone) {
+    if (typeof onProceed === 'function') onProceed();
+    return true;
+  }
+  // 不足あり → 保留アクションを記憶
+  if (typeof onProceed === 'function') {
+    window._pendingActionAfterProfile = onProceed;
+  } else {
+    window._pendingActionAfterProfile = null;
+  }
+  // ご登録の案内 → 登録モーダルを開く
+  showModalWithAction('🙏', 'お客様情報のご登録をお願いします',
+    'お名前・ご住所・お電話番号のご登録が確認できませんでした。\n\n' +
+    'お手続きの前にお客様情報をご登録ください。\nご登録完了後、続きをご案内します。',
+    function() {
+      openCustomerEditModal('register');
+    });
   return false;
 }
 
@@ -2863,10 +2883,11 @@ function withModeCheck(action) {
 }
 
 // 各アクションラッパー
-function actionNewOrder()    { withModeCheck(function(){ loadAndShow('newOrder'); }); }
-function actionTypeChange()  { withModeCheck(function(){ showTypeChangeGuide(); }); }
-function actionCancel()      { withModeCheck(function(){ showCancelGuide(); }); }
-function actionEndService()  { withModeCheck(function(){ openEndServiceModal(); }); }
+// ★操作開始時にお客様情報チェック → 不足あれば登録モーダル → 完了後に元の操作を自動再開
+function actionNewOrder()    { withModeCheck(function(){ ensureProfileForChange(function(){ loadAndShow('newOrder'); }); }); }
+function actionTypeChange()  { withModeCheck(function(){ ensureProfileForChange(function(){ proceedTypeChangeGuide(); }); }); }
+function actionCancel()      { withModeCheck(function(){ ensureProfileForChange(function(){ proceedCancelGuide(); }); }); }
+function actionEndService()  { withModeCheck(function(){ ensureProfileForChange(function(){ openEndServiceModal(); }); }); }
 
 // ★Phase 2: 意図ベース変更メニューのナビゲーション
 function cmShowTopMenu() {
@@ -2967,7 +2988,7 @@ var bcState = {
 };
 
 // ⑥相談 用ボタンから遷移
-function cmGoBulkChange() { loadAndShow('bulkChange'); }
+function cmGoBulkChange() { ensureProfileForChange(function(){ loadAndShow('bulkChange'); }); }
 
 // 変更開始日の選択肢を生成
 //   既存の getEditableWeek() ロジック(前週水曜17時締切)を流用し、編集可能週の月曜から4週分の月〜金を表示
@@ -3147,24 +3168,18 @@ function submitBulkChange() {
     return;
   }
 
-  // ★お客様情報の取得・バリデーション
-  // 顧客マスタにあれば優先、なければ画面入力値を使う
+  // ★お客様情報のチェック:揃っていない場合は登録モーダルへ誘導 → 完了後にこの関数を再実行
+  //   インライン入力欄(bc-profile-area)も存在するが、統一動線のため登録モーダルを優先
   var cd = window._customerData || {};
-  var nameEl = document.getElementById('bc-name');
-  var addrEl = document.getElementById('bc-address');
-  var phoneEl = document.getElementById('bc-phone');
-  var nameVal  = cd.name    || (nameEl  ? (nameEl.value  || '').trim() : '');
-  var addrVal  = cd.address || (addrEl  ? (addrEl.value  || '').trim() : '');
-  var phoneVal = cd.phone   || (phoneEl ? (phoneEl.value || '').trim() : '');
-
-  var errors = [];
-  if (!nameVal)  errors.push('お名前');
-  if (!addrVal)  errors.push('ご住所');
-  if (!phoneVal) errors.push('電話番号');
-  if (errors.length > 0) {
-    alert('以下のご入力をお願いします:\n\n・' + errors.join('\n・') + '\n\n上の入力欄からご記入ください。');
+  var hasAllInfo = !!(cd.name && cd.address && cd.phone);
+  if (!hasAllInfo) {
+    ensureProfileForChange(function(){ submitBulkChange(); });
     return;
   }
+  // 揃っている → そのまま payload に詰める
+  var nameVal  = cd.name;
+  var addrVal  = cd.address;
+  var phoneVal = cd.phone;
 
   var btn = document.getElementById('bc-submit-btn');
   var noteEl = document.getElementById('bc-note');
@@ -3579,8 +3594,13 @@ function submitTypeChangeMode() {
   var keys = Object.keys(typeChangeMode.changes || {});
   if (keys.length === 0) return;
 
-  // ★お客様情報のチェック:未登録なら送信できない
-  if (!ensureProfileForChange()) return;
+  // ★お客様情報のチェック:揃っていない場合のみ登録モーダル → 完了後にこの関数を再実行
+  //   (揃っている場合は ensureProfileForChange を呼ばない → onProceed の再帰呼出しによる無限ループを回避)
+  var _cdT = window._customerData || {};
+  if (!(_cdT.name && _cdT.address && _cdT.phone)) {
+    ensureProfileForChange(function(){ submitTypeChangeMode(); });
+    return;
+  }
 
   // === API 送信(複数の変更を1つのリクエストにまとめて送信) ===
   // GAS側で changes[] を受け取り、bento_delivery API には個別に転送する
@@ -3746,8 +3766,13 @@ function submitCancelMode() {
   var keys = Object.keys(cancelMode.selected);
   if (keys.length === 0) return;
 
-  // ★お客様情報のチェック:未登録なら送信できない
-  if (!ensureProfileForChange()) return;
+  // ★お客様情報のチェック:揃っていない場合のみ登録モーダル → 完了後にこの関数を再実行
+  //   (揃っている場合は ensureProfileForChange を呼ばない → 無限ループ回避)
+  var _cdC = window._customerData || {};
+  if (!(_cdC.name && _cdC.address && _cdC.phone)) {
+    ensureProfileForChange(function(){ submitCancelMode(); });
+    return;
+  }
 
   // === API用ペイロード組立(状態変更前にスナップショット取得) ===
   // 日付ごとに弁当をグループ化
@@ -6502,19 +6527,12 @@ function renderUsageCalendar(monthData) {
     }
   }
 
-  // ★変更/キャンセルモード時、当週(月〜金)のセルに重ねるオーバーレイ用の判定
-  //   当週の最初に出現するセル(=月曜、または月初が火曜以降ならその日)に anchor クラスを付ける
-  //   ::after で「⚠️ 注文締切過ぎ・変更不可」のメッセージが5列分にまたがって表示される
+  // ★変更/キャンセルモード時、編集不可な週(=注文締切過ぎ)のセル列に重なるオーバーレイ
+  //   各週の月曜について isDateEditable() を呼び、false なら締切過ぎ週として
+  //   その週の最初に表示されるセル(月曜 or 月初の平日)に anchor クラスを付ける。
+  //   ::after で「⚠️ 注文締切過ぎ・変更不可」のメッセージが残列数分にまたがって表示される
   var _isChangeMode = (isInCancelMode() || isInTypeChangeMode());
-  var _thisWeekMonStr = '';
-  var _thisWeekFriStr = '';
-  var _thisWeekAnchorSet = false;
-  if (_isChangeMode) {
-    var _twMon = getThisWeekMonday();
-    var _twFri = new Date(_twMon); _twFri.setDate(_twMon.getDate() + 4);
-    _thisWeekMonStr = _twMon.getFullYear() + '-' + pad(_twMon.getMonth()+1) + '-' + pad(_twMon.getDate());
-    _thisWeekFriStr = _twFri.getFullYear() + '-' + pad(_twFri.getMonth()+1) + '-' + pad(_twFri.getDate());
-  }
+  var _lastAnchorWeekStr = '';
 
   // 各日付セル(月〜金のみ)
   var lastColIdx = -1;
@@ -6537,18 +6555,25 @@ function renderUsageCalendar(monthData) {
     if (dayData && isEditable) cellClass += ' editable';
     if (!dayData) cellClass += ' no-delivery';
 
-    // ★変更モード時:当週セルにアンカークラス(最初に出てきたセルのみに付与)
-    if (_isChangeMode && !_thisWeekAnchorSet &&
-        dateStr >= _thisWeekMonStr && dateStr <= _thisWeekFriStr) {
-      cellClass += ' cell-this-week-anchor';
-      _thisWeekAnchorSet = true;
+    // ★変更モード時:この日付の週(月曜)が編集不可なら、その週の最初の可視セルにアンカーを付ける
+    var _anchorStyleAttr = '';
+    if (_isChangeMode) {
+      var _wm = new Date(dt);
+      _wm.setDate(dt.getDate() - (dow - 1));  // Mon=同日、Tue=-1日、…Fri=-4日 で週の月曜に
+      var _wmStr = _wm.getFullYear() + '-' + pad(_wm.getMonth()+1) + '-' + pad(_wm.getDate());
+      if (!isDateEditable(_wmStr) && _wmStr !== _lastAnchorWeekStr) {
+        cellClass += ' cell-this-week-anchor';
+        _lastAnchorWeekStr = _wmStr;
+        // 残りセル数:この曜日からその週の金曜まで何セルあるか(Mon=5, Tue=4, ..., Fri=1)
+        _anchorStyleAttr = ' style="--cells-remaining:' + (6 - dow) + ';"';
+      }
     }
 
     // ★この日付に紐づく pending_changes を取得
     var cellPending = getPendingForDate(dateStr);
     if (cellPending.length > 0) cellClass += ' has-pending';
 
-    html += '<div class="' + cellClass + '">';
+    html += '<div class="' + cellClass + '"' + _anchorStyleAttr + '>';
 
     // 日付
     html += '<div class="cell-date">' + d2 + '</div>';
@@ -8055,8 +8080,13 @@ function renderEndServiceConfirmStep() {
 }
 
 function submitEndService() {
-  // ★お客様情報のチェック:未登録なら送信できない
-  if (!ensureProfileForChange()) return;
+  // ★お客様情報のチェック:揃っていない場合のみ登録モーダル → 完了後にこの関数を再実行
+  //   (揃っている場合は ensureProfileForChange を呼ばない → 無限ループ回避)
+  var _cdE = window._customerData || {};
+  if (!(_cdE.name && _cdE.address && _cdE.phone)) {
+    ensureProfileForChange(function(){ submitEndService(); });
+    return;
+  }
 
   // ★ローカル状態の即時書き換えは廃止(B方式: 承認制を保つため、bento_delivery 側の pending_changes に従う)
   // 旧: ここで pending_cancel に書き換え + applyGohanAutoCancel() していた
@@ -8624,11 +8654,12 @@ function openCustomerRegisterModal() {
   modalState.ceCardLast4 = '';
   renderCustomerEditView();
 }
-function openCustomerEditModal() {
+function openCustomerEditModal(mode) {
   // ★Phase 2b: 開く前に支払方法を billing API から確実にロード(getCustomerは支払いを返さないため)
   ensurePaymentMethodLoaded(function(){
     modalState.view = 'customerEdit';
-    modalState.ceMode = 'edit';
+    // ★mode='register' を渡すと「お客様情報のご登録」タイトルになる(動線フロー用)
+    modalState.ceMode = (mode === 'register') ? 'register' : 'edit';
     var cd = window._customerData || {};
     modalState.ceName = cd.name || '';
     // 既存の name を「姓 名」のスペース区切りで分割
@@ -8849,6 +8880,20 @@ function finalizeCustomerInfoSave(nm, ad, ph, pm, cardLast4) {
 
   closeOpModal();
   renderCustomerInfoCard();
+
+  // ★保留アクション(別の操作の途中でこの登録モーダルが開かれた場合)があれば、
+  //   登録完了後に元の操作を自動再開する
+  var pendingAction = window._pendingActionAfterProfile;
+  window._pendingActionAfterProfile = null;
+  if (typeof pendingAction === 'function') {
+    showModalWithAction('✅', 'ご登録ありがとうございます',
+      'お手続きを続けます。',
+      function() {
+        try { pendingAction(); } catch(e) { console.error('pendingAction error:', e); }
+      });
+    return;
+  }
+
   if (isRegister) {
     // 新規登録 → 完了モーダル → OK で「マイページ」に自動遷移
     // (マイページ内の「新規注文」ボタンから初回注文へ進む導線)
