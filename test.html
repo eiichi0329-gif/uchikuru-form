@@ -2705,9 +2705,23 @@ function genRequestId(prefix) {
 //     ensureProfileForChange(function(){ proceedCancelGuide(); });
 //
 //   これにより、各動線が「先にお客様情報入力 → 完了後に元の操作続行」になる。
-function ensureProfileForChange(onProceed) {
+// ★お客様情報が「実際に意味のある値で埋まっているか」を判定するヘルパー
+//   空文字だけでなく「未入力」「未登録」等のプレースホルダー文字列も「未入力」とみなす。
+//   (bento 取得時には cleanVal 済みだが、他経路でプレースホルダーが入っても弾けるよう二重防御)
+function _isFilledProfileValue(v) {
+  var EMPTY = ['','未登録','(未登録)','(未登録)','未入力','(未入力)','(未入力)',
+               'なし','ー','―','-','−','未','ない','none','null','undefined'];
+  return EMPTY.indexOf(String(v || '').trim()) === -1;
+}
+function _hasCompleteProfile() {
   var cd = window._customerData || {};
-  if (cd.name && cd.address && cd.phone) {
+  return _isFilledProfileValue(cd.name) &&
+         _isFilledProfileValue(cd.address) &&
+         _isFilledProfileValue(cd.phone);
+}
+
+function ensureProfileForChange(onProceed) {
+  if (_hasCompleteProfile()) {
     if (typeof onProceed === 'function') onProceed();
     return true;
   }
@@ -3126,7 +3140,7 @@ function bcInitForm() {
 
   // ★お客様情報のチェック:enrolled または name/address/phoneが揃っていれば入力不要
   var cd = window._customerData || {};
-  var hasAllInfo = !!(cd.name && cd.address && cd.phone);
+  var hasAllInfo = _hasCompleteProfile();
   var profileArea = document.getElementById('bc-profile-area');
   if (profileArea) {
     if (hasAllInfo) {
@@ -3171,7 +3185,7 @@ function submitBulkChange() {
   // ★お客様情報のチェック:揃っていない場合は登録モーダルへ誘導 → 完了後にこの関数を再実行
   //   インライン入力欄(bc-profile-area)も存在するが、統一動線のため登録モーダルを優先
   var cd = window._customerData || {};
-  var hasAllInfo = !!(cd.name && cd.address && cd.phone);
+  var hasAllInfo = _hasCompleteProfile();
   if (!hasAllInfo) {
     ensureProfileForChange(function(){ submitBulkChange(); });
     return;
@@ -3596,8 +3610,7 @@ function submitTypeChangeMode() {
 
   // ★お客様情報のチェック:揃っていない場合のみ登録モーダル → 完了後にこの関数を再実行
   //   (揃っている場合は ensureProfileForChange を呼ばない → onProceed の再帰呼出しによる無限ループを回避)
-  var _cdT = window._customerData || {};
-  if (!(_cdT.name && _cdT.address && _cdT.phone)) {
+  if (!_hasCompleteProfile()) {
     ensureProfileForChange(function(){ submitTypeChangeMode(); });
     return;
   }
@@ -3768,8 +3781,7 @@ function submitCancelMode() {
 
   // ★お客様情報のチェック:揃っていない場合のみ登録モーダル → 完了後にこの関数を再実行
   //   (揃っている場合は ensureProfileForChange を呼ばない → 無限ループ回避)
-  var _cdC = window._customerData || {};
-  if (!(_cdC.name && _cdC.address && _cdC.phone)) {
+  if (!_hasCompleteProfile()) {
     ensureProfileForChange(function(){ submitCancelMode(); });
     return;
   }
@@ -5762,7 +5774,8 @@ function loadMonthlyMenus(callback) {
   if (monthlyMenuLoading) return;
 
   // ★Phase 2b: sessionStorage キャッシュ(当日中は再フェッチしない)
-  var _todayKey = '_uc_mmenu_' + (function(){
+  //   キーに v3 を付与:フィルタロジック変更に伴い、旧バージョンで保存した古いキャッシュを無効化
+  var _todayKey = '_uc_mmenu_v3_' + (function(){
     var d = new Date();
     return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
   })();
@@ -5904,7 +5917,8 @@ function loadDailyMenu(callback) {
   if (dailyMenuLoading) return;
 
   // ★Phase 2b: sessionStorage キャッシュ(当日中は再フェッチしない)
-  var _todayKey = '_uc_dmenu_' + (function(){
+  //   キーに v3 を付与:画像リトライ等の変更に伴い古いキャッシュを無効化
+  var _todayKey = '_uc_dmenu_v3_' + (function(){
     var d = new Date();
     return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
   })();
@@ -8149,8 +8163,7 @@ function renderEndServiceConfirmStep() {
 function submitEndService() {
   // ★お客様情報のチェック:揃っていない場合のみ登録モーダル → 完了後にこの関数を再実行
   //   (揃っている場合は ensureProfileForChange を呼ばない → 無限ループ回避)
-  var _cdE = window._customerData || {};
-  if (!(_cdE.name && _cdE.address && _cdE.phone)) {
+  if (!_hasCompleteProfile()) {
     ensureProfileForChange(function(){ submitEndService(); });
     return;
   }
