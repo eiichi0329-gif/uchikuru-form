@@ -7848,8 +7848,9 @@ function openEndServiceModal() {
   //   (actionTypeChange/actionCancel は ensureOnUsageCalendarPage 経由でロードされるが、
   //    利用終了は本来カレンダー操作不要のため、ここで自前で usageData をロードする)
   var hasUsage = !!(usageData && Object.keys(usageData).length > 0);
-  if (!hasUsage && typeof loadUsage === 'function') {
-    loadUsage(function() {
+  if (!hasUsage && typeof loadUsageData === 'function') {
+    loadUsageData(function(udata) {
+      usageData = udata;  // ★loadUsageData は usageData に代入しないのでここで設定
       _openEndServiceModalActual();
     });
     return;
@@ -7876,17 +7877,33 @@ function renderEndServiceStep() {
 function renderEndServiceKindsStep() {
   // 現在利用中の種類を取得(active / pending_add / pending_change)
   var typesMap = {};
+  var _diagStats = { months: 0, monthsWithData: 0, days: 0, items: 0, activeItems: 0, statusCounts: {} };
   Object.keys(usageData || {}).forEach(function(monthKey) {
+    _diagStats.months++;
     if (!usageData[monthKey].hasData) return;
+    _diagStats.monthsWithData++;
     usageData[monthKey].days.forEach(function(day) {
+      _diagStats.days++;
       day.items.forEach(function(it) {
+        _diagStats.items++;
+        var st = it.status || '(no-status)';
+        _diagStats.statusCounts[st] = (_diagStats.statusCounts[st] || 0) + 1;
         if (it.status !== 'active' && it.status !== 'pending_add' && it.status !== 'pending_change') return;
+        _diagStats.activeItems++;
         var nm = (it.status === 'pending_change' && it.pendingChange) ? it.pendingChange.name : it.name;
         if (nm) typesMap[nm] = true;
       });
     });
   });
-  var activeTypes = BENTO_LIST.filter(function(b) { return typesMap[b]; });
+
+  // ★BENTO_LIST 順を維持しつつ、BENTO_LIST に無い名前(短縮形等)も含める柔軟な抽出
+  var activeTypes = [];
+  BENTO_LIST.forEach(function(b) {
+    if (typesMap[b]) activeTypes.push(b);
+  });
+  Object.keys(typesMap).forEach(function(name) {
+    if (activeTypes.indexOf(name) === -1) activeTypes.push(name);
+  });
 
   var html = '';
   html += '<div class="op-modal-title">🛑 配達ストップ</div>';
@@ -7895,6 +7912,21 @@ function renderEndServiceKindsStep() {
   if (activeTypes.length === 0) {
     html += '<div class="op-info-box" style="background:#fff5f5;border-color:#c0392b;color:#444;">';
     html += '現在ご利用中のお弁当が見つかりません。';
+    // ★診断情報(原因切り分けのため)
+    var _statusLines = '';
+    Object.keys(_diagStats.statusCounts).forEach(function(s) {
+      _statusLines += s + ':' + _diagStats.statusCounts[s] + ' ';
+    });
+    html += '<div style="font-size:11px;color:#888;margin-top:10px;font-weight:normal;">';
+    html += '<b>診断情報</b><br>';
+    html += '・カレンダー月数: ' + _diagStats.months + '<br>';
+    html += '・データ有り月数: ' + _diagStats.monthsWithData + '<br>';
+    html += '・配達日数: ' + _diagStats.days + '<br>';
+    html += '・配達アイテム総数: ' + _diagStats.items + '<br>';
+    html += '・active アイテム数: ' + _diagStats.activeItems + '<br>';
+    html += '・status 内訳: ' + (_statusLines || 'なし') + '<br>';
+    html += '※「配達日数: 0」なら未紐付け・紐付け確認をご依頼ください';
+    html += '</div>';
     html += '</div>';
     html += '<button class="op-modal-cancel" onclick="closeOpModal()">閉じる</button>';
     document.getElementById('op-modal-content').innerHTML = html;
