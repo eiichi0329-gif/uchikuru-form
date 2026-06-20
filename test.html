@@ -2012,6 +2012,20 @@ body.cancel-mode-active {
         <div class="cm-arrow">›</div>
       </div>
     </button>
+
+    <!-- ★クレジットカード払いに変更(ENABLE_CREDIT_CARD が true のとき initCreditCardFeature で表示) -->
+    <div id="cc-change-btn-wrap" style="display:none;">
+      <button type="button" class="cm-item" onclick="onClickChangeToCreditCard()">
+        <div class="cm-row">
+          <div class="cm-icon">💳</div>
+          <div class="cm-body">
+            <div class="cm-title">クレジットカード払いに変更</div>
+            <div class="cm-desc">安全なカード入力画面でご登録いただけます</div>
+          </div>
+          <div class="cm-arrow">›</div>
+        </div>
+      </button>
+    </div>
   </div>
 
   <!-- 新規注文(顧客情報登録 → 注文入力 の2ステップ式) -->
@@ -2066,8 +2080,7 @@ body.cancel-mode-active {
           <option value="">選択してください</option>
           <option value="現金">現金</option>
           <option value="口座振替">口座振替</option>
-          <!-- ★クレジットカード:後日追加予定のため一旦非表示 -->
-          <!-- <option value="クレジットカード">クレジットカード</option> -->
+          <!-- ★クレジットカード:ENABLE_CREDIT_CARD フラグが true の時のみ JS で動的に追加 -->
         </select>
       </div>
       <div id="no-cust-card-section" style="display:none;">
@@ -2641,6 +2654,27 @@ var userId = '';
    ============================================================ */
 var USE_API = true;  // ★切替: false=テストモード(ローカル動作) / true=本番(API連携)
 
+/* ============================================================
+   ★クレジットカード決済 機能フラグ(2026-06 準備中)
+   ============================================================
+   ローンチ日が決まるまで false のままにしておくこと。
+   false の間:
+     ・新規注文の「クレジットカード」選択肢は非表示
+     ・マイページの「クレジットカード払いに変更」ボタンは非表示
+   ローンチ時に ENABLE_CREDIT_CARD = true に変更するだけで全機能が一斉公開される。
+
+   ※ bento側の新API POST /api/line/stripe/setup-link は実装が完了したら有効化される。
+     それまでフラグを true にしても叩くと404になるため、必ずバックエンド実装後に公開すること。
+   ============================================================ */
+var ENABLE_CREDIT_CARD = false;  // ★ローンチ日まで false。公開時に true に変更。
+
+// Stripe Checkout(setupモード)リンク発行API
+//   POST {BENTO_API_BASE}/api/line/stripe/setup-link
+//   認証: Authorization: Bearer {BENTO_API_KEY}(既存LINE APIと同じ)
+//   req:  { line_user_id }
+//   res:  { checkout_url }
+var STRIPE_SETUP_LINK_PATH = '/api/line/stripe/setup-link';
+
 // === API クライアント ===
 // GET (JSONP): クロスドメイン制約回避のため
 function apiGet(action, params, onSuccess, onError) {
@@ -2731,6 +2765,96 @@ function apiPost(payload, onSuccess, onError) {
 // 簡易UUID生成(client_request_id用、二重送信対策)
 function genRequestId(prefix) {
   return (prefix || 'req') + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+}
+
+/* ============================================================
+   ★クレジットカード決済(Stripe Checkout setupモード)
+   ============================================================
+   ・ENABLE_CREDIT_CARD = false の間は UI を一切出さない(本番非表示)
+   ・true にすると:
+       新規注文の支払方法に「クレジットカード」追加
+       マイページに「クレジットカード払いに変更」ボタン表示
+   ・カード入力は Stripe ホスト画面(checkout.stripe.com)で行うため、
+     LIFF 内にカード番号入力欄は持たない(PCI 範囲を最小化)。
+   ・フロー:
+       1) GAS 経由で bento の setup-link API を叩く(action=stripeSetupLink)
+       2) 返ってきた checkout_url にリダイレクト
+       3) Stripe 画面でカード入力 → 完了 → bento の戻りページへ
+   ============================================================ */
+
+// 起動時:フラグに応じてUIを準備(false なら何もしない=完全非表示)
+function initCreditCardFeature() {
+  if (!ENABLE_CREDIT_CARD) return;
+
+  // ① 新規注文の支払方法に「クレジットカード」選択肢を追加
+  var sel = document.getElementById('no-cust-payment');
+  if (sel && !sel.querySelector('option[value="クレジットカード"]')) {
+    var opt = document.createElement('option');
+    opt.value = 'クレジットカード';
+    opt.textContent = 'クレジットカード';
+    sel.appendChild(opt);
+  }
+
+  // ② マイページ(設定)の「クレジットカード払いに変更」ボタンを表示
+  var ccBtn = document.getElementById('cc-change-btn-wrap');
+  if (ccBtn) ccBtn.style.display = '';
+}
+
+// payment_method コード変換(bento: 1=現金/2=口座振替/3=クレジット)
+function paymentMethodCode(paymentLabel) {
+  if (paymentLabel === '口座振替') return 2;
+  if (paymentLabel === 'クレジットカード') return 3;
+  return 1; // 現金(デフォルト)
+}
+
+// Stripe Checkout(setupモード)リンクを取得して、その URL にリダイレクトする。
+//   GAS 経由(action=stripeSetupLink)で bento の setup-link API を中継して呼ぶ。
+//   onError 時は呼び出し側でハンドリング(ボタン活性化など)。
+function startStripeCardSetup(onError) {
+  if (!ENABLE_CREDIT_CARD) {
+    if (onError) onError({ message: 'クレジットカード決済は現在準備中です。' });
+    return;
+  }
+  if (!userId) {
+    if (onError) onError({ message: 'ユーザー情報が取得できません。LINEから開き直してください。' });
+    return;
+  }
+
+  // ローディング表示(任意)
+  showModal('⏳', 'カード入力画面を準備しています',
+    'まもなく安全なカード入力画面(Stripe)に移動します。少々お待ちください。');
+
+  apiGet('stripeSetupLink', { userId: userId }, function(data) {
+    if (data && data.checkout_url) {
+      // Stripe ホスト画面へリダイレクト
+      // LIFF 内ブラウザでもそのまま遷移可能。外部ブラウザを使う場合は liff.openWindow も検討。
+      window.location.href = data.checkout_url;
+    } else {
+      _closeUcModal();
+      var msg = (data && data.message) ? data.message
+        : 'カード入力画面の準備に失敗しました。時間をおいて再度お試しください。';
+      if (onError) onError({ message: msg });
+      else showModal('🙇', '申し訳ございません', msg);
+    }
+  }, function(err) {
+    _closeUcModal();
+    var msg = 'カード入力画面の準備に失敗しました。通信環境をご確認のうえ再度お試しください。';
+    if (onError) onError({ message: msg });
+    else showModal('🙇', '申し訳ございません', msg);
+  });
+}
+
+// uc-modal を閉じる共通ヘルパー
+function _closeUcModal() {
+  var ov = document.getElementById('uc-modal-overlay');
+  if (ov) ov.classList.remove('show');
+}
+
+// マイページの「クレジットカード払いに変更」ボタンから呼ばれる
+function onClickChangeToCreditCard() {
+  startStripeCardSetup(function(err) {
+    showModal('🙇', '申し訳ございません', (err && err.message) || 'エラーが発生しました。');
+  });
 }
 
 // ★操作開始前の検証:お客様の登録情報(名前/住所/電話)が揃っているか確認
@@ -4157,6 +4281,7 @@ window.onload = function() {
   buildBentoGrids();
   buildDayGrids();
   initAllCalendars();
+  initCreditCardFeature();  // ★クレカ機能フラグに応じてUIを準備(false なら何もしない)
 
   var params=new URLSearchParams(window.location.search);
   if(params.get('uid')) userId=params.get('uid');
@@ -7788,6 +7913,22 @@ function submitRegisterOnly() {
   }
 
   // 完了モーダル(登録のみ専用文言)
+  //   ★クレジットカード選択時(かつ機能ON時)は、完了後に Stripe カード入力へ誘導
+  if (ENABLE_CREDIT_CARD && cd.payment === 'クレジットカード') {
+    showModalWithAction('✅', 'お客様情報を承りました',
+      'お客様情報を登録しました。\n\n続いて、クレジットカードのご登録に進みます。\n安全なカード入力画面(Stripe)に移動します。',
+      function() {
+        startStripeCardSetup(function(err) {
+          // setup-link 失敗時はマイページに退避(登録自体は完了している)
+          showModalWithAction('🙇', 'カード登録は後ほど',
+            (err && err.message ? err.message : 'カード入力画面の準備に失敗しました。') +
+            '\n\nお客様情報のご登録は完了しています。カードのご登録は、マイページの「クレジットカード払いに変更」からいつでも可能です。',
+            function() { loadAndShow('usage'); });
+        });
+      });
+    return;
+  }
+
   showModalWithAction('✅', 'お客様情報を承りました',
     '現在ご利用中のお客様としてお客様情報を登録しました。\n\n店舗にて過去のご利用情報との紐付けを行います。\n紐付け完了時にLINEでお知らせします。',
     function() {
