@@ -2012,20 +2012,6 @@ body.cancel-mode-active {
         <div class="cm-arrow">›</div>
       </div>
     </button>
-
-    <!-- ★クレジットカード払いに変更(ENABLE_CREDIT_CARD が true のとき initCreditCardFeature で表示) -->
-    <div id="cc-change-btn-wrap" style="display:none;">
-      <button type="button" class="cm-item" onclick="onClickChangeToCreditCard()">
-        <div class="cm-row">
-          <div class="cm-icon">💳</div>
-          <div class="cm-body">
-            <div class="cm-title">クレジットカード払いに変更</div>
-            <div class="cm-desc">安全なカード入力画面でご登録いただけます</div>
-          </div>
-          <div class="cm-arrow">›</div>
-        </div>
-      </button>
-    </div>
   </div>
 
   <!-- 新規注文(顧客情報登録 → 注文入力 の2ステップ式) -->
@@ -2786,7 +2772,7 @@ function genRequestId(prefix) {
 function initCreditCardFeature() {
   if (!ENABLE_CREDIT_CARD) return;
 
-  // ① 新規注文の支払方法に「クレジットカード」選択肢を追加
+  // 新規注文の支払方法に「クレジットカード」選択肢を追加
   var sel = document.getElementById('no-cust-payment');
   if (sel && !sel.querySelector('option[value="クレジットカード"]')) {
     var opt = document.createElement('option');
@@ -2794,10 +2780,8 @@ function initCreditCardFeature() {
     opt.textContent = 'クレジットカード';
     sel.appendChild(opt);
   }
-
-  // ② マイページ(設定)の「クレジットカード払いに変更」ボタンを表示
-  var ccBtn = document.getElementById('cc-change-btn-wrap');
-  if (ccBtn) ccBtn.style.display = '';
+  // ※「登録情報の変更」ページ(顧客情報編集モーダル)の選択肢は
+  //   openCustomerEditModal 内で ENABLE_CREDIT_CARD を見て動的に追加する。
 }
 
 // payment_method コード変換(bento: 1=現金/2=口座振替/3=クレジット)
@@ -7178,12 +7162,10 @@ function onNoCustPaymentChange(value) {
   noState.payment = value;
   var section = document.getElementById('no-cust-card-section');
   if (!section) return;
-  if (value === 'クレジットカード') {
-    section.style.display = 'block';
-    setTimeout(initStripeElements, 50);
-  } else {
-    section.style.display = 'none';
-  }
+  // ★Stripe リダイレクト方式:LIFF内にカード入力欄は出さない。
+  //   クレジットカード選択時は、登録完了後に Stripe のカード入力画面へリダイレクトする
+  //   (submitNoCustomerInfo → 完了モーダル → startStripeCardSetup)。
+  section.style.display = 'none';
 }
 
 function submitNoCustomerInfo() {
@@ -7202,28 +7184,10 @@ function submitNoCustomerInfo() {
     return;
   }
 
-  if (pm === 'クレジットカード') {
-    var isNewCard = !noState.cardLast4;
-    if (typeof Stripe !== 'undefined' && stripeInstance && stripeCardNumber) {
-      stripeInstance.createToken(stripeCardNumber).then(function(result) {
-        if (result.error) {
-          if (isNewCard) {
-            var errEl = document.getElementById('stripe-card-errors');
-            if (errEl) errEl.textContent = result.error.message;
-            return;
-          }
-          finalizeNoCustomerInfo(nm, ad, ph, pm, noState.cardLast4);
-        } else {
-          var last4 = (result.token.card && result.token.card.last4) || '****';
-          finalizeNoCustomerInfo(nm, ad, ph, pm, last4);
-        }
-      });
-      return;
-    } else {
-      finalizeNoCustomerInfo(nm, ad, ph, pm, noState.cardLast4 || '4242');
-      return;
-    }
-  }
+  // ★クレジットカード選択時も、この段階ではカード入力しない。
+  //   Stripe リダイレクト方式のため、注文送信完了後(submitNewOrder系の完了処理)に
+  //   startStripeCardSetup で Stripe カード入力画面へ誘導する。
+  //   ここでは支払方法だけ保持して次ステップへ進む。
   finalizeNoCustomerInfo(nm, ad, ph, pm, '');
 }
 
@@ -8985,44 +8949,33 @@ function renderCustomerEditView() {
   html += '<option value=""' + (modalState.cePayment === '' ? ' selected' : '') + '>選択してください</option>';
   html += '<option value="現金"' + (modalState.cePayment === '現金' ? ' selected' : '') + '>現金</option>';
   html += '<option value="口座振替"' + (modalState.cePayment === '口座振替' ? ' selected' : '') + '>口座振替</option>';
-  // ★クレジットカード:後日追加予定のため一旦非表示
-  // html += '<option value="クレジットカード"' + (modalState.cePayment === 'クレジットカード' ? ' selected' : '') + '>クレジットカード</option>';
+  // ★クレジットカード:ENABLE_CREDIT_CARD が true のときのみ選択肢を表示
+  if (ENABLE_CREDIT_CARD) {
+    html += '<option value="クレジットカード"' + (modalState.cePayment === 'クレジットカード' ? ' selected' : '') + '>クレジットカード</option>';
+  }
   html += '</select>';
   html += '</div>';
 
-  // === ★クレジットカード:後日追加予定のため一旦非表示 ===
-  // クレジットカード選択時のみカード入力欄を表示(復活時にコメントアウト解除)
-  /*
-  if (modalState.cePayment === 'クレジットカード') {
+  // ★クレジットカード選択時:カード入力は Stripe ホスト画面で行うため、
+  //   ここでは案内文のみ表示。「更新する」を押すと Stripe のカード入力へリダイレクトする。
+  if (ENABLE_CREDIT_CARD && modalState.cePayment === 'クレジットカード') {
     html += '<div class="stripe-payment-section">';
-    html += '<h4>💳 クレジットカード情報</h4>';
+    html += '<h4>💳 クレジットカードのご登録</h4>';
     if (modalState.ceCardLast4) {
-      html += '<div class="desc">現在登録中のカード: <b>**** **** **** ' + modalState.ceCardLast4 + '</b><br>変更する場合は新しいカード情報を入力してください(任意)。</div>';
+      html += '<div class="desc">現在登録中のカード: <b>**** **** **** ' + modalState.ceCardLast4 + '</b><br>「この内容で更新する」を押すと、安全なカード入力画面(Stripe)でカードを再登録できます。</div>';
     } else {
-      html += '<div class="desc">月末締めでご請求を行います。<br>カード情報は暗号化され安全に保存されます。</div>';
+      html += '<div class="desc">「この内容で更新する」を押すと、安全なカード入力画面(Stripe)に移動します。<br>カード情報は Stripe 社のページで暗号化して安全に登録されます。</div>';
     }
-    html += '<label class="stripe-label">カード番号</label>';
-    html += '<div id="stripe-card-number" class="stripe-input-field"></div>';
-    html += '<label class="stripe-label">有効期限</label>';
-    html += '<div id="stripe-card-expiry" class="stripe-input-field"></div>';
-    html += '<label class="stripe-label">セキュリティコード</label>';
-    html += '<div id="stripe-card-cvc" class="stripe-input-field"></div>';
-    html += '<div id="stripe-card-errors" class="stripe-error" role="alert"></div>';
-    html += '<div class="stripe-secure-note">SSL暗号化通信で安全に登録されます</div>';
+    html += '<div class="stripe-secure-note">🔒 カード情報はうちくるのサーバーには保存されません</div>';
     html += '</div>';
   }
-  */
 
   html += '<button class="op-modal-confirm" onclick="submitCustomerInfo()">' + (isRegister ? 'この内容で登録する' : 'この内容で更新する') + '</button>';
   html += '<button class="op-modal-cancel" style="margin-top:8px;" onclick="closeOpModal()">キャンセル</button>';
 
   document.getElementById('op-modal-content').innerHTML = html;
   openOpModal(false);
-
-  // クレカ選択時はStripe Elementsを初期化
-  if (modalState.cePayment === 'クレジットカード') {
-    setTimeout(initStripeElements, 50);
-  }
+  // ★Stripe リダイレクト方式のため、LIFF内カード入力欄(initStripeElements)は不要
 }
 
 // 支払い方法変更時の処理(再描画してカード欄を出し入れ)
@@ -9053,40 +9006,27 @@ function submitCustomerInfo() {
     return;
   }
 
-  // クレジットカードの場合、Stripeでトークン化(本番接続時)
+  // ★クレジットカードの場合:
+  //   カード入力は Stripe ホスト画面で行う。まず顧客情報(支払方法=クレジット)を保存し、
+  //   保存完了後に Stripe のカード入力画面へリダイレクトする。
   if (pm === 'クレジットカード') {
-    // 新規登録 or カード未登録の場合はカード入力必須
-    var isNewCard = !modalState.ceCardLast4;
-    if (typeof Stripe !== 'undefined' && stripeInstance && stripeCardNumber) {
-      stripeInstance.createToken(stripeCardNumber).then(function(result) {
-        if (result.error) {
-          // 新規でエラー → 中止
-          if (isNewCard) {
-            var errEl = document.getElementById('stripe-card-errors');
-            if (errEl) errEl.textContent = result.error.message;
-            return;
-          }
-          // 既存カードがあるならそのまま既存利用
-          finalizeCustomerInfoSave(nm, ad, ph, pm, modalState.ceCardLast4);
-        } else {
-          // TODO: 本番では token.id をサーバーに送信して保存
-          var last4 = (result.token.card && result.token.card.last4) || '****';
-          finalizeCustomerInfoSave(nm, ad, ph, pm, last4);
-        }
+    finalizeCustomerInfoSave(nm, ad, ph, pm, modalState.ceCardLast4 || '', function() {
+      // 保存完了 → Stripe カード入力へ
+      startStripeCardSetup(function(err) {
+        showModalWithAction('🙇', 'カード登録は後ほど',
+          (err && err.message ? err.message : 'カード入力画面の準備に失敗しました。') +
+          '\n\nお支払い方法の変更は承りました。カードのご登録は、もう一度この画面からお試しいただけます。',
+          function() { loadAndShow('usage'); });
       });
-      return; // 非同期処理のためここで抜ける
-    } else {
-      // Stripe未読込 → デモモード(テスト用ダミー保存)
-      finalizeCustomerInfoSave(nm, ad, ph, pm, modalState.ceCardLast4 || '4242');
-      return;
-    }
+    });
+    return;
   }
 
   // クレカ以外
   finalizeCustomerInfoSave(nm, ad, ph, pm, '');
 }
 
-function finalizeCustomerInfoSave(nm, ad, ph, pm, cardLast4) {
+function finalizeCustomerInfoSave(nm, ad, ph, pm, cardLast4, onComplete) {
   // ローカル更新(配達情報は注文ページで管理するため、前回値を維持)
   var prev = window._customerData || {};
 
@@ -9155,6 +9095,13 @@ function finalizeCustomerInfoSave(nm, ad, ph, pm, cardLast4) {
 
   closeOpModal();
   renderCustomerInfoCard();
+
+  // ★クレジットカード選択時など、保存後に続けて処理がある場合(onComplete)を最優先で実行
+  //   (Stripe カード入力画面へのリダイレクトなど)
+  if (typeof onComplete === 'function') {
+    onComplete();
+    return;
+  }
 
   // ★保留アクション(別の操作の途中でこの登録モーダルが開かれた場合)があれば、
   //   登録完了後に元の操作を自動再開する
