@@ -2666,7 +2666,7 @@ var USE_API = true;  // ★切替: false=テストモード(ローカル動作) 
    ※ bento側の新API POST /api/line/stripe/setup-link は実装が完了したら有効化される。
      それまでフラグを true にしても叩くと404になるため、必ずバックエンド実装後に公開すること。
    ============================================================ */
-var ENABLE_CREDIT_CARD = false;  // ★ローンチ日まで false。公開時に true に変更。
+var ENABLE_CREDIT_CARD = true;  // ★2026-06-20 公開: bento setup-link API 本番稼働確認済み
 
 // Stripe Checkout(setupモード)リンク発行API
 //   POST {BENTO_API_BASE}/api/line/stripe/setup-link
