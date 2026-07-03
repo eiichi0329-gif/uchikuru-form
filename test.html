@@ -90,6 +90,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<!-- ★v8p3: 接続確立の先行(GAS・LINE SDKへのDNS/TLSを前倒しして初回表示を短縮) -->
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://static.line-scdn.net" crossorigin>
 <title>うちくるサービス</title>
 <script>
   // ★v7: デモモード(?demo=true)では LIFF SDK を読み込まない
@@ -106,7 +109,7 @@
     }
   })();
 </script>
-<script src="https://js.stripe.com/v3/"></script>
+<script src="https://js.stripe.com/v3/" defer></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #f5f0eb; min-height: 100vh; font-size: 17px; }
@@ -1712,6 +1715,48 @@ body.cancel-mode-active {
   border: 0;
 }
 
+</style>
+<style id="uc-design-polish">
+/* ============================================================
+   ★v8p3 デザイン改善レイヤー(見やすさ・押しやすさの底上げ)
+   高齢のお客様が多い前提で、中核操作(日付選択)の視認性を優先。
+   このblockを削除すれば元のデザインに完全に戻ります。
+   ============================================================ */
+
+/* --- 日付選択カレンダー:このアプリの中核操作なので日付を大きく --- */
+.cal-cell { font-size: 16.5px; font-weight: 600; }
+.cal-cell.selected {
+  box-shadow: 0 1px 5px rgba(240,131,0,.45);
+  font-size: 17px;
+}
+.cal-cell.today { border-width: 2.5px; }
+/* 選択不可日:従来の#ddd/#cccはほぼ見えないため、
+   「存在は分かるが押せないと分かる」濃さに調整 */
+.cal-cell.disabled { color: #cfc7bd; }
+.cal-cell.weekend  { color: #cfc7bd; }
+
+/* --- 選択済み日付タグ:文字と✕ボタンを大きく(誤タップ防止) --- */
+.date-tag { font-size: 14.5px; padding: 6px 12px; }
+.date-tag .rm { font-size: 17px; padding: 0 3px; }
+
+/* --- 薄グレー文字のコントラスト改善(読みやすさ) --- */
+.status { color: #666; }
+.month-tab { color: #777; }
+
+/* --- 選択中タブの視認性を強化 --- */
+.pattern-tab.active {
+  background: #ffead6;
+  box-shadow: inset 0 0 0 1px #F08300;
+}
+
+/* --- タップした感触(押した実感が伝わる) --- */
+.cal-cell:not(.disabled):not(.weekend):not(.empty):active { transform: scale(.93); }
+.btn-submit:active:not(:disabled) { transform: scale(.985); opacity: .92; }
+.op-btn:active:not(:disabled) { opacity: .85; }
+.month-tab:active { opacity: .8; }
+
+/* --- 週ごとの達成状況カード(パッチ追加分)も一回り大きく --- */
+.uc-wk { font-size: 14px; }
 </style>
 </head>
 <body>
@@ -9716,6 +9761,580 @@ function showComplete(type){
   document.getElementById('completeMsg').textContent=msgs[type]||'送信が完了しました。';
   document.getElementById('completeWrap').classList.add('active');
 }
+</script>
+<script id="uc-patch-v8p3">
+/* ============================================================
+   うちくる LIFF 統合パッチ v8p3(HTML本体末尾に埋め込み済み)
+   ------------------------------------------------------------
+   本体の関数を後から上書きして、以下を追加する:
+   A. 表示速度改善(bootstrap一括取得 / localStorageキャッシュ即時表示 /
+      顧客情報の二重取得解消 / スケルトンUI / GAS未対応時の自動フォールバック)
+   B. 未入力送信の防止(submitNoOrder・submitShopTalkゲート /
+      apiPost最終チェック / GAS側ガード応答の表示 /
+      bulkChangeインライン欄の非表示 / プロフィール保存時のキャッシュ同期)
+   C. 月またぎ週の注文対応(日程指定・配達開始日カレンダーに前月/翌月の
+      日付を薄色表示して選択可能に / 週ごとの週3日達成状況をリアルタイム表示)
+
+   ※問題が起きた場合は、この <script id="uc-patch-v8p3"> ブロックを
+     まるごと削除すれば、確実に元の動作に戻せる。
+   ============================================================ */
+(function () {
+  'use strict';
+  if (window.__UC_PATCH_V8P3__) return;
+  window.__UC_PATCH_V8P3__ = true;
+
+  /* ---------- 共通ユーティリティ ---------- */
+  function demo()  { return (typeof isDemoMode !== 'undefined') && isDemoMode; }
+  function apiOn() { return (typeof USE_API !== 'undefined') && USE_API; }
+  function uidGet() { return (typeof userId !== 'undefined' && userId) ? userId : ''; }
+  function gasUrl() { return (typeof GAS_URL !== 'undefined') ? GAS_URL : ''; }
+  var UC_EMPTY = ['未登録','(未登録)','(未登録)','未入力','(未入力)','(未入力)',
+                  'なし','ー','―','-','−','未','ない','none','null','undefined'];
+  function filled(v) {
+    var s = String(v == null ? '' : v).trim();
+    return !!s && UC_EMPTY.indexOf(s) === -1;
+  }
+  function pad2(n) { return n < 10 ? '0' + n : String(n); }
+  function ymd(y, m, d) { return y + '-' + pad2(m) + '-' + pad2(d); }
+  function addMonths(y, m, delta) {
+    var dt = new Date(y, m - 1 + delta, 1);
+    return { y: dt.getFullYear(), m: dt.getMonth() + 1 };
+  }
+  function daysIn(y, m) { return new Date(y, m, 0).getDate(); }
+
+  /* ---------- localStorage キャッシュ ---------- */
+  var CV = 'v1';
+  function lsKey(kind) { return '_uc_cache_' + CV + '_' + kind + '_' + (uidGet() || 'anon'); }
+  function saveCache(kind, obj) {
+    try { localStorage.setItem(lsKey(kind), JSON.stringify({ t: Date.now(), v: obj })); } catch (e) {}
+  }
+  function readCache(kind, maxAgeMs) {
+    try {
+      var raw = localStorage.getItem(lsKey(kind));
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || !o.t) return null;
+      if (maxAgeMs && (Date.now() - o.t) > maxAgeMs) return null;
+      return o.v;
+    } catch (e) { return null; }
+  }
+
+  /* ---------- 顧客キャッシュ(本体と同じ _uc_cust_ キー) ---------- */
+  function syncCustCache(nm, ad, ph, enrolled) {
+    if (!uidGet()) return;
+    try {
+      var key = '_uc_cust_' + uidGet();
+      var prev = {};
+      try { prev = JSON.parse(sessionStorage.getItem(key) || '{}') || {}; } catch (e) {}
+      sessionStorage.setItem(key, JSON.stringify({
+        enrolled: (enrolled != null) ? !!enrolled : !!prev.enrolled,
+        name:    nm != null ? nm : (prev.name    || ''),
+        address: ad != null ? ad : (prev.address || ''),
+        phone:   ph != null ? ph : (prev.phone   || ''),
+        store:   prev.store || ''
+      }));
+    } catch (e) {}
+  }
+
+  /* ---------- CSS(スケルトン + カレンダーUX) ---------- */
+  (function () {
+    if (document.getElementById('uc-patch-style')) return;
+    var st = document.createElement('style');
+    st.id = 'uc-patch-style';
+    st.textContent =
+      '@keyframes ucSkelPulse{0%,100%{opacity:.5}50%{opacity:1}}' +
+      '.uc-skel{background:#ece5dd;border-radius:10px;animation:ucSkelPulse 1.2s ease-in-out infinite;}' +
+      '.uc-skel-tabs{height:46px;margin-bottom:14px;}' +
+      '.uc-skel-cal{height:320px;margin-bottom:14px;}' +
+      '.uc-skel-card{height:110px;margin-bottom:12px;}' +
+      '.cal-cell.uc-adj{opacity:.5;background:#fbf7f2;}' +
+      '.cal-cell.uc-adj.selected{opacity:1;background:#F08300;color:#fff;}' +
+      '.uc-adj-m{font-size:9px;color:#b8845a;margin-right:1px;font-weight:normal;}' +
+      '.uc-cal-note{font-size:11.5px;color:#8a8a8a;padding:7px 4px 2px;line-height:1.55;}' +
+      '#uc-week-summary{margin-top:8px;display:flex;flex-direction:column;gap:6px;}' +
+      '.uc-wk{font-size:13px;padding:9px 12px;border-radius:7px;line-height:1.6;}' +
+      '.uc-wk.ok{background:#eef8ee;color:#2d7a31;border:1px solid #bfe3bf;}' +
+      '.uc-wk.ng{background:#fff6e8;color:#a05a00;border:1.5px solid #f2cf9a;font-weight:bold;}' +
+      '.uc-wk-hint{display:block;margin-top:3px;font-weight:normal;font-size:12px;color:#8a6500;}' +
+      '.usage-cell.uc-adj{opacity:.5;}';
+    document.head.appendChild(st);
+  })();
+  function skeletonHtml() {
+    return '<div class="uc-skel uc-skel-tabs"></div>' +
+           '<div class="uc-skel uc-skel-cal"></div>' +
+           '<div class="uc-skel uc-skel-card"></div>';
+  }
+
+  /* ############################################################
+     A. bootstrap 一括取得(高速化)
+     ############################################################ */
+  var _boot = null, _bootAt = 0;
+  var BOOT_FRESH_MS = 45 * 1000;
+  var BOOT_NA_KEY = '_uc_boot_na';
+
+  function bootUnavailable() {
+    try {
+      var at = parseInt(localStorage.getItem(BOOT_NA_KEY), 10) || 0;
+      return at && (Date.now() - at) < 3600 * 1000;
+    } catch (e) { return false; }
+  }
+  function bootstrapFetch(uidArg, timeoutMs, done) {
+    if (demo() || !apiOn() || !uidArg || bootUnavailable() || !gasUrl()) { done(null); return; }
+    var cb = '__ucBoot_' + Math.random().toString(36).slice(2, 10);
+    var finished = false, timer = null;
+    var sc = document.createElement('script');
+    function finish(data) {
+      if (finished) return;
+      finished = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+      window[cb] = function () {};
+      if (sc.parentNode) sc.parentNode.removeChild(sc);
+      var ok = !!(data && data.ok);
+      try {
+        if (ok) localStorage.removeItem(BOOT_NA_KEY);
+        else    localStorage.setItem(BOOT_NA_KEY, String(Date.now()));
+      } catch (e) {}
+      done(ok ? data : null);
+    }
+    window[cb] = function (d) { finish(d); };
+    sc.src = gasUrl() + '?action=bootstrap&userId=' + encodeURIComponent(uidArg) + '&callback=' + cb;
+    sc.onerror = function () { finish(null); };
+    timer = setTimeout(function () { finish(null); }, timeoutMs || 6000);
+    document.body.appendChild(sc);
+  }
+
+  /* apiGet 横取り:bootstrap 直後の getSchedule/getEta/getBilling を結果から即応答 */
+  if (typeof apiGet === 'function') {
+    var _origApiGet = apiGet;
+    window.apiGet = function (action, params, onSuccess, onError) {
+      if (_boot && (Date.now() - _bootAt) < BOOT_FRESH_MS) {
+        var slice = null;
+        if (action === 'getSchedule' && _boot.schedule) { slice = _boot.schedule; _boot.schedule = null; }
+        else if (action === 'getEta'     && _boot.eta)      { slice = _boot.eta;      _boot.eta      = null; }
+        else if (action === 'getBilling' && _boot.billing)  { slice = _boot.billing;  _boot.billing  = null; }
+        if (slice) { setTimeout(function () { if (onSuccess) onSuccess(slice); }, 0); return; }
+      }
+      _origApiGet(action, params, onSuccess, onError);
+    };
+  }
+
+  /* checkExistingCustomerThenLoad を bootstrap 版に差し替え */
+  if (typeof checkExistingCustomerThenLoad === 'function') {
+    var _origCheck = checkExistingCustomerThenLoad;
+    window.checkExistingCustomerThenLoad = function (currentType) {
+      if (demo() || !apiOn() || !uidGet() || bootUnavailable()) { _origCheck(currentType); return; }
+      bootstrapFetch(uidGet(), 6000, function (data) {
+        if (!data) { _origCheck(currentType); return; }
+        _boot = data; _bootAt = Date.now();
+        var c = data.customer || {};
+        syncCustCache(c.name || '', c.address || '', c.phone || '', c.enrolled === true);
+        if (currentType) { loadAndShow(currentType); return; }
+        var isExisting = (c.enrolled === true) || filled(c.name) || filled(c.address) || filled(c.phone);
+        loadAndShow(isExisting ? 'usage' : '');
+      });
+    };
+  }
+
+  /* schedule/billing/eta を localStorage にキャッシュ */
+  if (typeof loadUsageData === 'function') {
+    var _origLoadUsage = loadUsageData;
+    window.loadUsageData = function (cb) {
+      _origLoadUsage(function (d) {
+        if (!demo()) saveCache('sched', { data: d, pending: (window.pendingChanges || []) });
+        cb(d);
+      });
+    };
+  }
+  if (typeof loadBillingData === 'function') {
+    var _origLoadBilling = loadBillingData;
+    window.loadBillingData = function (cb) {
+      _origLoadBilling(function (d) {
+        if (!demo()) saveCache('bill', d);
+        cb(d);
+      });
+    };
+  }
+  if (typeof loadEtaData === 'function') {
+    var _origLoadEta = loadEtaData;
+    window.loadEtaData = function (cb) {
+      _origLoadEta(function (d) {
+        if (!demo() && d) saveCache('eta', d);
+        if (cb) cb(d);
+      });
+    };
+  }
+
+  /* onFormShown:キャッシュ即時表示 → 裏で再検証 */
+  if (typeof onFormShown === 'function') {
+    var _origOnFormShown = onFormShown;
+    window.onFormShown = function (type) {
+      if (type !== 'usage' || demo() || !apiOn() || !uidGet()) { _origOnFormShown(type); return; }
+
+      var hadSched = false, hadBill = false;
+      if (!window.usageData) {
+        var cs = readCache('sched', 24 * 3600 * 1000);
+        if (cs && cs.data) { window.usageData = cs.data; window.pendingChanges = cs.pending || []; hadSched = true; }
+      }
+      if (!window.billingData) {
+        var cb2 = readCache('bill', 24 * 3600 * 1000);
+        if (cb2) { window.billingData = cb2; hadBill = true; }
+      }
+      if (!window.etaData) {
+        var ce = readCache('eta', 10 * 60 * 1000);
+        if (ce) window.etaData = ce;
+      }
+      if (!window.usageData) {
+        var el = document.getElementById('usage-content');
+        if (el) el.innerHTML = skeletonHtml();
+      }
+
+      _origOnFormShown(type);
+
+      if (hadSched || hadBill) {
+        setTimeout(function () {
+          window.loadUsageData(function (d) {
+            window.usageData = d;
+            window.loadBillingData(function (b) {
+              window.billingData = b;
+              if (typeof renderMonthTabs === 'function') try { renderMonthTabs('usage'); } catch (e) {}
+              if (typeof renderUsageContent === 'function') try { renderUsageContent(); } catch (e) {}
+            });
+          });
+        }, 30);
+      }
+    };
+  }
+
+  /* ############################################################
+     B. 未入力送信の防止
+     ############################################################ */
+  function gateSubmit(fnName, needName) {
+    var orig = window[fnName];
+    if (typeof orig !== 'function') return;
+    window[fnName] = function () {
+      if (!demo()) {
+        var ok = (typeof _hasCompleteProfile === 'function') ? _hasCompleteProfile() : true;
+        // submitShopTalk は住所不要だが、店舗が誰か特定するため名前は必須にする
+        if (needName === 'nameOnly') {
+          var nm = (window._customerData && window._customerData.name) || '';
+          ok = filled(nm);
+        }
+        if (!ok) {
+          var self = this, args = arguments;
+          if (typeof ensureProfileForChange === 'function') {
+            ensureProfileForChange(function () { window[fnName].apply(self, args); });
+            return;
+          }
+          if (typeof openCustomerEditModal === 'function') { openCustomerEditModal('register'); return; }
+        }
+      }
+      return orig.apply(this, arguments);
+    };
+  }
+  gateSubmit('submitNoOrder', 'full');
+  gateSubmit('submitShopTalk', 'nameOnly');
+
+  /* apiPost 最終ゲート + GAS側ガード応答の表示 */
+  function profileMissingIn(payload) {
+    if (!payload) return false;
+    var t = payload.type || '';
+    if (t === 'quantityChange' || t === 'dateCancel' || t === 'cancel') {
+      return !(filled(payload.name) && filled(payload.address) && filled(payload.phone));
+    }
+    if (t === 'newOrder') {
+      var c = payload.customer || {};
+      return !(filled(c.name) && filled(c.address) && filled(c.phone));
+    }
+    if (t === 'profileEdit') {
+      var a = payload.after || {};
+      return !(filled(a.name) && filled(a.address) && filled(a.phone));
+    }
+    if (payload.action === 'change' && payload.change_type === 'schedule_change') {
+      return !(filled(payload.name) && filled(payload.address) && filled(payload.phone));
+    }
+    return false;
+  }
+  function showProfileRequiredModal(message) {
+    var msg = message || 'お名前・ご住所・お電話番号のご登録が確認できなかったため、送信できませんでした。\n\nお客様情報をご登録のうえ、もう一度お試しください。';
+    if (typeof showModalWithAction === 'function') {
+      showModalWithAction('🙏', 'お客様情報のご登録が必要です', msg, function () {
+        if (typeof openCustomerEditModal === 'function') openCustomerEditModal('register');
+      });
+    } else if (typeof showModal === 'function') {
+      showModal('🙏', 'お客様情報のご登録が必要です', msg);
+    } else {
+      alert(msg);
+    }
+  }
+  if (typeof apiPost === 'function') {
+    var _origApiPost = apiPost;
+    window.apiPost = function (payload, onSuccess, onError) {
+      if (!demo() && profileMissingIn(payload)) {
+        console.warn('[patch] 未入力のため送信ブロック:', payload.type || payload.change_type);
+        setTimeout(function () { showProfileRequiredModal(); }, 400);
+        if (onError) onError({ status: 'error', code: 'profile_required', message: 'blocked by client guard' });
+        return;
+      }
+      _origApiPost(payload, function (res) {
+        if (res && res.status === 'error' && res.code === 'profile_required') {
+          console.warn('[patch] GAS側ガードにより拒否');
+          setTimeout(function () { showProfileRequiredModal(res.message); }, 200);
+          if (onError) onError(res);
+          return;
+        }
+        if (onSuccess) onSuccess(res);
+      }, onError);
+    };
+  }
+
+  /* bulkChange のインライン入力欄を非表示(統一動線) */
+  if (typeof bcInitForm === 'function') {
+    var _origBcInit = bcInitForm;
+    window.bcInitForm = function () {
+      _origBcInit.apply(this, arguments);
+      var pa = document.getElementById('bc-profile-area');
+      if (pa) pa.style.display = 'none';
+    };
+  }
+
+  /* プロフィール保存時に sessionStorage キャッシュを同期 */
+  if (typeof finalizeCustomerInfoSave === 'function') {
+    var _origFin = finalizeCustomerInfoSave;
+    window.finalizeCustomerInfoSave = function (nm, ad, ph, pm, cardLast4, onComplete) {
+      var r = _origFin.apply(this, arguments);
+      syncCustCache(nm || '', ad || '', ph || '', null);
+      return r;
+    };
+  }
+  if (typeof finalizeNoCustomerInfo === 'function') {
+    var _origFinNo = finalizeNoCustomerInfo;
+    window.finalizeNoCustomerInfo = function (nm, ad, ph, pm, cardLast4) {
+      var r = _origFinNo.apply(this, arguments);
+      syncCustCache(nm || '', ad || '', ph || '', null);
+      return r;
+    };
+  }
+
+  /* ############################################################
+     C. 月またぎ週の注文対応 + カレンダーUX
+     ############################################################ */
+
+  /* 週ごとの達成状況(本体の countExistingDeliveryDaysInWeek を利用) */
+  function weekStatusList(dates) {
+    var weeks = {};
+    (dates || []).forEach(function (ds) {
+      var dt = new Date(ds + 'T00:00:00');
+      var dow = dt.getDay();
+      if (dow === 0 || dow === 6) return;
+      var mon = new Date(dt);
+      mon.setDate(dt.getDate() - (dow - 1));
+      var key = ymd(mon.getFullYear(), mon.getMonth() + 1, mon.getDate());
+      if (!weeks[key]) {
+        var fri = new Date(mon); fri.setDate(mon.getDate() + 4);
+        weeks[key] = { mon: mon, fri: fri, sel: 0 };
+      }
+      weeks[key].sel++;
+    });
+    return Object.keys(weeks).sort().map(function (k) {
+      var w = weeks[k];
+      var existing = 0;
+      if (typeof countExistingDeliveryDaysInWeek === 'function') {
+        try { existing = countExistingDeliveryDaysInWeek(w.mon, w.fri) || 0; } catch (e) {}
+      }
+      return {
+        mon: w.mon, fri: w.fri, sel: w.sel, existing: existing,
+        ok: (w.sel + existing) >= 3,
+        crossMonth: w.mon.getMonth() !== w.fri.getMonth()
+      };
+    });
+  }
+  function renderWeekSummary() {
+    var tags = document.getElementById('no-date-tags');
+    if (!tags) return;
+    var box = document.getElementById('uc-week-summary');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'uc-week-summary';
+      tags.parentNode.insertBefore(box, tags.nextSibling);
+    }
+    var list = weekStatusList(noState && noState.specifyDates);
+    if (list.length === 0) { box.innerHTML = ''; return; }
+    var html = '';
+    list.forEach(function (w) {
+      var label = (w.mon.getMonth() + 1) + '/' + w.mon.getDate() + '(月)〜' +
+                  (w.fri.getMonth() + 1) + '/' + w.fri.getDate() + '(金)の週';
+      var total = w.sel + w.existing;
+      if (w.ok) {
+        html += '<div class="uc-wk ok">✅ ' + label + ':' + w.sel + '日選択' +
+                (w.existing ? '(登録済み' + w.existing + '日と合わせて週' + total + '日)' : '') + '</div>';
+      } else {
+        var need = 3 - total;
+        var hint = w.crossMonth
+          ? '<span class="uc-wk-hint">※この週は月をまたいでいます。カレンダーの薄い色の日付(' + (w.fri.getMonth() + 1) + '月分)もそのまま選べます</span>'
+          : '';
+        html += '<div class="uc-wk ng">⚠️ ' + label + ':あと' + need + '日の選択が必要です' + hint + '</div>';
+      }
+    });
+    box.innerHTML = html;
+  }
+
+  /* 日程指定カレンダー:前月・翌月の日付を薄色表示して選択可能に */
+  if (typeof renderNoSpecifyCalendar === 'function') {
+    window.renderNoSpecifyCalendar = function () {
+      var s = noState.specifyMonth;
+      if (!s) return;
+      var first = new Date(s.y, s.m - 1, 1).getDay();
+      var days  = daysIn(s.y, s.m);
+
+      function cell(cy, cm, cd, isAdj) {
+        var dt = new Date(cy, cm - 1, cd);
+        var dow = dt.getDay();
+        var ds = ymd(cy, cm, cd);
+        var cls = 'cal-cell';
+        var click = '';
+        if (isAdj) cls += ' uc-adj';
+        if (dow === 0 || dow === 6) {
+          cls += ' weekend';
+        } else if (!isDateEditable(ds)) {
+          cls += ' disabled';
+        } else {
+          if (noState.specifyDates.indexOf(ds) !== -1) cls += ' selected';
+          click = ' onclick="toggleNoSpecifyDate(\'' + ds + '\')"';
+        }
+        var label = isAdj ? ('<span class="uc-adj-m">' + cm + '/</span>' + cd) : cd;
+        return '<div class="' + cls + '"' + click + '>' + label + '</div>';
+      }
+
+      var html = '';
+      html += '<div class="calendar-wrap">';
+      html += '<div class="cal-header">';
+      html += '<button onclick="changeNoSpecifyMonth(-1)">‹</button>';
+      html += '<span class="cal-title">' + s.y + '年' + s.m + '月</span>';
+      html += '<button onclick="changeNoSpecifyMonth(1)">›</button>';
+      html += '</div>';
+      html += '<div class="cal-days-header">';
+      html += '<span>日</span><span class="wd">月</span><span class="wd">火</span><span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span>土</span>';
+      html += '</div>';
+      html += '<div class="cal-grid">';
+
+      if (first > 0) {
+        var pm = addMonths(s.y, s.m, -1);
+        var pdays = daysIn(pm.y, pm.m);
+        for (var i = first - 1; i >= 0; i--) html += cell(pm.y, pm.m, pdays - i, true);
+      }
+      for (var d = 1; d <= days; d++) html += cell(s.y, s.m, d, false);
+      var total = first + days;
+      var trail = (7 - (total % 7)) % 7;
+      if (trail > 0) {
+        var nm = addMonths(s.y, s.m, 1);
+        for (var t = 1; t <= trail; t++) html += cell(nm.y, nm.m, t, true);
+      }
+
+      html += '</div>';
+      html += '<div class="uc-cal-note">薄い色の日付は前月・翌月分です。同じ週(月〜金)ならそのまま選べます。グレーの日付は注文締切を過ぎているため選択できません。</div>';
+      html += '</div>';
+      document.getElementById('no-specify-cal-wrap').innerHTML = html;
+
+      // 選択中の日付タグ(本体と同じ描画)
+      var tagsHtml = '';
+      noState.specifyDates.slice().sort().forEach(function (ds) {
+        var pp = ds.split('-');
+        tagsHtml += '<div class="date-tag">' + parseInt(pp[1]) + '月' + parseInt(pp[2]) + '日 ';
+        tagsHtml += '<span class="rm" onclick="removeNoSpecifyDate(\'' + ds + '\')">✕</span>';
+        tagsHtml += '</div>';
+      });
+      document.getElementById('no-date-tags').innerHTML = tagsHtml;
+
+      // 週ごとの達成状況(本体の警告表示も併用)
+      renderWeekSummary();
+      var warn = document.getElementById('no-date-warn');
+      if (warn) {
+        var anyNg = weekStatusList(noState.specifyDates).some(function (w) { return !w.ok; });
+        if (noState.specifyDates.length > 0 && anyNg) warn.classList.remove('hidden');
+        else warn.classList.add('hidden');
+      }
+    };
+  }
+
+  /* 配達開始日カレンダー:前月・翌月も含めて週単位で描画(月またぎ開始日に対応) */
+  if (typeof renderNoStartCalendar === 'function') {
+    window.renderNoStartCalendar = function () {
+      var s = noState.startMonth;
+      if (!s) return;
+      var firstDow = noState.dows.length > 0 ? Math.min.apply(null, noState.dows) : null;
+      var DOWJA = ['日', '月', '火', '水', '木', '金', '土'];
+
+      var html = '';
+      html += '<div class="usage-cal-wrap" style="margin-bottom:6px;">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#fff5ee;border-bottom:1px solid #f0e8e0;">';
+      html += '<button onclick="changeNoStartMonth(-1)" style="background:white;border:1.5px solid #F08300;border-radius:6px;padding:4px 10px;font-size:14px;font-weight:bold;color:#F08300;cursor:pointer;">‹</button>';
+      html += '<span style="font-size:15px;font-weight:bold;color:#F08300;">' + s.y + '年' + s.m + '月</span>';
+      html += '<button onclick="changeNoStartMonth(1)" style="background:white;border:1.5px solid #F08300;border-radius:6px;padding:4px 10px;font-size:14px;font-weight:bold;color:#F08300;cursor:pointer;">›</button>';
+      html += '</div>';
+      html += '<div style="padding:8px 12px;font-size:12px;color:#8a6500;background:#fffbeb;border-bottom:1px solid #f0e8e0;line-height:1.6;">';
+      html += (firstDow === null)
+        ? '先に上の「配達曜日」を選ぶと、開始できる日が表示されます'
+        : '開始日は各週の最初の配達曜日(<b>' + DOWJA[firstDow] + '曜日</b>)から選べます';
+      html += '</div>';
+      html += '<div class="usage-cal-days-row">';
+      html += '<span>月</span><span>火</span><span>水</span><span>木</span><span>金</span>';
+      html += '</div>';
+      html += '<div class="usage-cal-grid">';
+
+      var firstDate = new Date(s.y, s.m - 1, 1);
+      var fd = firstDate.getDay();
+      var weekStart = new Date(firstDate);
+      if (fd === 0)      weekStart.setDate(firstDate.getDate() + 1);
+      else if (fd === 6) weekStart.setDate(firstDate.getDate() + 2);
+      else               weekStart.setDate(firstDate.getDate() - (fd - 1));
+      var monthEnd = new Date(s.y, s.m, 0);
+
+      var cur = new Date(weekStart);
+      while (cur <= monthEnd) {
+        for (var c = 0; c < 5; c++) {
+          var dt = new Date(cur); dt.setDate(cur.getDate() + c);
+          var isAdj = (dt.getMonth() + 1) !== s.m || dt.getFullYear() !== s.y;
+          var ds = ymd(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+          var dow = dt.getDay();
+          var selectable = isDateEditable(ds) && firstDow !== null && dow === firstDow;
+          var style = 'min-height:48px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;';
+          var click = '';
+          if (!selectable) {
+            style += 'opacity:0.3;cursor:not-allowed;color:#bbb;';
+          } else if (noState.startDate === ds) {
+            style += 'background:#F08300;color:white;cursor:pointer;';
+            click = ' onclick="selectNoStartDate(\'' + ds + '\')"';
+          } else {
+            style += 'color:#333;cursor:pointer;';
+            click = ' onclick="selectNoStartDate(\'' + ds + '\')"';
+          }
+          var lbl = isAdj
+            ? '<span style="font-size:9px;opacity:.85;margin-right:1px;">' + (dt.getMonth() + 1) + '/</span>' + dt.getDate()
+            : String(dt.getDate());
+          html += '<div class="usage-cell' + (isAdj ? ' uc-adj' : '') + '" style="' + style + '"' + click + '>' + lbl + '</div>';
+        }
+        cur.setDate(cur.getDate() + 7);
+      }
+
+      html += '</div></div>';
+      document.getElementById('no-start-cal-wrap').innerHTML = html;
+
+      var tagsHtml = '';
+      if (noState.startDate) {
+        var pp = noState.startDate.split('-');
+        var sdt = new Date(parseInt(pp[0]), parseInt(pp[1]) - 1, parseInt(pp[2]));
+        tagsHtml += '<div class="date-tag" style="background:#fff5ee;border-color:#F08300;color:#F08300;font-weight:bold;">';
+        tagsHtml += '配達開始: ' + parseInt(pp[1]) + '月' + parseInt(pp[2]) + '日(' + DOWJA[sdt.getDay()] + ')';
+        tagsHtml += '<span class="rm" onclick="clearNoStartDate()">✕</span>';
+        tagsHtml += '</div>';
+      }
+      document.getElementById('no-start-date-tag').innerHTML = tagsHtml;
+    };
+  }
+
+  console.log('[patch-v8p3] loaded: speed + guard + cross-month calendar');
+})();
+
 </script>
 </body>
 </html>
