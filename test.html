@@ -9826,13 +9826,16 @@ function showComplete(type){
       var key = '_uc_cust_' + uidGet();
       var prev = {};
       try { prev = JSON.parse(sessionStorage.getItem(key) || '{}') || {}; } catch (e) {}
-      sessionStorage.setItem(key, JSON.stringify({
+      var merged = {
         enrolled: (enrolled != null) ? !!enrolled : !!prev.enrolled,
         name:    nm != null ? nm : (prev.name    || ''),
         address: ad != null ? ad : (prev.address || ''),
         phone:   ph != null ? ph : (prev.phone   || ''),
         store:   prev.store || ''
-      }));
+      };
+      sessionStorage.setItem(key, JSON.stringify(merged));
+      // ★v8p3.1: 端末にも保存(次回LIFFを開いたとき「確認中」を待たず即表示するため)
+      saveCache('cust', merged);
     } catch (e) {}
   }
 
@@ -9918,19 +9921,80 @@ function showComplete(type){
     };
   }
 
-  /* checkExistingCustomerThenLoad を bootstrap 版に差し替え */
+  /* checkExistingCustomerThenLoad を差し替え
+     ★v8p3.1: 顧客情報の端末キャッシュ(7日)があれば「確認中」を待たずに即表示し、
+              裏で bootstrap により最新化する。キャッシュが無い初回のみ従来どおり待つ。 */
   if (typeof checkExistingCustomerThenLoad === 'function') {
     var _origCheck = checkExistingCustomerThenLoad;
+
+    function bgRefresh() {
+      // 画面表示後に裏で最新情報を取得してキャッシュ・表示を静かに更新
+      bootstrapFetch(uidGet(), 8000, function (data) {
+        if (!data) return;
+        _boot = data; _bootAt = Date.now();
+        var c = data.customer || {};
+        var fresh = {
+          enrolled: c.enrolled === true,
+          name: c.name || '', address: c.address || '',
+          phone: c.phone || '', store: c.store || ''
+        };
+        saveCache('cust', fresh);
+        try { sessionStorage.setItem('_uc_cust_' + uidGet(), JSON.stringify(fresh)); } catch (e) {}
+        // メモリ上の顧客データも更新(表示中の画面に静かに反映)
+        if (window._customerData) {
+          if (filled(fresh.name))    window._customerData.name    = fresh.name;
+          if (filled(fresh.address)) window._customerData.address = fresh.address;
+          if (filled(fresh.phone))   window._customerData.phone   = fresh.phone;
+          window._customerData.enrolled = fresh.enrolled;
+          if (typeof renderCustomerInfoCard === 'function') { try { renderCustomerInfoCard(); } catch (e) {} }
+        }
+      });
+    }
+
     window.checkExistingCustomerThenLoad = function (currentType) {
-      if (demo() || !apiOn() || !uidGet() || bootUnavailable()) { _origCheck(currentType); return; }
+      if (demo() || !apiOn() || !uidGet()) { _origCheck(currentType); return; }
+
+      // --- 2回目以降: 端末キャッシュで即表示(「確認中」スキップ) ---
+      var cached = readCache('cust', 7 * 24 * 3600 * 1000);
+      if (cached && (cached.enrolled === true || filled(cached.name) || filled(cached.address) || filled(cached.phone))) {
+        try { sessionStorage.setItem('_uc_cust_' + uidGet(), JSON.stringify(cached)); } catch (e) {}
+        var isExisting = (cached.enrolled === true) || filled(cached.name) || filled(cached.address) || filled(cached.phone);
+        loadAndShow(currentType || (isExisting ? 'usage' : ''));
+        bgRefresh();
+        return;
+      }
+
+      // --- 初回(キャッシュなし): bootstrap を待ってから表示 ---
+      if (bootUnavailable()) { _origCheck(currentType); return; }
       bootstrapFetch(uidGet(), 6000, function (data) {
         if (!data) { _origCheck(currentType); return; }
         _boot = data; _bootAt = Date.now();
         var c = data.customer || {};
-        syncCustCache(c.name || '', c.address || '', c.phone || '', c.enrolled === true);
+        var fresh = {
+          enrolled: c.enrolled === true,
+          name: c.name || '', address: c.address || '',
+          phone: c.phone || '', store: c.store || ''
+        };
+        saveCache('cust', fresh);
+        syncCustCache(fresh.name, fresh.address, fresh.phone, fresh.enrolled);
         if (currentType) { loadAndShow(currentType); return; }
-        var isExisting = (c.enrolled === true) || filled(c.name) || filled(c.address) || filled(c.phone);
+        var isExisting = fresh.enrolled || filled(fresh.name) || filled(fresh.address) || filled(fresh.phone);
         loadAndShow(isExisting ? 'usage' : '');
+      });
+    };
+  }
+
+  /* ★v8p3.1: GAS v12 が未反映の環境でも端末キャッシュが育つように、
+     従来経路(getCustomer)の取得結果も localStorage に写す */
+  if (typeof loadCustomerInfoThen === 'function') {
+    var _origLCIT = loadCustomerInfoThen;
+    window.loadCustomerInfoThen = function (type, callback) {
+      _origLCIT(type, function () {
+        try {
+          var raw = sessionStorage.getItem('_uc_cust_' + uidGet());
+          if (raw) saveCache('cust', JSON.parse(raw));
+        } catch (e) {}
+        if (callback) callback.apply(this, arguments);
       });
     };
   }
@@ -10332,7 +10396,7 @@ function showComplete(type){
     };
   }
 
-  console.log('[patch-v8p3] loaded: speed + guard + cross-month calendar');
+  console.log('[patch-v8p3.1] loaded: instant-profile + speed + guard + cross-month calendar');
 })();
 
 </script>
