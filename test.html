@@ -10083,6 +10083,11 @@ function showComplete(type){
           var nm = (window._customerData && window._customerData.name) || '';
           ok = filled(nm);
         }
+        // ★v8p3.2: bento紐付け済み(enrolled)顧客は、端末側の_customerDataが
+        //   まだ埋まっていなくても弾かない(GAS側が最終的に名前等を補完・判定する)。
+        //   これにより「登録済みなのに再登録を求められる」誤爆を防ぐ。
+        var cd = window._customerData || {};
+        if (!ok && cd.enrolled === true) ok = true;
         if (!ok) {
           var self = this, args = arguments;
           if (typeof ensureProfileForChange === 'function') {
@@ -10396,7 +10401,63 @@ function showComplete(type){
     };
   }
 
-  console.log('[patch-v8p3.1] loaded: instant-profile + speed + guard + cross-month calendar');
+  /* ############################################################
+     ★v8p3.2 重大バグ修正: 顧客情報「登録」がGAS/シートに保存されない問題
+     ------------------------------------------------------------
+     原因: finalizeCustomerInfoSave は「!isRegister(=編集時のみ)」に
+           GASへ profileEdit を送る設計。新規登録(register)モードでは
+           送信されず、その後すぐ初回注文まで進めば注文と一緒に保存されるが、
+           登録だけして離脱すると _customerData(端末メモリ)にしか残らない。
+           → 次回LIFFを開くと GAS/シートは空 → また登録を求められる。
+           → シートに情報が無いため、キャンセル等の申請も弾かれる。
+     修正: 登録(register)完了時にも profileEdit を送信してシートへ確実に保存。
+           GAS側は既に profileEdit で consolidateCustomerRows(シート書込)する
+           ため、GASの改修は不要。
+     ############################################################ */
+  if (typeof finalizeCustomerInfoSave === 'function' && typeof apiPost === 'function') {
+    var _finForSave = finalizeCustomerInfoSave;
+    window.finalizeCustomerInfoSave = function (nm, ad, ph, pm, cardLast4, onComplete) {
+      var wasRegister = false;
+      try { wasRegister = (typeof modalState !== 'undefined' && modalState && modalState.ceMode === 'register'); } catch (e) {}
+
+      // 元処理を実行(編集時はこの中でprofileEdit送信済み)
+      var r = _finForSave.apply(this, arguments);
+
+      // ★登録(register)モードのときだけ、ここで明示的にGASへ保存を送る
+      //   (元処理は register では送らないため、この1回で穴を塞ぐ)
+      if (wasRegister && !demo() && apiOn() && uidGet() && filled(nm) && filled(ad) && filled(ph)) {
+        var pmMap = { '現金': 1, '口座振替': 2, 'クレジットカード': 3 };
+        var payload = {
+          type: 'profileEdit',
+          line_user_id: uidGet(),
+          client_request_id: (typeof genRequestId === 'function' ? genRequestId('reg') : 'reg_' + Date.now()),
+          client_timestamp: new Date().toISOString(),
+          before: { name: '', address: '', phone: '' },
+          after: {
+            name: nm, address: ad, phone: ph,
+            payment_method: pmMap[pm] || null,
+            card_last4: cardLast4 || ''
+          },
+          fields_changed: ['name', 'address', 'phone']
+        };
+        try {
+          apiPost(payload, function () {
+            // 保存成功 → 端末キャッシュも即更新(次回から即表示&再登録要求なし)
+            syncCustCache(nm, ad, ph, true);
+          }, function (err) {
+            console.error('[patch-v8p3.2] 登録保存の送信に失敗:', err);
+            // 失敗してもキャッシュには残す(次回起動時の裏更新で再同期を試みる)
+            syncCustCache(nm, ad, ph, true);
+          });
+        } catch (e) {
+          console.error('[patch-v8p3.2] apiPost呼び出し例外:', e);
+        }
+      }
+      return r;
+    };
+  }
+
+  console.log('[patch-v8p3.2] loaded: register-save-fix + instant-profile + speed + guard + cross-month calendar');
 })();
 
 </script>
