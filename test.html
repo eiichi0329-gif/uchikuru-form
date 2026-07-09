@@ -2226,10 +2226,16 @@ body.cancel-mode-active {
           <label>当サービスを何でお知りになりましたか?<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
           <select id="no-referral">
             <option value="">選択してください</option>
-            <option value="チラシ・ポスティング">チラシ・ポスティング</option>
-            <option value="インターネット(検索)">インターネット(検索)</option>
+            <!-- ★value はシステム側 referral_sources の正式名と完全一致させること。
+                 1文字でも違うと customers.referral_id が NULL(未設定)になる。
+                 表示ラベルのみ変更可。 -->
+            <option value="新聞折込">新聞折込</option>
+            <option value="サンデー折込">サンデー折込</option>
+            <option value="サンデー紙面">サンデー紙面</option>
+            <option value="インターネット">インターネット</option>
             <option value="Instagram・SNS">Instagram・SNS</option>
-            <option value="ご家族・知人の紹介">ご家族・知人の紹介</option>
+            <option value="ケアマネ紹介">ケアマネから紹介された</option>
+            <option value="紹介">知り合いから紹介された</option>
             <option value="その他">その他</option>
           </select>
         </div>
