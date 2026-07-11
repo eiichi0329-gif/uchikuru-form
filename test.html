@@ -10463,7 +10463,102 @@ function showComplete(type){
     };
   }
 
-  console.log('[patch-v8p3.2] loaded: register-save-fix + instant-profile + speed + guard + cross-month calendar');
+  /* ############################################################
+     ★v8p3.3 献立表示の高速化
+     ------------------------------------------------------------
+     問題: 今日の献立・月間献立は専用GAS(IG_MENU_URL)が毎回WordPressを
+           スクレイピングするため5〜15秒かかり、WordPressが重いと表示されない。
+           本体は sessionStorage でキャッシュしているが、LINEはLIFFを閉じると
+           セッションが切れやすく、開くたびに空 → 毎回スクレイピングになりがち。
+     対策: loadDailyMenu / loadMonthlyMenus をラップし、
+           (1) localStorage(当日中保持・LIFFを閉じても消えない)を最優先で参照
+               → あれば通信ゼロで即描画
+           (2) localStorage が無いときだけ本体を呼び、成功時に localStorage へ保存
+           (3) 起動時プリフェッチも維持されるため、初回も裏で先読みされる
+           ※ ok:false(取得失敗)は localStorage に保存しない
+             → 失敗を1日固定せず、次回開いたときに再取得を試みる
+     ############################################################ */
+  (function () {
+    function todayStr() {
+      var d = new Date();
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+    function lmKey(kind) { return '_uc_menu_' + kind + '_' + todayStr(); }
+    function lmRead(kind) {
+      try {
+        var raw = localStorage.getItem(lmKey(kind));
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+    function lmSave(kind, data) {
+      // 取得成功(ok!==false かつ 中身がある)ときだけ保存
+      if (!data) return;
+      if (data.ok === false) return;
+      try {
+        // 当日以外の古いキーは掃除
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('_uc_menu_' + kind + '_') === 0 && k !== lmKey(kind)) {
+            localStorage.removeItem(k);
+          }
+        }
+        localStorage.setItem(lmKey(kind), JSON.stringify(data));
+      } catch (e) {}
+    }
+
+    // --- 今日の献立 ---
+    if (typeof loadDailyMenu === 'function') {
+      var _origDaily = loadDailyMenu;
+      window.loadDailyMenu = function (callback) {
+        if (typeof dailyMenuData !== 'undefined' && dailyMenuData) { if (callback) callback(dailyMenuData); return; }
+        var cached = lmRead('daily');
+        if (cached) {
+          try { dailyMenuData = cached; } catch (e) {}
+          if (typeof renderDailyMenuCard === 'function') { try { renderDailyMenuCard(); } catch (e) {} }
+          if (callback) callback(cached);
+          // 裏で最新を取りに行き、変わっていれば静かに差し替え
+          _origDaily(function (fresh) {
+            if (fresh && fresh.ok !== false) {
+              lmSave('daily', fresh);
+              if (typeof renderDailyMenuCard === 'function') { try { renderDailyMenuCard(); } catch (e) {} }
+            }
+          });
+          return;
+        }
+        _origDaily(function (data) {
+          lmSave('daily', data);
+          if (callback) callback(data);
+        });
+      };
+    }
+
+    // --- 月間献立 ---
+    if (typeof loadMonthlyMenus === 'function') {
+      var _origMonthly = loadMonthlyMenus;
+      window.loadMonthlyMenus = function (callback) {
+        if (typeof monthlyMenuData !== 'undefined' && monthlyMenuData) { if (callback) callback(monthlyMenuData); return; }
+        var cached = lmRead('monthly');
+        if (cached) {
+          try { monthlyMenuData = cached; } catch (e) {}
+          if (typeof renderMonthlyMenuCard === 'function') { try { renderMonthlyMenuCard(); } catch (e) {} }
+          if (callback) callback(cached);
+          _origMonthly(function (fresh) {
+            if (fresh && fresh.ok !== false && fresh.items && fresh.items.length) {
+              lmSave('monthly', fresh);
+              if (typeof renderMonthlyMenuCard === 'function') { try { renderMonthlyMenuCard(); } catch (e) {} }
+            }
+          });
+          return;
+        }
+        _origMonthly(function (data) {
+          lmSave('monthly', data);
+          if (callback) callback(data);
+        });
+      };
+    }
+  })();
+
+  console.log('[patch-v8p3.3] loaded: menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
 })();
 
 </script>
