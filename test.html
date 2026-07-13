@@ -2220,24 +2220,40 @@ body.cancel-mode-active {
       <input type="hidden" id="no-emergency">
       <input type="hidden" id="no-absentAction">
 
-      <!-- 「何でお知りになりましたか?」は初回注文時のみ表示 -->
+      <!-- 「何でお知りになりましたか?」は初回注文時のみ表示(★KPI: referral_id 8分類・必須) -->
       <div id="no-referral-wrap" style="display:none;">
         <div class="field">
-          <label>当サービスを何でお知りになりましたか?<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
+          <label>当サービスを何でお知りになりましたか?<span style="font-size:12px;color:#c0392b;font-weight:normal;margin-left:5px;">(必須)</span></label>
+          <!-- ★option の value = referral_id(1〜8)。本部 referral_sources と一致。
+               表示ラベルのみ変更可。送信時は referral_id(数値) と referral(ラベル文字列) の両方を送る。 -->
           <select id="no-referral">
             <option value="">選択してください</option>
-            <!-- ★value はシステム側 referral_sources の正式名と完全一致させること。
-                 1文字でも違うと customers.referral_id が NULL(未設定)になる。
-                 表示ラベルのみ変更可。 -->
-            <option value="新聞折込">新聞折込</option>
-            <option value="サンデー折込">サンデー折込</option>
-            <option value="サンデー紙面">サンデー紙面</option>
-            <option value="インターネット">インターネット</option>
-            <option value="Instagram・SNS">Instagram・SNS</option>
-            <option value="ケアマネ紹介">ケアマネから紹介された</option>
-            <option value="紹介">知り合いから紹介された</option>
-            <option value="その他">その他</option>
+            <option value="1">新聞折込チラシ</option>
+            <option value="2">サンデー(折込)</option>
+            <option value="3">サンデー(紙面広告)</option>
+            <option value="4">インターネット・検索・ホームページ</option>
+            <option value="5">Instagram・SNS</option>
+            <option value="6">ケアマネジャーさんの紹介</option>
+            <option value="7">ご家族・知人の紹介</option>
+            <option value="8">その他</option>
           </select>
+        </div>
+        <!-- ★A: 「その他(8)」選択時のみ表示する自由記入欄 -->
+        <div class="field" id="no-referral-other-wrap" style="display:none;">
+          <label>差し支えなければ、詳しく教えてください<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意)</span></label>
+          <input type="text" id="no-referral-other" placeholder="例:知人の家で見かけて">
+        </div>
+        <!-- ★B: 紹介(referral_id=6/7)選択時のみ表示する紹介元欄 -->
+        <div id="no-referrer-wrap" style="display:none;background:#fffbf5;border:1px solid #f0e0c8;border-radius:7px;padding:12px;margin-top:4px;">
+          <div style="font-size:14px;font-weight:bold;color:#a05a00;margin-bottom:8px;">どなたのご紹介ですか?<span style="font-size:12px;color:#aaa;font-weight:normal;margin-left:5px;">(任意・分かる範囲で)</span></div>
+          <div class="field">
+            <label>ご紹介者のお名前</label>
+            <input type="text" id="no-referrer-name" placeholder="例:山田 太郎">
+          </div>
+          <div class="field">
+            <label>ご紹介者のお電話番号</label>
+            <input type="tel" id="no-referrer-phone" placeholder="例:090-1234-5678">
+          </div>
         </div>
       </div>
 
@@ -2433,9 +2449,34 @@ body.cancel-mode-active {
     </div>
     <div class="date-tags" id="date-tags-stop"></div>
     <input type="hidden" id="st-lastDate" value="">
-    <div class="sec-label">停止理由<span style="font-size:12px;color:#aaa;font-weight:normal;"> （任意）</span></div>
+    <div class="sec-label">差し支えなければ理由をお聞かせください<span style="font-size:12px;color:#aaa;font-weight:normal;"> （任意）</span></div>
     <div class="field">
-      <textarea id="st-reason" placeholder="退会理由をご自由にお書きください"></textarea>
+      <!-- ★KPI C: reason_code。value=コード。グループ見出しで選びやすく。 -->
+      <select id="st-reason-code" class="uc-reason-select">
+        <option value="">選択してください（任意）</option>
+        <optgroup label="一時的なご事情">
+          <option value="11">入院・療養することになった</option>
+          <option value="12">帰省・旅行などでしばらく留守にする</option>
+          <option value="13">体調で食べられない（一時的）</option>
+        </optgroup>
+        <optgroup label="ご不満・サービスについて">
+          <option value="21">味・メニューが好みに合わない／飽きた</option>
+          <option value="22">量が合わない（多い／少ない）</option>
+          <option value="23">価格が負担</option>
+          <option value="24">配達・対応に不満があった</option>
+        </optgroup>
+        <optgroup label="今後のご予定">
+          <option value="31">ご本人が逝去された</option>
+          <option value="32">介護施設・病院に入られた</option>
+          <option value="33">引っ越し（配達エリア外）</option>
+          <option value="34">自炊・同居などで不要になった</option>
+          <option value="35">他社に切り替える</option>
+        </optgroup>
+        <option value="90">その他</option>
+      </select>
+    </div>
+    <div class="field" id="st-reason-memo-wrap" style="display:none;">
+      <textarea id="st-reason" placeholder="差し支えなければ詳しくお聞かせください"></textarea>
     </div>
     <div class="sec-label">店舗への伝達事項<span style="font-size:12px;color:#aaa;font-weight:normal;"> （任意）</span></div>
     <div class="field"><textarea id="st-note" placeholder="その他ご要望など"></textarea></div>
@@ -7779,14 +7820,46 @@ function submitNoOrder() {
   var aa = (document.getElementById('no-absentAction').value || '').trim();
   var rfEl = document.getElementById('no-referral');
   var rfWrap = document.getElementById('no-referral-wrap');
-  // referral は表示中(=初回)の場合のみ更新、そうでなければ前回値維持
-  var prevRef = (window._customerData && window._customerData.referral) || '';
-  var rf = (rfWrap && rfWrap.style.display !== 'none' && rfEl) ? (rfEl.value || '').trim() : prevRef;
+  // ★KPI: referral は referral_id(数値1-8)で保持。表示中(=初回)のみ更新、そうでなければ前回値維持。
+  var refShowing = (rfWrap && rfWrap.style.display !== 'none' && rfEl);
+  var REF_LABELS = {
+    '1':'新聞折込チラシ','2':'サンデー(折込)','3':'サンデー(紙面広告)',
+    '4':'インターネット・検索・ホームページ','5':'Instagram・SNS',
+    '6':'ケアマネジャーさんの紹介','7':'ご家族・知人の紹介','8':'その他'
+  };
+  var prevRefId    = (window._customerData && window._customerData.referralId)    || null;
+  var prevRefLabel = (window._customerData && window._customerData.referral)       || '';
+  var refIdRaw = refShowing ? (rfEl.value || '').trim() : (prevRefId ? String(prevRefId) : '');
+  var refId = refIdRaw ? parseInt(refIdRaw, 10) : null;
+  // 「その他(8)」の自由記入 / 紹介元(6,7)
+  var refOther = '';
+  var referrerName = '', referrerPhone = '';
+  if (refShowing) {
+    if (refId === 8) {
+      refOther = (document.getElementById('no-referral-other') || {}).value || '';
+      refOther = refOther.trim();
+    }
+    if (refId === 6 || refId === 7) {
+      referrerName  = ((document.getElementById('no-referrer-name')  || {}).value || '').trim();
+      referrerPhone = ((document.getElementById('no-referrer-phone') || {}).value || '').trim();
+    }
+  } else {
+    referrerName  = (window._customerData && window._customerData.referrerName)  || '';
+    referrerPhone = (window._customerData && window._customerData.referrerPhone) || '';
+  }
+  // referral(文字列ラベル): その他は自由記入があればそれを優先、なければラベル
+  var rfLabel = refShowing
+    ? (refId === 8 && refOther ? refOther : (REF_LABELS[String(refId)] || ''))
+    : prevRefLabel;
+
   window._customerData = window._customerData || {};
   window._customerData.emergency    = em;
   window._customerData.deliveryNote = dn;
   window._customerData.absentAction = aa;
-  window._customerData.referral     = rf;
+  window._customerData.referral     = rfLabel;    // 文字列(後方互換・目視用)
+  window._customerData.referralId   = refId;      // 数値1-8(KPI用)
+  window._customerData.referrerName = referrerName;
+  window._customerData.referrerPhone = referrerPhone;
 
   // === API 送信(USE_API=true のときのみ) ===
   if (USE_API) {
@@ -7814,7 +7887,10 @@ function submitNoOrder() {
         emergency_contacts: cd.emergency   || '',
         delivery_note:      cd.deliveryNote || '',
         absence_handling:   cd.absentAction || '',
-        referral:           cd.referral    || ''
+        referral:           cd.referral    || '',
+        referral_id:        (cd.referralId != null ? cd.referralId : null),
+        referrer_name:      cd.referrerName  || '',
+        referrer_phone:     cd.referrerPhone || ''
       },
       order: {
         items:            selectedTypes.map(function(t) {
@@ -8344,10 +8420,36 @@ function renderEndServiceConfirmStep() {
   // 最終配達日
   html += '<div style="border-top:1px dashed #c0392b;margin-top:12px;padding-top:10px;font-size:13px;color:#888;margin-bottom:4px;">最終配達日</div>';
   html += '<div style="font-size:22px;font-weight:bold;color:#c0392b;">' + dateLabel + '</div>';
-  if (modalState.esReason) {
-    html += '<div style="border-top:1px dashed #c0392b;margin-top:12px;padding-top:10px;font-size:13px;color:#888;margin-bottom:4px;">理由</div>';
-    html += '<div style="font-size:14px;color:#333;line-height:1.6;white-space:pre-wrap;">' + escapeHtml(modalState.esReason) + '</div>';
-  }
+  html += '</div>';
+
+  // ★KPI C: 利用終了理由(reason_code)の選択式。任意。
+  html += '<div style="background:#fff;border:1px solid #e0d0d0;border-radius:7px;padding:14px;margin-bottom:14px;">';
+  html += '<div style="font-size:14px;font-weight:bold;color:#555;margin-bottom:8px;">差し支えなければ理由をお聞かせください <span style="font-size:12px;color:#aaa;font-weight:normal;">(任意)</span></div>';
+  html += '<select id="es-reason-code" class="uc-reason-select" onchange="onEsReasonChange()" style="width:100%;padding:12px;font-size:15px;border:1px solid #ccc;border-radius:6px;">';
+  html += '<option value="">選択してください(任意)</option>';
+  html += '<optgroup label="一時的なご事情">';
+  html += '<option value="11">入院・療養することになった</option>';
+  html += '<option value="12">帰省・旅行などでしばらく留守にする</option>';
+  html += '<option value="13">体調で食べられない(一時的)</option>';
+  html += '</optgroup>';
+  html += '<optgroup label="ご不満・サービスについて">';
+  html += '<option value="21">味・メニューが好みに合わない／飽きた</option>';
+  html += '<option value="22">量が合わない(多い／少ない)</option>';
+  html += '<option value="23">価格が負担</option>';
+  html += '<option value="24">配達・対応に不満があった</option>';
+  html += '</optgroup>';
+  html += '<optgroup label="今後のご予定">';
+  html += '<option value="31">ご本人が逝去された</option>';
+  html += '<option value="32">介護施設・病院に入られた</option>';
+  html += '<option value="33">引っ越し(配達エリア外)</option>';
+  html += '<option value="34">自炊・同居などで不要になった</option>';
+  html += '<option value="35">他社に切り替える</option>';
+  html += '</optgroup>';
+  html += '<option value="90">その他</option>';
+  html += '</select>';
+  html += '<div id="es-reason-memo-wrap" style="display:none;margin-top:10px;">';
+  html += '<textarea id="es-reason-memo" placeholder="差し支えなければ詳しくお聞かせください" style="width:100%;min-height:70px;padding:10px;font-size:15px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;">' + escapeHtml(modalState.esReasonMemo || '') + '</textarea>';
+  html += '</div>';
   html += '</div>';
 
   html += '<div class="op-info-box" style="background:#fff5f5;border-color:#c0392b;">';
@@ -8406,7 +8508,10 @@ function submitEndService() {
       client_timestamp: new Date().toISOString(),
       last_delivery_date: modalState.esDate || '',
       bento_types: selected.slice(),     // ★停止する弁当種類
-      reason: modalState.esReason || ''
+      reason: modalState.esReason || '',
+      // ★KPI C: 離客理由の選択式コード + 任意メモ
+      reason_code: (modalState.esReasonCode != null ? modalState.esReasonCode : null),
+      reason_memo: modalState.esReasonMemo || ''
     };
     // ★お名前・ご住所・電話番号を payload に必ず含める
     attachProfileToPayload(apiPayload);
@@ -10558,7 +10663,105 @@ function showComplete(type){
     }
   })();
 
-  console.log('[patch-v8p3.3] loaded: menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
+  /* ############################################################
+     ★v8p4 KPIデータ整備(本部指示書 2026-07-13)
+       A. 集客経路8分類(referral_id 1-8)+ 必須化 + その他自由記入
+       B. 紹介元(referral_id=6/7 のとき referrer_name/phone)
+       C. 解約(利用終了)理由の選択式(reason_code)+ 任意メモ
+       ※送信ペイロードへの反映は本体側で実装済み。ここは表示制御と検証。
+     ############################################################ */
+  (function () {
+
+    /* --- A/B: 集客経路セレクトの出し分け(その他欄・紹介元欄) --- */
+    function bindReferralToggle() {
+      var sel = document.getElementById('no-referral');
+      if (!sel || sel.__ucBound) return;
+      sel.__ucBound = true;
+      sel.addEventListener('change', function () {
+        var v = parseInt(sel.value, 10);
+        var otherWrap = document.getElementById('no-referral-other-wrap');
+        var referrerWrap = document.getElementById('no-referrer-wrap');
+        if (otherWrap) otherWrap.style.display = (v === 8) ? 'block' : 'none';
+        if (referrerWrap) referrerWrap.style.display = (v === 6 || v === 7) ? 'block' : 'none';
+      });
+    }
+
+    /* --- A: 必須バリデーション(集客経路が表示中なら未選択を弾く) --- */
+    if (typeof submitNoOrder === 'function') {
+      var _origSubmitNoOrder = window.submitNoOrder;
+      window.submitNoOrder = function () {
+        var wrap = document.getElementById('no-referral-wrap');
+        var sel = document.getElementById('no-referral');
+        if (wrap && wrap.style.display !== 'none' && sel && !sel.value) {
+          if (typeof showModal === 'function') {
+            showModal('🙏', 'きっかけをお選びください',
+              '「当サービスを何でお知りになりましたか?」をお選びください。\nサービス改善の参考にさせていただきます。');
+          }
+          try { sel.focus(); } catch (e) {}
+          return;
+        }
+        return _origSubmitNoOrder.apply(this, arguments);
+      };
+    }
+
+    /* --- C: 利用終了モーダルの理由セレクト変更(その他→メモ欄表示 + state保存) --- */
+    window.onEsReasonChange = function () {
+      var sel = document.getElementById('es-reason-code');
+      if (!sel) return;
+      var code = sel.value ? parseInt(sel.value, 10) : null;
+      if (typeof modalState !== 'undefined' && modalState) {
+        modalState.esReasonCode = code;
+      }
+      var memoWrap = document.getElementById('es-reason-memo-wrap');
+      if (memoWrap) memoWrap.style.display = (code === 90) ? 'block' : 'none';
+    };
+
+    /* --- C: 利用終了の送信直前に、メモ欄の値を state へ確実に取り込む --- */
+    if (typeof submitEndService === 'function') {
+      var _origEnd = window.submitEndService;
+      window.submitEndService = function () {
+        try {
+          var sel = document.getElementById('es-reason-code');
+          var memo = document.getElementById('es-reason-memo');
+          if (sel && typeof modalState !== 'undefined' && modalState) {
+            modalState.esReasonCode = sel.value ? parseInt(sel.value, 10) : null;
+            if (memo) modalState.esReasonMemo = (memo.value || '').trim();
+          }
+        } catch (e) {}
+        return _origEnd.apply(this, arguments);
+      };
+    }
+
+    /* --- C: 利用停止フォーム(form-stop)の理由セレクト → メモ欄出し分け --- */
+    function bindStopReasonToggle() {
+      var sel = document.getElementById('st-reason-code');
+      if (!sel || sel.__ucBound) return;
+      sel.__ucBound = true;
+      sel.addEventListener('change', function () {
+        var v = parseInt(sel.value, 10);
+        var memoWrap = document.getElementById('st-reason-memo-wrap');
+        // 「その他(90)」および不満系(20番台)はメモ欄を出して詳細を促す
+        if (memoWrap) memoWrap.style.display = (v === 90 || (v >= 21 && v <= 24)) ? 'block' : 'none';
+      });
+    }
+
+    /* フォーム表示のたびにバインドし直す(onFormShown をフック) */
+    if (typeof onFormShown === 'function') {
+      var _ofsForKpi = window.onFormShown;
+      window.onFormShown = function (type) {
+        var r = _ofsForKpi.apply(this, arguments);
+        setTimeout(function () {
+          bindReferralToggle();
+          bindStopReasonToggle();
+        }, 0);
+        return r;
+      };
+    }
+    // 初回ロード時にもバインド
+    setTimeout(function () { bindReferralToggle(); bindStopReasonToggle(); }, 500);
+  })();
+
+  console.log('[patch-v8p4] loaded: KPI(referral_id/referrer/reason_code) + menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
 })();
 
 </script>
