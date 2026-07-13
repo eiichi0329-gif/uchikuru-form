@@ -7976,7 +7976,10 @@ function submitRegisterOnly() {
         emergency_contacts: cd.emergency   || '',
         delivery_note:      cd.deliveryNote || '',
         absence_handling:   cd.absentAction || '',
-        referral:           cd.referral    || ''
+        referral:           cd.referral    || '',
+        referral_id:        (cd.referralId != null ? cd.referralId : null),
+        referrer_name:      cd.referrerName  || '',
+        referrer_phone:     cd.referrerPhone || ''
       },
       order: {
         items:            [],   // 空(登録のみ)
