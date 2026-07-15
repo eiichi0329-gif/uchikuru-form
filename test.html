@@ -7939,12 +7939,8 @@ function submitNoOrder() {
     completeMsg = 'ご注文を承りました。\nマイページのカレンダーからご注文内容をご確認いただけます。';
   }
 
-  // 完了モーダル → タップでマイページ(usage)に遷移
-  showModalWithAction('✅', completeTitle, completeMsg,
-    function() {
-      // マイページに遷移
-      loadAndShow('usage');
-    });
+  // ★v8p6: 完了はモーダルではなく、専用の「注文を受け付けました」ページへ遷移する
+  showOrderComplete({ title: completeTitle, message: completeMsg });
 }
 
 // ★v5: 「登録のみ」送信(usage_status=active で注文なしのケース)
@@ -10889,6 +10885,7 @@ function showComplete(type){
     window.ucRecheckCard = function () { pollCard(5); };
     // 他の処理(紐付けのみ申請の完了後など)から登録済みか判定できるように公開
     window.ucIsCardRegistered = function () { return CARD.registered === true; };
+    window.ucCardLast4 = function () { return CARD.last4 || ''; };
 
     // ---- 外部ブラウザから戻ってきたら自動で再確認 ----
     document.addEventListener('visibilitychange', function () {
@@ -11019,7 +11016,86 @@ function showComplete(type){
     }
   })();
 
-  console.log('[patch-v8p5] loaded: card-gate + KPI(referral_id/referrer/reason_code) + menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
+  /* ############################################################
+     ★v8p6 注文完了ページ
+     ------------------------------------------------------------
+     従来: 注文確定 → 完了モーダル → タップでマイページ
+     変更: 注文確定 → 専用の「ご注文を受け付けました」ページへ遷移
+     ・クレジットカードの場合は、カード登録状況もこの画面で明示する
+       (v8p5のゲートにより、この画面に来た時点で登録は完了している)
+     ############################################################ */
+  (function () {
+
+    window.showOrderComplete = function (opts) {
+      opts = opts || {};
+      var wrap = document.getElementById('completeWrap');
+      if (!wrap) {   // 万一要素が無い場合は従来のモーダルに退避
+        showModalWithAction('✅', opts.title || 'ご注文を受け付けました',
+          opts.message || '', function () { loadAndShow('usage'); });
+        return;
+      }
+
+      var isCredit = false;
+      try {
+        var pm = (window._customerData && window._customerData.payment) || '';
+        isCredit = (pm === 'クレジットカード');
+      } catch (e) {}
+
+      var h = '';
+      h += '<div class="icon">✅</div>';
+      h += '<h2>' + escapeHtml(opts.title || 'ご注文を受け付けました') + '</h2>';
+      h += '<p id="completeMsg" style="font-size:15px;color:#555;line-height:1.8;white-space:pre-wrap;text-align:left;">' +
+           escapeHtml(opts.message || '') + '</p>';
+
+      // --- クレジットカードの場合の案内 ---
+      if (isCredit) {
+        var registered = (typeof ucIsCardRegistered === 'function') && ucIsCardRegistered();
+        var last4 = (typeof ucCardLast4 === 'function') ? ucCardLast4() : '';
+        if (registered) {
+          h += '<div style="background:#eef8ee;border:1px solid #bfe3bf;border-radius:8px;padding:14px;margin-top:18px;text-align:left;">';
+          h += '<div style="font-size:15px;font-weight:bold;color:#2d7a31;margin-bottom:6px;">' +
+               '💳 カードのご登録も完了しています' + (last4 ? '(****' + escapeHtml(last4) + ')' : '') + '</div>';
+          h += '<div style="font-size:13px;color:#4a7a4d;line-height:1.7;">' +
+               '月末締めでご請求いたします。カードの変更は、マイページからいつでも可能です。</div>';
+          h += '</div>';
+        } else {
+          // 通常ここには来ない(ゲートで登録済みのはず)が、念のための保険
+          h += '<div style="background:#fff6e8;border:1.5px solid #f2cf9a;border-radius:8px;padding:14px;margin-top:18px;text-align:left;">';
+          h += '<div style="font-size:15px;font-weight:bold;color:#a05a00;margin-bottom:6px;">' +
+               '💳 カードのご登録をお願いします</div>';
+          h += '<div style="font-size:13px;color:#8a6500;line-height:1.7;">' +
+               'お支払いに使うカードのご登録がまだのようです。マイページの' +
+               '「クレジットカード払いに変更」からご登録をお願いします。</div>';
+          h += '</div>';
+        }
+      }
+
+      // --- マイページへのボタン ---
+      h += '<button type="button" onclick="loadAndShow(\'usage\')" ' +
+           'style="width:100%;margin-top:24px;padding:16px;background:#F08300;color:#fff;border:none;' +
+           'border-radius:7px;font-size:17px;font-weight:bold;cursor:pointer;">マイページで確認する</button>';
+      h += '<div style="font-size:12px;color:#999;margin-top:12px;line-height:1.6;">' +
+           'ご注文内容は、マイページのカレンダーからいつでもご確認いただけます。</div>';
+
+      wrap.innerHTML = h;
+      hideAll();
+      wrap.classList.add('active');
+      try { window.scrollTo(0, 0); } catch (e) {}
+    };
+
+    // 旧 showComplete(他フォームの完了画面)は、完了ページの中身を作り替えるため
+    // 元の素朴な構造に戻してから実行する(相互に壊れないようにする)
+    if (typeof showComplete === 'function') {
+      var _origShowComplete = window.showComplete;
+      window.showComplete = function (type) {
+        var w = document.getElementById('completeWrap');
+        if (w) w.innerHTML = '<h2>送信が完了しました</h2><p id="completeMsg"></p>';
+        return _origShowComplete.apply(this, arguments);
+      };
+    }
+  })();
+
+  console.log('[patch-v8p6] loaded: order-complete-page + card-gate + KPI(referral_id/referrer/reason_code) + menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
 })();
 
 </script>
