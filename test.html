@@ -11095,7 +11095,64 @@ function showComplete(type){
     }
   })();
 
-  console.log('[patch-v8p6] loaded: order-complete-page + card-gate + KPI(referral_id/referrer/reason_code) + menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
+  /* ############################################################
+     ★v8p7 LINE ID(line_user_id)未取得のまま送信させないガード
+     ------------------------------------------------------------
+     背景:
+       liff.getProfile() が失敗しても .catch でそのまま画面表示に進むため、
+       userId が '' のまま注文フォームが使える状態だった。
+       submitNoOrder 等にも userId のチェックが無く、
+       line_user_id:"" で bento へ送信され得た。
+     影響:
+       ・bento が却下通知を送れない(宛先が無い)
+       ・顧客の紐付けができない / マイページが使えない
+     対策:
+       apiPost を1か所の関門にして、line_user_id が空の送信を止める。
+       止める前に liff.getProfile() で1回だけ再取得を試み、
+       取れたらそのまま送信を継続する(お客様の手間を増やさない)。
+     ############################################################ */
+  (function () {
+    var _retrying = false;
+
+    function blockNoLineId(onError) {
+      showModal('🙇', 'LINEの情報が取得できませんでした',
+        'お客様のLINE情報が確認できないため、送信できませんでした。\n\n' +
+        'お手数ですが、LINEのトーク画面から開き直して、もう一度お試しください。');
+      if (onError) onError({ status: 'error', code: 'no_line_user_id' });
+    }
+
+    var _apiPostForId = window.apiPost;
+    window.apiPost = function (payload, onSuccess, onError) {
+      var needsId = payload && Object.prototype.hasOwnProperty.call(payload, 'line_user_id');
+      var idEmpty = needsId && !String(payload.line_user_id || '').trim();
+
+      if (!demo() && idEmpty) {
+        // まず LINE ID の再取得を1回だけ試す
+        if (!_retrying && window.liff && typeof liff.getProfile === 'function') {
+          _retrying = true;
+          liff.getProfile().then(function (p) {
+            _retrying = false;
+            if (p && p.userId) {
+              userId = p.userId;                 // グローバルも復旧させる
+              payload.line_user_id = p.userId;
+              window.apiPost(payload, onSuccess, onError);   // 再送
+            } else {
+              blockNoLineId(onError);
+            }
+          }).catch(function () {
+            _retrying = false;
+            blockNoLineId(onError);
+          });
+          return;
+        }
+        blockNoLineId(onError);
+        return;
+      }
+      return _apiPostForId(payload, onSuccess, onError);
+    };
+  })();
+
+  console.log('[patch-v8p7] loaded: lineid-guard + order-complete-page + card-gate + KPI(referral_id/referrer/reason_code) + menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
 })();
 
 </script>
