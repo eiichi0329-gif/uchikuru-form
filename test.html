@@ -2114,6 +2114,8 @@ body.cancel-mode-active {
           <!-- ★クレジットカード:ENABLE_CREDIT_CARD フラグが true の時のみ JS で動的に追加 -->
         </select>
       </div>
+      <!-- ★クレジットカード選択時のカード登録ゲート(JSが内容を描画) -->
+      <div id="no-card-gate" style="display:none;"></div>
       <div id="no-cust-card-section" style="display:none;">
         <div class="stripe-payment-section">
           <h4>💳 クレジットカード情報</h4>
@@ -2257,7 +2259,9 @@ body.cancel-mode-active {
         </div>
       </div>
 
-      <button class="btn-submit" onclick="submitNoOrder()">注文を確定する</button>
+      <!-- ★クレジットカード選択時のカード登録ゲート(JSが内容を描画) -->
+      <div id="no-order-card-gate" style="display:none;"></div>
+      <button class="btn-submit" id="no-order-submit" onclick="submitNoOrder()">注文を確定する</button>
       <button onclick="loadAndShow('usage')" style="margin-top:14px;width:100%;padding:16px;background:#fff;color:#F08300;border:2px solid #F08300;border-radius: 7px;font-size:17px;font-weight:bold;cursor:pointer;">‹ 戻る</button>
     </div>
   </div>
@@ -8008,7 +8012,9 @@ function submitRegisterOnly() {
 
   // 完了モーダル(登録のみ専用文言)
   //   ★クレジットカード選択時(かつ機能ON時)は、完了後に Stripe カード入力へ誘導
-  if (ENABLE_CREDIT_CARD && cd.payment === 'クレジットカード') {
+  //   ただし v8p5 のカード登録ゲートで既に登録済みの場合は、二重に誘導しない。
+  if (ENABLE_CREDIT_CARD && cd.payment === 'クレジットカード' &&
+      !(typeof ucIsCardRegistered === 'function' && ucIsCardRegistered())) {
     showModalWithAction('✅', 'お客様情報を承りました',
       'お客様情報を登録しました。\n\n続いて、クレジットカードのご登録に進みます。\n安全なカード入力画面(Stripe)に移動します。',
       function() {
@@ -10764,7 +10770,256 @@ function showComplete(type){
     setTimeout(function () { bindReferralToggle(); bindStopReasonToggle(); }, 500);
   })();
 
-  console.log('[patch-v8p4] loaded: KPI(referral_id/referrer/reason_code) + menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
+  /* ############################################################
+     ★v8p5 クレジットカード登録ゲート
+     ------------------------------------------------------------
+     目的: クレジット選択時は、カード登録を完了しないと注文を確定できない。
+     ・カード番号はStripeのホスト画面でのみ入力(LIFF内に入力欄は作らない)
+     ・Stripeは「外部ブラウザ」で開く。window.location.href で遷移すると
+       LIFFが再読込され、入力済みの注文内容が全部消えてしまうため。
+     ・戻ってきたら card-status を確認(登録直後のラグに備え2秒間隔で5回リトライ)
+     ・通信失敗時は「未登録」扱い(安全側)。未登録のまま注文させない。
+     ・現金/口座振替はこのゲートを一切通らず、従来どおり即注文できる。
+     ############################################################ */
+  (function () {
+    var CARD = { registered: false, last4: '', checking: false, attempted: false };
+    var _awaiting = false;
+    var _pollTimer = null;
+
+    function creditSelected() {
+      var sel = document.getElementById('no-cust-payment');
+      var pm = (sel && sel.value) ? sel.value : '';
+      if (!pm) pm = (window._customerData && window._customerData.payment) || '';
+      if (!pm && typeof noState !== 'undefined' && noState) pm = noState.payment || '';
+      return pm === 'クレジットカード';
+    }
+
+    // ---- カード登録状況の確認 ----
+    function checkCard(cb) {
+      if (demo()) {   // デモは通信せず、現在の状態のまま返す(登録ボタンで擬似的に完了する)
+        CARD.checking = false;
+        renderGates();
+        if (cb) cb(CARD);
+        return;
+      }
+      if (!uidGet() || !apiOn()) {
+        CARD.registered = false; CARD.checking = false;
+        renderGates(); if (cb) cb(CARD); return;
+      }
+      CARD.checking = true;
+      renderGates();
+      apiGet('cardStatus', { userId: uidGet() }, function (d) {
+        CARD.checking = false;
+        CARD.registered = !!(d && d.registered === true);
+        CARD.last4 = (d && d.card_last4) ? String(d.card_last4) : '';
+        renderGates();
+        if (cb) cb(CARD);
+      }, function () {
+        // 通信失敗 → 未登録扱い(安全側に倒す)
+        CARD.checking = false;
+        CARD.registered = false;
+        renderGates();
+        if (cb) cb(CARD);
+      });
+    }
+
+    // ---- 登録直後のラグ対策: 2秒間隔で最大5回リトライ ----
+    function pollCard(times) {
+      var max = times || 5, n = 0;
+      if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+      (function loop() {
+        checkCard(function (st) {
+          if (st.registered) return;           // 登録確認 → 終了
+          n++;
+          if (n < max) _pollTimer = setTimeout(loop, 2000);
+        });
+      })();
+    }
+
+    // ---- カード登録の開始(Stripeを外部ブラウザで開く) ----
+    window.ucStartCardRegistration = function () {
+      CARD.attempted = true;
+
+      if (demo()) {   // デモ: 通信せず擬似的に登録完了させる
+        showModal('💳', 'デモモード', 'デモのため、カード登録が完了したものとして進みます。');
+        CARD.registered = true; CARD.last4 = '4242';
+        renderGates();
+        return;
+      }
+      if (!uidGet()) {
+        showModal('🙇', '申し訳ございません', 'ユーザー情報が取得できません。LINEから開き直してください。');
+        return;
+      }
+
+      var btns = document.querySelectorAll('.uc-card-reg-btn');
+      for (var i = 0; i < btns.length; i++) { btns[i].disabled = true; btns[i].textContent = '準備中…'; }
+
+      apiGet('stripeSetupLink', { userId: uidGet() }, function (data) {
+        if (data && data.checkout_url) {
+          _awaiting = true;
+          // ★外部ブラウザで開く(LIFFを生かしたまま = 入力内容が消えない)
+          var opened = false;
+          try {
+            if (window.liff && typeof liff.openWindow === 'function') {
+              liff.openWindow({ url: data.checkout_url, external: true });
+              opened = true;
+            }
+          } catch (e) {}
+          if (!opened) {
+            try { opened = !!window.open(data.checkout_url, '_blank'); } catch (e) {}
+          }
+          if (!opened) {
+            // ポップアップが塞がれた場合の最終手段(この場合LIFFは再読込される)
+            window.location.href = data.checkout_url;
+            return;
+          }
+          renderGates();   // 「登録が終わったら確認」ボタンを出す
+        } else {
+          renderGates();
+          showModal('🙇', '申し訳ございません',
+            (data && data.message) ? data.message : 'カード入力画面の準備に失敗しました。時間をおいて再度お試しください。');
+        }
+      }, function () {
+        renderGates();
+        showModal('🙇', '申し訳ございません',
+          'カード入力画面の準備に失敗しました。通信環境をご確認のうえ再度お試しください。');
+      });
+    };
+
+    window.ucRecheckCard = function () { pollCard(5); };
+    // 他の処理(紐付けのみ申請の完了後など)から登録済みか判定できるように公開
+    window.ucIsCardRegistered = function () { return CARD.registered === true; };
+
+    // ---- 外部ブラウザから戻ってきたら自動で再確認 ----
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && _awaiting && !CARD.registered) {
+        _awaiting = false;
+        pollCard(5);
+      }
+    });
+
+    // ---- ゲートUIの描画 ----
+    function gateHtml() {
+      if (CARD.registered) {
+        return '<div style="background:#eef8ee;border:1px solid #bfe3bf;border-radius:7px;padding:12px;margin-bottom:12px;font-size:14px;color:#2d7a31;font-weight:bold;">' +
+               '✅ カードのご登録が完了しています' + (CARD.last4 ? '(****' + CARD.last4 + ')' : '') +
+               '</div>';
+      }
+      var h = '<div style="background:#fff6e8;border:1.5px solid #f2cf9a;border-radius:7px;padding:14px;margin-bottom:12px;">';
+      h += '<div style="font-size:14px;color:#a05a00;font-weight:bold;line-height:1.6;margin-bottom:10px;">' +
+           'カードのご登録をお願いします</div>';
+      h += '<div style="font-size:13px;color:#8a6500;line-height:1.6;margin-bottom:12px;">' +
+           'クレジットカードでのお支払いには、先にカードのご登録が必要です。' +
+           'ご登録が終わると、ご注文に進めます。</div>';
+      if (CARD.checking) {
+        h += '<div style="font-size:13px;color:#8a6500;padding:10px 0;">確認しています…</div>';
+      } else {
+        h += '<button type="button" class="uc-card-reg-btn" onclick="ucStartCardRegistration()" ' +
+             'style="width:100%;padding:15px;background:#F08300;color:#fff;border:none;border-radius:7px;' +
+             'font-size:16px;font-weight:bold;cursor:pointer;">💳 カードを登録する</button>';
+        if (CARD.attempted) {
+          h += '<button type="button" onclick="ucRecheckCard()" ' +
+               'style="width:100%;margin-top:8px;padding:12px;background:#fff;color:#F08300;' +
+               'border:2px solid #F08300;border-radius:7px;font-size:14px;font-weight:bold;cursor:pointer;">' +
+               'ご登録が終わったら、ここを押してください</button>';
+        }
+      }
+      h += '<div style="font-size:11px;color:#a08050;margin-top:10px;line-height:1.5;">' +
+           'カード番号は、カード会社の安全な画面(Stripe)でご入力いただきます。' +
+           'LINEの画面には入力・保存されません。</div>';
+      h += '</div>';
+      return h;
+    }
+
+    function renderGates() {
+      var show = creditSelected();
+      ['no-card-gate', 'no-order-card-gate'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (!show) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        el.style.display = 'block';
+        el.innerHTML = gateHtml();
+      });
+      syncOrderBtn();
+    }
+    window.ucRenderCardGates = renderGates;
+
+    function syncOrderBtn() {
+      var btn = document.getElementById('no-order-submit');
+      if (!btn) return;
+      if (creditSelected() && !CARD.registered) {
+        btn.disabled = true;
+        btn.textContent = 'カードのご登録後に注文できます';
+      } else {
+        btn.disabled = false;
+        btn.textContent = '注文を確定する';
+      }
+    }
+
+    // ---- 支払い方法の変更を捕捉 ----
+    if (typeof onNoCustPaymentChange === 'function') {
+      var _origPm = window.onNoCustPaymentChange;
+      window.onNoCustPaymentChange = function (value) {
+        _origPm.apply(this, arguments);
+        if (value === 'クレジットカード') { CARD.attempted = false; checkCard(); }
+        else { renderGates(); }
+      };
+    }
+
+    // ---- 顧客情報ステップの「注文へ進む」: 未登録なら止める ----
+    if (typeof submitNoCustomerInfo === 'function') {
+      var _origSubCust = window.submitNoCustomerInfo;
+      window.submitNoCustomerInfo = function () {
+        var sel = document.getElementById('no-cust-payment');
+        if (sel && sel.value === 'クレジットカード' && !CARD.registered) {
+          showModal('💳', 'カードのご登録をお願いします',
+            'クレジットカードでのお支払いには、先にカードのご登録が必要です。\n\n' +
+            '「💳 カードを登録する」ボタンからご登録をお願いします。');
+          checkCard();
+          return;
+        }
+        return _origSubCust.apply(this, arguments);
+      };
+    }
+
+    // ---- 注文確定: 未登録なら止める(最終防衛) ----
+    if (typeof submitNoOrder === 'function') {
+      var _origSubOrder = window.submitNoOrder;
+      window.submitNoOrder = function () {
+        if (creditSelected() && !CARD.registered) {
+          showModal('💳', 'カードのご登録をお願いします',
+            'クレジットカードでのお支払いには、先にカードのご登録が必要です。\n\n' +
+            '「💳 カードを登録する」ボタンからご登録をお願いします。');
+          checkCard();
+          return;
+        }
+        return _origSubOrder.apply(this, arguments);
+      };
+    }
+
+    // ---- 注文ステップ表示時にも状態を反映(顧客情報ステップを飛ばす既存客対応) ----
+    if (typeof noShowOrderStep === 'function') {
+      var _origShowOrder = window.noShowOrderStep;
+      window.noShowOrderStep = function () {
+        var r = _origShowOrder.apply(this, arguments);
+        if (creditSelected() && !CARD.registered) checkCard();
+        else renderGates();
+        return r;
+      };
+    }
+    if (typeof noShowCustomerStep === 'function') {
+      var _origShowCust = window.noShowCustomerStep;
+      window.noShowCustomerStep = function () {
+        var r = _origShowCust.apply(this, arguments);
+        setTimeout(function () {
+          if (creditSelected()) checkCard(); else renderGates();
+        }, 0);
+        return r;
+      };
+    }
+  })();
+
+  console.log('[patch-v8p5] loaded: card-gate + KPI(referral_id/referrer/reason_code) + menu-cache + register-save-fix + instant-profile + speed + guard + cross-month calendar');
 })();
 
 </script>
