@@ -3930,24 +3930,11 @@ function toggleCancelChip(dateStr, itemId) {
   if (cancelMode.selected[key]) {
     delete cancelMode.selected[key];
   } else {
-    // 週3未満チェック
-    var item = findItem(dateStr, itemId);
-    if (item && item.name !== 'ごはん' && item.status !== 'pending_add') {
-      if (wouldCancelChipMakeBelowThree(dateStr, itemId)) {
-        showModalWithAction('🙏', '週3回未満となるためキャンセルできません',
-          'このキャンセルを行うと、同じお弁当の週内配達が週3回未満になってしまいます。\n\n' +
-          'お弁当のご注文は週3回以上からとなります。\n\n' +
-          '別の日にちにご注文を追加していただければ、こちらの日のキャンセルが可能になります。\n\n' +
-          '【ご利用の流れ】\n' +
-          '1. 「新規注文」ボタンから別の日を追加\n' +
-          '2. その後、こちらの日をキャンセル',
-          function() {
-            // モーダルを閉じたらキャンセル選択モードも解除
-            exitCancelMode();
-          });
-        return;
-      }
-    }
+    // ★2026-07 変更: キャンセル時の「週3回未満」制限を撤廃。
+    //   「今週の水曜だけ休みたい」等の一時的なお休みを、お客様が自由に選べるようにするため。
+    //   ・定期契約そのものを週3未満にする操作(新規注文・曜日変更)には別途週3チェックが
+    //     生きているため、この撤廃で定期が週3を割ることはない。
+    //   ・キャンセルはあくまで「その回だけの一時休止」なので制限しない。
     cancelMode.selected[key] = true;
   }
   renderUsageContent();
