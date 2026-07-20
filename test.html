@@ -5207,10 +5207,26 @@ function convertScheduleApiToUsageData(monthsObj) {
       // scheduled / delivered は items があるはず
 
       var liffItems = [];
-      // canceled の場合、APIは items を空で返す可能性があるので注意
+
+      // ★2026-07: 承認済みキャンセル(status=canceled)も「取消済み」チップとして残す。
+      //   従来はここで return して捨てていたため、店舗が承認した瞬間に
+      //   カレンダーから消え、お客様に「キャンセルが反映された」ことが伝わらなかった。
+      //   bento は canceled 日も items(キャンセルされた弁当)を返すので、
+      //   それを status:'canceled' のチップとして描画する(灰色+打ち消し線)。
       if (d.status === 'canceled') {
-        // canceled はチップの表示自体は不要(LIFF UI では消えた状態)
-        // 念のためスキップ(必要に応じて将来「キャンセル済」表示を追加)
+        (d.items || []).forEach(function(it, idx) {
+          var cName = it.bento_type || it.name || '';
+          liffItems.push({
+            id:      d.date + '-' + cName + '-c' + idx,
+            groupId: d.date + '-' + cName,
+            name:    cName,
+            qty:     parseInt(it.quantity) || 0,
+            status:  'canceled'
+          });
+        });
+        if (liffItems.length > 0) {
+          days.push({ date: d.date, items: liffItems });
+        }
         return;
       }
 
@@ -6887,6 +6903,12 @@ function renderUsageCalendar(monthData) {
           displayName = bentoShortName(item.name);
           displayQty = item.qty;
           pendingMark = '+';
+        } else if (item.status === 'canceled') {
+          // ★取消済み(店舗が承認したキャンセル):灰色+打ち消し線で「休み」と分かるように
+          chipClass = 'bento-chip ' + bentoColorClass(item.name) + ' canceled';
+          displayName = bentoShortName(item.name);
+          displayQty = item.qty;
+          pendingMark = '休';
         } else {
           displayName = bentoShortName(item.name);
           displayQty = item.qty;
