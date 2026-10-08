@@ -2528,19 +2528,59 @@ body.cancel-mode-active {
   </div>
 
   <!-- 求人 (★Phase 2b: ?mode=recruit でリッチメニュー6番目から直接遷移) -->
+  <!-- ★v9 (2026-10): 求人ページをシンプル化。冒頭=要点+申込フォーム、「LINEで質問する」導線を追加、FAQ(折りたたみ)・動画は下へ移動 -->
   <div id="form-recruit" class="form-wrap">
     <div class="form-title">👥 配達スタッフ募集</div>
 
-    <!-- 簡単な導入 -->
-    <div style="text-align:center;color:#555;font-size:13px;margin-bottom:18px;line-height:1.7;">
-      まずはよくいただくご質問をご確認ください。<br>
-      その下に動画とお申込みフォームがございます。
+    <!-- 要点(FAQ記載の内容のみ) -->
+    <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:14px 16px;margin-bottom:18px;font-size:14px;color:#444;line-height:1.8;">
+      <b style="color:#F08300;">未経験OK・短時間勤務歓迎</b><br>
+      お弁当を決まったルートでお届けするお仕事です。<br>
+      ✓ ダブルワークOK(17時までの間で時間を調整できます)<br>
+      ✓ お子さまを車に乗せての配達OK
     </div>
 
-    <!-- ★よくある質問(FAQ) -->
-    <div style="margin:0 0 24px 0;">
-      <h3 style="color:#F08300;font-size:17px;margin-bottom:14px;text-align:center;border-bottom:2px solid #F08300;padding-bottom:8px;">❓ よくある質問</h3>
+    <div style="text-align:center;color:#555;font-size:13px;margin-bottom:6px;line-height:1.7;">
+      まずはお気軽にお申込みください。<br>
+      担当者よりご連絡し、面接日程をご案内いたします。
+    </div>
 
+    <div class="sec-label">希望店舗<span class="req">*</span></div>
+    <div class="field">
+      <select id="rc-store">
+        <option value="">選択してください</option>
+        <option>下関店</option>
+        <option>北九州店</option>
+        <option>宇部店</option>
+        <option>宗像店</option>
+        <option>飯塚店</option>
+        <option>福岡東店</option>
+        <option>どこでも可</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>お名前<span class="req">*</span></label>
+      <input type="text" id="rc-name" placeholder="例:田中 花子">
+    </div>
+
+    <div class="field">
+      <label>電話番号<span class="req">*</span></label>
+      <input type="tel" id="rc-phone" placeholder="例:090-1234-5678">
+    </div>
+
+    <button class="btn-submit" onclick="submitForm('recruit')">まずは話を聞いてみる</button>
+
+    <!-- ★v9: 応募前に質問だけしたい人向け -->
+    <div style="margin:22px 0 26px 0;padding:14px 16px;border:1.5px dashed #F08300;border-radius:7px;text-align:center;">
+      <div style="font-size:14px;color:#444;margin-bottom:10px;">応募の前に聞いてみたいことがある方は</div>
+      <button type="button" onclick="recruitAskInChat()" style="width:100%;padding:14px;background:#fff;color:#F08300;border:2px solid #F08300;border-radius:7px;font-size:16px;font-weight:bold;cursor:pointer;">💬 LINEで質問する</button>
+    </div>
+
+    <!-- ★よくある質問(FAQ) ★v9: 全体を折りたたみに変更 -->
+    <details style="margin:0 0 24px 0;">
+      <summary style="color:#F08300;font-size:16px;font-weight:bold;text-align:center;border:1.5px solid #F08300;border-radius:7px;padding:12px;cursor:pointer;background:#fff;">❓ よくある質問を見る(タップで開きます)</summary>
+      <div style="margin-top:14px;">
       <!-- カテゴリ1: 契約・働き方 -->
       <div style="background:#fff8f3;padding:9px 14px;font-weight:bold;color:#F08300;font-size:14px;border-radius:6px 6px 0 0;border:1px solid #f0d4b0;border-bottom:none;">🤝 契約・働き方</div>
       <div style="border:1px solid #f0d4b0;border-radius:0 0 6px 6px;background:#fff;margin-bottom:14px;">
@@ -2583,7 +2623,8 @@ body.cancel-mode-active {
         <details style="border-bottom:1px solid #f5f5f5;"><summary style="padding:12px 14px;cursor:pointer;font-size:14px;color:#333;font-weight:500;">Q. お届け先でクレームがあった場合は?</summary><div style="padding:0 14px 14px 14px;font-size:13px;color:#555;line-height:1.7;">現場で「遅い」「味が薄い」など言われることもありますが、その場でお詫びし、契約や食事内容に関する詳しい対応は店舗責任者にバトンタッチしてください。一人で抱え込まなくて大丈夫です。</div></details>
         <details><summary style="padding:12px 14px;cursor:pointer;font-size:14px;color:#333;font-weight:500;">Q. 配達中に事故を起こしてしまったら?</summary><div style="padding:0 14px 14px 14px;font-size:13px;color:#555;line-height:1.7;">まずは警察と救急への連絡、そして店舗へ必ず連絡してください。車両の修理費などはご自身の保険対応になりますが、業務のフォローは店舗と仲間で行います。</div></details>
       </div>
-    </div>
+      </div>
+    </details>
 
     <!-- ★YouTube動画埋め込み -->
     <h3 style="color:#F08300;font-size:17px;margin-bottom:12px;text-align:center;border-bottom:2px solid #F08300;padding-bottom:8px;">🎬 配達スタッフのお仕事紹介</h3>
@@ -2597,43 +2638,6 @@ body.cancel-mode-active {
       </div>
       <div style="font-size:12px;color:#888;margin-top:6px;text-align:center;">▲ 配達スタッフのお仕事内容のご紹介</div>
     </div>
-
-    <!-- ★面接申し込み -->
-    <h3 style="color:#F08300;font-size:17px;margin-bottom:12px;text-align:center;border-bottom:2px solid #F08300;padding-bottom:8px;">📝 面接のお申込み</h3>
-
-    <!-- 募集要項 -->
-    <div style="background:#fff8f3;border:1.5px solid #F08300;border-radius:7px;padding:14px 16px;margin-bottom:18px;font-size:14px;color:#444;line-height:1.7;">
-      <b style="color:#F08300;">未経験OK・短時間勤務歓迎</b><br>
-      お弁当を決まったルートでお届けするお仕事です。<br>
-      まずはご希望の店舗・お名前・電話番号をお送りください。<br>
-      担当者よりご連絡し、面接日程をご案内いたします。
-    </div>
-
-    <div class="sec-label">希望店舗<span class="req">*</span></div>
-    <div class="field">
-      <select id="rc-store">
-        <option value="">選択してください</option>
-        <option>下関店</option>
-        <option>北九州店</option>
-        <option>宇部店</option>
-        <option>宗像店</option>
-        <option>飯塚店</option>
-        <option>福岡東店</option>
-        <option>どこでも可</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>お名前<span class="req">*</span></label>
-      <input type="text" id="rc-name" placeholder="例:田中 花子">
-    </div>
-
-    <div class="field">
-      <label>電話番号<span class="req">*</span></label>
-      <input type="tel" id="rc-phone" placeholder="例:090-1234-5678">
-    </div>
-
-    <button class="btn-submit" onclick="submitForm('recruit')">面接を申し込む</button>
   </div>
 
   <!-- お問い合わせ -->
@@ -9765,16 +9769,57 @@ function submitForm(type){
   var params=buildParams(type); if(!params) return;
   params.type=type; params.userId=userId||'';
   var btn=document.querySelector('#form-'+type+' .btn-submit');
+  var btnLabel=btn.textContent;
   btn.disabled=true; btn.textContent='送信中...';
   var cbName='cb_'+Date.now();
   params.action='formSubmit'; params.callback=cbName;
-  window[cbName]=function(){delete window[cbName];showComplete(type);};
-  var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+  var qs;
   var script=document.createElement('script');
+
+  // ★v9: 求人は「GASの応答(コールバック)が返ってきた時だけ」完了表示にする。
+  //       読み込み失敗・15秒応答なしの場合は完了表示を出さず、再送・トークでの連絡を案内する。
+  if(type==='recruit'){
+    var settled=false;
+    window[cbName]=function(){ if(settled) return; settled=true; showComplete(type); };
+    var fail=function(){ if(settled) return; settled=true; recruitSubmitFailed(btn,btnLabel); };
+    qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+    script.src=GAS_URL+'?'+qs;
+    script.onerror=fail;
+    document.body.appendChild(script);
+    setTimeout(fail,15000);
+    return;
+  }
+
+  window[cbName]=function(){delete window[cbName];showComplete(type);};
+  qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
   script.src=GAS_URL+'?'+qs;
   script.onerror=function(){delete window[cbName];showComplete(type);};
   document.body.appendChild(script);
   setTimeout(function(){if(window[cbName]){delete window[cbName];showComplete(type);}},5000);
+}
+
+// ★v9: 求人の送信失敗時(完了表示は出さない)
+function recruitSubmitFailed(btn,btnLabel){
+  if(btn){ btn.disabled=false; btn.textContent=btnLabel||'まずは話を聞いてみる'; }
+  showModal('⚠️','送信を確認できませんでした','通信状況により、お申込みが届いていない可能性があります。お手数ですが、少し時間をおいてもう一度お試しいただくか、トーク画面からメッセージでお知らせください。');
+}
+
+// ★v9: 「LINEで質問する」 トークに定型文を送ってLIFFを閉じる。
+//       送れない環境(LINE外・権限なし等)では案内を出してトーク画面へ戻す。
+function recruitAskInChat(){
+  var text='求人について質問があります。';
+  try{
+    if(typeof liff!=='undefined' && liff.isInClient && liff.isInClient() && liff.sendMessages){
+      liff.sendMessages([{type:'text',text:text}])
+        .then(function(){ try{ liff.closeWindow(); }catch(e){} })
+        .catch(function(){ recruitAskFallback(); });
+      return;
+    }
+  }catch(e){}
+  recruitAskFallback();
+}
+function recruitAskFallback(){
+  showModalWithAction('💬','トーク画面からご質問ください','この画面を閉じたあと、トーク画面に「求人について」とご質問内容をお送りください。',function(){ goToLineChat(); });
 }
 
 function buildParams(type){
@@ -9880,7 +9925,7 @@ function showComplete(type){
     change:'変更内容を受け付けました。\n内容を確認のうえ対応いたします。',
     stop:'利用停止のご連絡を受け付けました。\nご利用いただきありがとうございました。',
     resume:'再開のご連絡を受け付けました。\nまたよろしくお願いいたします!',
-    recruit:'面接申込を受け付けました。',
+    recruit:'お申込みを受け付けました。\n担当者よりご連絡し、面接日程をご案内いたします。',
     inquiry:'お問い合わせを受け付けました。\n内容を確認のうえご連絡いたします。'
   };
   document.getElementById('completeMsg').textContent=msgs[type]||'送信が完了しました。';
